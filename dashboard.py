@@ -10,6 +10,19 @@ st.set_page_config(layout="wide", page_title="Business Analytics Dashboard")
 st.title("Business Analytics Dashboard")
 st.markdown("Upload a combined Excel file with all data (add a 'Type' column: 'Sales', 'Purchase', 'Payment').")
 
+# Download sample data button
+try:
+    with open("combined_dummy.xlsx", "rb") as file:
+        st.download_button(
+            label="📥 Download Sample Data",
+            data=file,
+            file_name="sample_dashboard_data.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            help="Download a sample Excel file to see the expected data format"
+        )
+except FileNotFoundError:
+    pass  # Sample file not available
+
 # File upload
 combined_file = st.file_uploader("Upload Combined Data (Excel)", type=["xlsx", "xls"])
 
