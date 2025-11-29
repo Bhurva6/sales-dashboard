@@ -122,7 +122,7 @@ if combined_file:
     st.success(f"Data loaded: {len(df)} rows")
     
     # Preview of uploaded data
-    with st.expander("📊 Preview Uploaded Data", expanded=False):
+    with st.expander("Preview Uploaded Data", expanded=False):
         st.dataframe(df.head(20), use_container_width=True)
     
     # Split data based on 'Type' column or key columns
@@ -146,7 +146,7 @@ if combined_file:
             available_qty_years = get_available_years(df_sales, 'Qty\n')
             
             # 1. Revenue & Quantity Insights
-            st.header("💰 Revenue & Quantity Insights")
+            st.header("Revenue & Quantity Insights")
             if CURRENT_VALUE_COL in df_sales.columns and 'Company' in df_sales.columns:
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -212,7 +212,7 @@ if combined_file:
                 st.plotly_chart(qty_trend_chart, use_container_width=True, key="sales_qty_trend")
 
             # 1. Sales Forecasting
-            st.header("🔮 Sales Forecasting")
+            st.header(" Sales Forecasting")
             if available_value_years and len(available_value_years) > 1:
                 yearly_sales = [df_sales[f'Value\n{year}'].sum() for year in available_value_years]
                 
@@ -240,7 +240,7 @@ if combined_file:
                     st.plotly_chart(forecast_chart, use_container_width=True, key="sales_forecast")
             
             # 2. Customer Segmentation
-            st.header("👥 Customer Segmentation")
+            st.header(" Customer Segmentation")
             if CURRENT_VALUE_COL in df_sales.columns and 'Company' in df_sales.columns:
                 customer_sales = df_sales.groupby('Company')[CURRENT_VALUE_COL].sum().reset_index()
                 customer_sales['Segment'] = pd.cut(customer_sales[CURRENT_VALUE_COL], bins=3, labels=['Low', 'Medium', 'High'])
@@ -248,7 +248,7 @@ if combined_file:
                 st.plotly_chart(seg_pie, use_container_width=True, key="sales_seg_pie")
             
             # 3. Trend Analysis
-            st.header("📈 Trend Analysis")
+            st.header(" Trend Analysis")
             if available_value_years and 'Category' in df_sales.columns:
                 trend_data = {'Year': available_value_years}
                 for cat in df_sales['Category'].unique():
@@ -258,7 +258,7 @@ if combined_file:
                 st.plotly_chart(trend_chart, use_container_width=True, key="sales_cat_trend")
 
             # 2. Customer Segmentation (Onion method)
-            with st.expander("👥 Customer Segmentation - Click to Drill Down"):
+            with st.expander(" Customer Segmentation - Click to Drill Down"):
                 if 'State' in df_sales.columns and CURRENT_VALUE_COL in df_sales.columns:
                     state_rev = px.bar(df_sales.groupby('State')[CURRENT_VALUE_COL].sum().reset_index(), 
                                      x='State', y=CURRENT_VALUE_COL, title="State-wise Revenue")
@@ -271,17 +271,26 @@ if combined_file:
                         st.plotly_chart(city_rev, key="sales_city_rev")
 
             # 3. Non-Moving Items
-            with st.expander("📦 Non-Moving & Slow-Moving Items"):
+            with st.expander(" Non-Moving & Slow-Moving Items"):
                 product_col = 'Product' if 'Product' in df_sales.columns else ('Product Code' if 'Product Code' in df_sales.columns else None)
                 if CURRENT_QTY_COL in df_sales.columns and product_col and CURRENT_VALUE_COL in df_sales.columns:
                     months_back = st.slider("Last X months", 1, 12, 3, key="sales_slow_slider")
+                    
+                    # Checkbox to hide null revenue items
+                    hide_null_revenue = st.checkbox("Hide items with null revenue", value=False, key="sales_hide_null_revenue")
+                    
                     slow_items = df_sales[df_sales[CURRENT_QTY_COL] < df_sales[CURRENT_QTY_COL].mean() * 0.2]
+                    
+                    # Filter out null revenue if checkbox is checked
+                    if hide_null_revenue:
+                        slow_items = slow_items[slow_items[CURRENT_VALUE_COL].notna()]
+                    
                     st.dataframe(slow_items[[product_col, CURRENT_QTY_COL, CURRENT_VALUE_COL]].rename(columns={CURRENT_QTY_COL: 'Quantity', CURRENT_VALUE_COL: 'Revenue'}))
                 else:
                     st.write("Required columns not found in the data.")
 
             # 4. Cross-Selling Opportunities
-            with st.expander("🔗 Cross-Selling Analysis"):
+            with st.expander(" Cross-Selling Analysis"):
                 if 'Product' in df_sales.columns or 'Product Code' in df_sales.columns:
                     prod_col = 'Product' if 'Product' in df_sales.columns else 'Product Code'
                     top_products = df_sales[prod_col].value_counts().head(5).index.tolist()
@@ -291,7 +300,7 @@ if combined_file:
                     st.write("Required column ('Product' or 'Product Code') not found in the data.")
 
             # Customer Hierarchy: CustID linked to Company
-            with st.expander("🔗 Customer Hierarchy (CustID to Company)"):
+            with st.expander(" Customer Hierarchy (CustID to Company)"):
                 if 'CustID' in df_sales.columns and 'Company' in df_sales.columns and 'Value\n2024-25' in df_sales.columns:
                     cust_hierarchy = df_sales.groupby(['CustID', 'Company'])['Value\n2024-25'].sum().reset_index().sort_values('Value\n2024-25', ascending=False)
                     st.dataframe(cust_hierarchy.head(20), use_container_width=True)
@@ -342,7 +351,7 @@ if combined_file:
             
             sub_tabs = st.tabs(["Overview", "Forecasting", "Trends", "Segmentation", "Inventory Management", "Cross-Selling"])
             with sub_tabs[0]:
-                st.header("🛒 Purchase Insights")
+                st.header("Purchase Insights")
                 if CURRENT_VALUE_COL in df_purchase.columns and 'Company' in df_purchase.columns:
                     col1, col2, col3 = st.columns(3)
                     with col1:
@@ -405,7 +414,7 @@ if combined_file:
                     pur_qty_trend_chart = px.line(pur_qty_trend_df, x='Year', y='Purchase Quantity', title="Yearly Purchase Quantity Trend")
                     st.plotly_chart(pur_qty_trend_chart, use_container_width=True, key="pur_qty_trend")
             with sub_tabs[1]:
-                st.header("🔮 Purchase Forecasting")
+                st.header(" Purchase Forecasting")
                 if available_value_years and len(available_value_years) > 1:
                     yearly_purchases = [df_purchase[f'Value\n{year}'].sum() for year in available_value_years]
                     
@@ -432,7 +441,7 @@ if combined_file:
                         forecast_chart = px.line(forecast_df, x='Year', y=['Purchases', 'Predicted'], title="Purchase Forecast")
                         st.plotly_chart(forecast_chart, use_container_width=True, key="pur_forecast")
             with sub_tabs[2]:
-                st.header("📈 Trend Analysis")
+                st.header(" Trend Analysis")
                 if available_value_years and 'Category' in df_purchase.columns:
                     trend_data = {'Year': available_value_years}
                     for cat in df_purchase['Category'].unique():
@@ -441,7 +450,7 @@ if combined_file:
                     trend_chart = px.line(trend_df, x='Year', y=trend_df.columns[1:], title="Category-wise Purchase Trend")
                     st.plotly_chart(trend_chart, use_container_width=True, key="pur_cat_trend")
             with sub_tabs[3]:
-                st.header("👥 Customer Segmentation")
+                st.header(" Customer Segmentation")
                 with st.expander("Click to Drill Down"):
                     if 'State' in df_purchase.columns and CURRENT_VALUE_COL in df_purchase.columns:
                         state_rev = px.bar(df_purchase.groupby('State')[CURRENT_VALUE_COL].sum().reset_index(), 
@@ -454,16 +463,25 @@ if combined_file:
                                             x='City', y=CURRENT_VALUE_COL, color='State', title="City-wise Purchase Value")
                             st.plotly_chart(city_rev, key="pur_city_rev")
             with sub_tabs[4]:
-                st.header("📦 Inventory Management")
+                st.header(" Inventory Management")
                 product_col = 'Product' if 'Product' in df_purchase.columns else ('Product Code' if 'Product Code' in df_purchase.columns else None)
                 if CURRENT_QTY_COL in df_purchase.columns and product_col and CURRENT_VALUE_COL in df_purchase.columns:
                     months_back = st.slider("Last X months", 1, 12, 3, key="pur_slow_slider")
+                    
+                    # Checkbox to hide null revenue items
+                    hide_null_revenue = st.checkbox("Hide items with null revenue", value=False, key="purchase_hide_null_revenue")
+                    
                     slow_items = df_purchase[df_purchase[CURRENT_QTY_COL] < df_purchase[CURRENT_QTY_COL].mean() * 0.2]
+                    
+                    # Filter out null revenue if checkbox is checked
+                    if hide_null_revenue:
+                        slow_items = slow_items[slow_items[CURRENT_VALUE_COL].notna()]
+                    
                     st.dataframe(slow_items[[product_col, CURRENT_QTY_COL, CURRENT_VALUE_COL]].rename(columns={CURRENT_QTY_COL: 'Quantity', CURRENT_VALUE_COL: 'Value'}))
                 else:
                     st.write("Required columns not found in the data.")
             with sub_tabs[5]:
-                st.header("🔗 Cross-Selling Opportunities")
+                st.header("Cross-Selling Opportunities")
                 if 'Product' in df_purchase.columns or 'Product Code' in df_purchase.columns:
                     prod_col = 'Product' if 'Product' in df_purchase.columns else 'Product Code'
                     top_products = df_purchase[prod_col].value_counts().head(5).index.tolist()
@@ -476,7 +494,7 @@ if combined_file:
         if not df_sales.empty:
             
             # Customer Segmentation
-            st.header("👥 Customer Segmentation")
+            st.header("Customer Segmentation")
             with st.expander("Drill-Down Analysis"):
                 if 'state' in df_sales.columns and CURRENT_VALUE_COL in df_sales.columns:
                     # Create columns for better layout
@@ -511,7 +529,7 @@ if combined_file:
                     
                     # City drill-down (if available)
                     if 'city' in df_sales.columns:
-                        st.subheader("📍 City-Level Analysis")
+                        st.subheader(" City-Level Analysis")
                         col3, col4 = st.columns(2)
                         
                         with col3:
@@ -530,7 +548,7 @@ if combined_file:
                     
                     # Executive drill-down (if available)
                     if 'executive' in df_sales.columns:
-                        st.subheader("👔 Executive Performance")
+                        st.subheader(" Executive Performance")
                         col5, col6 = st.columns(2)
                         
                         with col5:
@@ -548,7 +566,7 @@ if combined_file:
                             st.plotly_chart(exec_count_chart, key="ci_exec_count", use_container_width=True)
                     
                     # Additional Insights
-                    st.subheader("📊 Key Insights")
+                    st.subheader(" Key Insights")
                     insight_col1, insight_col2, insight_col3 = st.columns(3)
                     
                     with insight_col1:
@@ -571,7 +589,7 @@ if combined_file:
                     
                     # Top Customers Analysis
                     if 'Company' in df_sales.columns:
-                        st.subheader("🏆 Top Customers")
+                        st.subheader(" Top Customers")
                         top_customers = df_sales.groupby('Company')[CURRENT_VALUE_COL].sum().reset_index().sort_values(CURRENT_VALUE_COL, ascending=False).head(10)
                         top_cust_chart = px.bar(top_customers, x='Company', y=CURRENT_VALUE_COL,
                                               title="Top 10 Customers by Revenue", 
@@ -595,7 +613,7 @@ if combined_file:
             available_qty_years = get_available_years(df_payment, 'Qty\n')
             
             # 1. Payment Insights
-            st.header("💳 Payment Insights")
+            st.header(" Payment Insights")
             if CURRENT_VALUE_COL in df_payment.columns and 'Company' in df_payment.columns:
                 col1, col2, col3 = st.columns(3)
                 with col1:
@@ -649,17 +667,26 @@ if combined_file:
                         st.plotly_chart(city_rev, key="pay_city_rev")
 
             # 3. Non-Moving Items
-            with st.expander("📦 Non-Moving & Slow-Moving Items"):
+            with st.expander("Non-Moving & Slow-Moving Items"):
                 product_col = 'Product' if 'Product' in df_payment.columns else ('Product Code' if 'Product Code' in df_payment.columns else None)
                 if CURRENT_QTY_COL in df_payment.columns and product_col and CURRENT_VALUE_COL in df_payment.columns:
                     months_back = st.slider("Last X months", 1, 12, 3, key="pay_slow_slider")
+                    
+                    # Checkbox to hide null revenue items
+                    hide_null_revenue = st.checkbox("Hide items with null revenue", value=False, key="payment_hide_null_revenue")
+                    
                     slow_items = df_payment[df_payment[CURRENT_QTY_COL] < df_payment[CURRENT_QTY_COL].mean() * 0.2]
+                    
+                    # Filter out null revenue if checkbox is checked
+                    if hide_null_revenue:
+                        slow_items = slow_items[slow_items[CURRENT_VALUE_COL].notna()]
+                    
                     st.dataframe(slow_items[[product_col, CURRENT_QTY_COL, CURRENT_VALUE_COL]].rename(columns={CURRENT_QTY_COL: 'Quantity', CURRENT_VALUE_COL: 'Revenue'}))
                 else:
                     st.write("Required columns not found in the data.")
 
             # 4. Cross-Selling Opportunities
-            with st.expander("🔗 Cross-Selling Analysis"):
+            with st.expander("Cross-Selling Analysis"):
                 if 'Product' in df_payment.columns or 'Product Code' in df_payment.columns:
                     prod_col = 'Product' if 'Product' in df_payment.columns else 'Product Code'
                     top_products = df_payment[prod_col].value_counts().head(5).index.tolist()
