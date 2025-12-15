@@ -1,696 +1,767 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import numpy as np
 from sklearn.linear_model import LinearRegression
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, IsolationForest
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.cluster import KMeans, DBSCAN
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, silhouette_score
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
-from statsmodels.tsa.arima.model import ARIMA
-from statsmodels.tsa.seasonal import seasonal_decompose
-import xgboost as xgb
-from datetime import datetime, timedelta
-import warnings
-from scipy import stats
-from collections import Counter
-import json
-warnings.filterwarnings('ignore')
 
-# Utility function for Indian currency formatting
+# Page configuration
+st.set_page_config(page_title="Orthopedic Implant Analytics Dashboard", layout="wide")
+
+# Load data
+@st.cache_data
+def load_data():
+    df = pd.read_excel("combined_dummy.xlsx", engine="openpyxl")
+    df.columns = df.columns.str.strip()
+    return df
+
+df = load_data()
+
+# Helper function to format currency in Indian format (Lakhs/Crores)
 def format_inr(value):
+    if pd.isna(value):
+        return "Rs. 0"
     if value >= 1e7:
-        return f"₹{value/1e7:.2f} Cr"
+        return f"Rs. {value/1e7:.2f} Cr"
     elif value >= 1e5:
-        return f"₹{value/1e5:.2f} Lakh"
+        return f"Rs. {value/1e5:.2f} Lakh"
     else:
-        return f"₹{value:,.0f}"
+        return f"Rs. {value:,.0f}"
 
-# Column name constants
-YEARS = ['2020-21', '2021-22', '2022-23', '2023-24', '2024-25']
-VALUE_COLS = [f'Value\n{year}' for year in YEARS]
-QTY_COLS = [f'Qty\n{year}' for year in YEARS]
-CURRENT_VALUE_COL = VALUE_COLS[-1]  # 'Value\n2024-25'
-CURRENT_QTY_COL = QTY_COLS[-1]      # 'Qty\n2024-25'
+# Dynamic year detection
+def get_available_years(dataframe, prefix='Value'):
+    cols = [c for c in dataframe.columns if c.startswith(prefix)]
+    return cols
 
-# Function to get available years from data
-def get_available_years(df, prefix):
-    available_cols = [col for col in df.columns if col.startswith(prefix)]
-    available_years = [col.split('\n')[-1] for col in available_cols]
-    return sorted(available_years)
+# Column detection
+VALUE_COLS = get_available_years(df, 'Value')
+QTY_COLS = get_available_years(df, 'Qty')
 
-# Page Configuration
-st.set_page_config(
-    layout="wide", 
-    page_title="Orthopedic Implant Analytics Dashboard", 
-    page_icon="🏥",
-    initial_sidebar_state="expanded"
-)
+# Title
+st.title("Orthopedic Implant Analytics Dashboard - Stage 1")
+st.markdown("---")
 
-# Custom CSS for better UI
-st.markdown("""
-    <style>
-    .main-header {
-        font-size: 42px;
-        font-weight: bold;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 10px;
-    }
-    .sub-header {
-        font-size: 18px;
-        color: #666;
-        text-align: center;
-        margin-bottom: 30px;
-    }
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 20px;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
-    }
-    .insight-box {
-        background-color: #f0f8ff;
-        padding: 15px;
-        border-left: 5px solid #1f77b4;
-        border-radius: 5px;
-        margin: 10px 0;
-    }
-    .warning-box {
-        background-color: #fff3cd;
-        padding: 15px;
-        border-left: 5px solid #ffc107;
-        border-radius: 5px;
-        margin: 10px 0;
-    }
-    .success-box {
-        background-color: #d4edda;
-        padding: 15px;
-        border-left: 5px solid #28a745;
-        border-radius: 5px;
-        margin: 10px 0;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# Check if data is loaded properly
+if df.empty:
+    st.error("No data available. Please check your data file.")
+    st.stop()
 
-st.markdown('<p class="main-header">Orthopedic Implant Analytics Dashboard</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">AI-Powered Sales Intelligence & Demand Forecasting Platform</p>', unsafe_allow_html=True)
+# Main Tabs
+tab1, tab2, tab3, tab4 = st.tabs(["Sales Analytics", "Purchase Analytics", "Customer Insights", "Payment Analysis"])
 
-# Download sample data button
-try:
-    with open("combined_dummy.xlsx", "rb") as file:
-        st.download_button(
-            label="📥 Download Sample Data",
-            data=file,
-            file_name="sample_dashboard_data.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            help="Download a sample Excel file to see the expected data format"
-        )
-except FileNotFoundError:
-    pass  # Sample file not available
-
-# File upload
-combined_file = st.file_uploader("Upload Combined Data (Excel)", type=["xlsx", "xls"])
-
-if combined_file:
-    df = pd.read_excel(combined_file, engine='openpyxl')
-    st.success(f"Data loaded: {len(df)} rows")
+# ================================
+# TAB 1: SALES ANALYTICS
+# ================================
+with tab1:
+    st.header("Sales Analytics")
     
-    # Preview of uploaded data
-    with st.expander("Preview Uploaded Data", expanded=False):
-        st.dataframe(df.head(20), use_container_width=True)
+    sales_sub1, sales_sub2, sales_sub3, sales_sub4, sales_sub5 = st.tabs([
+        "Revenue & Quantity Insights", 
+        "Customer Segmentation", 
+        "Non-Moving & Slow-Moving Items",
+        "Cross-Selling Analytics",
+        "Product Drop-Off Tracker"
+    ])
     
-    # Split data based on 'Type' column or key columns
-    if 'Type' in df.columns:
-        df_sales = df[df['Type'] == 'Sales']
-        df_purchase = df[df['Type'] == 'Purchase']
-        df_payment = df[df['Type'] == 'Payment']
-    else:
-        df_sales = df
-        df_purchase = df
-        df_payment = df
-    
-    tabs = st.tabs(["Sales Analytics", "Purchase Analytics", "Customer Insights", "Payment Analysis"])
-    
-    with tabs[0]:
-        if not df_sales.empty:
-            st.success(f"Sales data: {len(df_sales)} rows")
-            
-            # Get available years
-            available_value_years = get_available_years(df_sales, 'Value\n')
-            available_qty_years = get_available_years(df_sales, 'Qty\n')
-            
-            # 1. Revenue & Quantity Insights
-            st.header("Revenue & Quantity Insights")
-            if CURRENT_VALUE_COL in df_sales.columns and 'Company' in df_sales.columns:
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    rev_pie = px.pie(df_sales, values=CURRENT_VALUE_COL, names='Company', title="Revenue by Company",
-                                    hover_data=[df_sales[CURRENT_VALUE_COL].apply(format_inr)])
-                    rev_pie.update_traces(textinfo='label+percent', hovertemplate='%{label}: %{value} (%{percent})<br>Value: %{customdata[0]}')
-                    st.plotly_chart(rev_pie, use_container_width=True, key="sales_rev_pie")
-                with col2:
-                    if CURRENT_QTY_COL in df_sales.columns:
-                        qty_pie = px.pie(df_sales, values=CURRENT_QTY_COL, names='Company', title="Quantity by Company")
-                        st.plotly_chart(qty_pie, use_container_width=True, key="sales_qty_pie")
-                with col3:
-                    # Year-wise trend
-                    if available_value_years:
-                        yearly_revenue = [df_sales[f'Value\n{year}'].sum() for year in available_value_years]
-                        trend_df = pd.DataFrame({'Year': available_value_years, 'Revenue': yearly_revenue})
-                        trend_df['Revenue (INR)'] = trend_df['Revenue'].apply(format_inr)
-                        trend_chart = px.line(trend_df, x='Year', y='Revenue', title="Yearly Revenue Trend",
-                                             hover_data=['Revenue (INR)'])
-                        st.plotly_chart(trend_chart, use_container_width=True, key="sales_yearly_trend")
-            
-            # Additional: By State and Category
-            if CURRENT_VALUE_COL in df_sales.columns:
-                if 'State' in df_sales.columns:
-                    state_pie = px.pie(df_sales, values=CURRENT_VALUE_COL, names='State', title="Revenue by State")
-                    st.plotly_chart(state_pie, use_container_width=True, key="sales_state_pie")
-                if 'Category' in df_sales.columns:
-                    cat_pie = px.pie(df_sales, values=CURRENT_VALUE_COL, names='Category', title="Revenue by Category")
-                    st.plotly_chart(cat_pie, use_container_width=True, key="sales_cat_pie")
-            
-            # Comparison by Sub Category
-            if 'Sub Category' in df_sales.columns and CURRENT_VALUE_COL in df_sales.columns:
-                # Get all available subcategories
-                all_sub_cats = df_sales['Sub Category'].unique().tolist()
-                # Add dropdown for subcategory selection
-                selected_sub_cats = st.multiselect(
-                    "Select Sub Categories to Display:",
-                    options=all_sub_cats,
-                    default=all_sub_cats,
-                    key="sales_sub_cat_filter"
-                )
-                
-                if selected_sub_cats:
-                    # Filter data based on selected subcategories
-                    filtered_data = df_sales[df_sales['Sub Category'].isin(selected_sub_cats)]
-                    sub_cat_data = filtered_data.groupby('Sub Category')[CURRENT_VALUE_COL].sum().reset_index()
-                    
-                    sub_cat_bar = px.bar(sub_cat_data, 
-                                       x='Sub Category', y=CURRENT_VALUE_COL, title="Revenue by Sub Category",
-                                       hover_data=[sub_cat_data[CURRENT_VALUE_COL].apply(format_inr)])
-                    sub_cat_bar.update_traces(hovertemplate='%{x}: %{y}<br>Value: %{customdata[0]}')
-                    st.plotly_chart(sub_cat_bar, use_container_width=True, key="sales_sub_cat_bar")
-                else:
-                    st.write("Please select at least one subcategory to display the chart.")
-            
-            # Year-wise Quantity Trend
-            if available_qty_years:
-                yearly_qty = [df_sales[f'Qty\n{year}'].sum() for year in available_qty_years]
-                qty_trend_df = pd.DataFrame({'Year': available_qty_years, 'Quantity': yearly_qty})
-                qty_trend_df['Quantity (INR)'] = qty_trend_df['Quantity'].apply(format_inr)
-                qty_trend_chart = px.line(qty_trend_df, x='Year', y='Quantity', title="Yearly Quantity Trend",
-                                     hover_data=['Quantity (INR)'])
-                st.plotly_chart(qty_trend_chart, use_container_width=True, key="sales_qty_trend")
-
-            # 1. Sales Forecasting
-            st.header(" Sales Forecasting")
-            if available_value_years and len(available_value_years) > 1:
-                yearly_sales = [df_sales[f'Value\n{year}'].sum() for year in available_value_years]
-                
-                # Simple linear regression for forecasting
-                X = np.array(range(len(available_value_years))).reshape(-1, 1)
-                y = yearly_sales
-                model = LinearRegression()
-                model.fit(X, y)
-                
-                # Predict for all years including next
-                X_all = np.array(range(len(available_value_years) + 1)).reshape(-1, 1)
-                predicted_all = model.predict(X_all)
-                
-                forecast_df = pd.DataFrame({
-                    'Year': list(range(len(available_value_years))) + [len(available_value_years)],
-                    'Sales': yearly_sales + [np.nan],
-                    'Predicted': predicted_all
-                })
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("Predicted Sales for Next Year", format_inr(predicted_all[-1]))
-                with col2:
-                    forecast_chart = px.line(forecast_df, x='Year', y=['Sales', 'Predicted'], title="Sales Forecast")
-                    st.plotly_chart(forecast_chart, use_container_width=True, key="sales_forecast")
-            
-            # 2. Customer Segmentation
-            st.header(" Customer Segmentation")
-            if CURRENT_VALUE_COL in df_sales.columns and 'Company' in df_sales.columns:
-                customer_sales = df_sales.groupby('Company')[CURRENT_VALUE_COL].sum().reset_index()
-                customer_sales['Segment'] = pd.cut(customer_sales[CURRENT_VALUE_COL], bins=3, labels=['Low', 'Medium', 'High'])
-                seg_pie = px.pie(customer_sales, values=CURRENT_VALUE_COL, names='Segment', title="Customer Segmentation by Revenue")
-                st.plotly_chart(seg_pie, use_container_width=True, key="sales_seg_pie")
-            
-            # 3. Trend Analysis
-            st.header(" Trend Analysis")
-            if available_value_years and 'Category' in df_sales.columns:
-                trend_data = {'Year': available_value_years}
-                for cat in df_sales['Category'].unique():
-                    trend_data[cat] = [df_sales[df_sales['Category'] == cat][f'Value\n{year}'].sum() for year in available_value_years]
-                trend_df = pd.DataFrame(trend_data)
-                trend_chart = px.line(trend_df, x='Year', y=trend_df.columns[1:], title="Category-wise Sales Trend")
-                st.plotly_chart(trend_chart, use_container_width=True, key="sales_cat_trend")
-
-            # 2. Customer Segmentation (Onion method)
-            with st.expander(" Customer Segmentation - Click to Drill Down"):
-                if 'State' in df_sales.columns and CURRENT_VALUE_COL in df_sales.columns:
-                    state_rev = px.bar(df_sales.groupby('State')[CURRENT_VALUE_COL].sum().reset_index(), 
-                                     x='State', y=CURRENT_VALUE_COL, title="State-wise Revenue")
-                    st.plotly_chart(state_rev, key="sales_state_rev")
-                    
-                    # City drill-down
-                    if 'City' in df_sales.columns:
-                        city_rev = px.bar(df_sales.groupby(['State','City'])[CURRENT_VALUE_COL].sum().reset_index(), 
-                                        x='City', y=CURRENT_VALUE_COL, color='State', title="City-wise Revenue")
-                        st.plotly_chart(city_rev, key="sales_city_rev")
-
-            # 3. Non-Moving Items
-            with st.expander(" Non-Moving & Slow-Moving Items"):
-                product_col = 'Product' if 'Product' in df_sales.columns else ('Product Code' if 'Product Code' in df_sales.columns else None)
-                if CURRENT_QTY_COL in df_sales.columns and product_col and CURRENT_VALUE_COL in df_sales.columns:
-                    months_back = st.slider("Last X months", 1, 12, 3, key="sales_slow_slider")
-                    
-                    # Checkbox to hide null revenue items
-                    hide_null_revenue = st.checkbox("Hide items with null revenue", value=False, key="sales_hide_null_revenue")
-                    
-                    slow_items = df_sales[df_sales[CURRENT_QTY_COL] < df_sales[CURRENT_QTY_COL].mean() * 0.2]
-                    
-                    # Filter out null revenue if checkbox is checked
-                    if hide_null_revenue:
-                        slow_items = slow_items[slow_items[CURRENT_VALUE_COL].notna()]
-                    
-                    st.dataframe(slow_items[[product_col, CURRENT_QTY_COL, CURRENT_VALUE_COL]].rename(columns={CURRENT_QTY_COL: 'Quantity', CURRENT_VALUE_COL: 'Revenue'}))
-                else:
-                    st.write("Required columns not found in the data.")
-
-            # 4. Cross-Selling Opportunities
-            with st.expander(" Cross-Selling Analysis"):
-                if 'Product' in df_sales.columns or 'Product Code' in df_sales.columns:
-                    prod_col = 'Product' if 'Product' in df_sales.columns else 'Product Code'
-                    top_products = df_sales[prod_col].value_counts().head(5).index.tolist()
-                    st.write(f"Top products: {', '.join(top_products)}")
-                    # Add product mix table here
-                else:
-                    st.write("Required column ('Product' or 'Product Code') not found in the data.")
-
-            # Customer Hierarchy: CustID linked to Company
-            with st.expander(" Customer Hierarchy (CustID to Company)"):
-                if 'CustID' in df_sales.columns and 'Company' in df_sales.columns and 'Value\n2024-25' in df_sales.columns:
-                    cust_hierarchy = df_sales.groupby(['CustID', 'Company'])['Value\n2024-25'].sum().reset_index().sort_values('Value\n2024-25', ascending=False)
-                    st.dataframe(cust_hierarchy.head(20), use_container_width=True)
-                    st.write("This shows each CustID linked to its Company with total revenue.")
-            
-            # Product Hierarchy: CID linked to Sub Category and Product Code
-            with st.expander("🔗 Product Hierarchy (CID to Sub Category to Product Code)"):
-                if 'CID' in df_sales.columns and 'Sub Category' in df_sales.columns and 'Product Code' in df_sales.columns:
-                    prod_hierarchy = df_sales.groupby(['CID', 'Sub Category', 'Product Code']).size().reset_index(name='Count').sort_values('Count', ascending=False)
-                    st.dataframe(prod_hierarchy.head(20), use_container_width=True)
-                    st.write("This shows CID linked to Sub Category and associated Product Codes with transaction counts.")
-            
-            # Sidebar filters
-            st.sidebar.header("Filters")
-            date_range = st.sidebar.date_input("Date Range", [])
-            
-            # Dealer Ranking
-            if 'Dealer' in df_sales.columns and CURRENT_VALUE_COL in df_sales.columns:
-                dealer_rank = df_sales.groupby('Dealer')[CURRENT_VALUE_COL].sum().sort_values(ascending=False).reset_index()
-                st.subheader("Dealer Ranking")
-                st.dataframe(dealer_rank)
-            
+    # 1.1 Revenue & Quantity Insights
+    with sales_sub1:
+        st.subheader("Revenue & Quantity Insights")
+        
+        if not VALUE_COLS:
+            st.warning("No value columns found in the dataset")
         else:
-            st.write("No sales data found.")
-    
-    with tabs[1]:
-        if not df_purchase.empty:
-            st.success(f"Purchase data: {len(df_purchase)} rows")
+            selected_year = st.selectbox("Select Year", VALUE_COLS, key="sales_year_select")
+            qty_col = selected_year.replace('Value', 'Qty') if 'Value' in selected_year else QTY_COLS[0] if QTY_COLS else None
             
-            # Key Metrics
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                total_value = df_purchase[CURRENT_VALUE_COL].sum() if CURRENT_VALUE_COL in df_purchase.columns else 0
-                st.metric("Total Purchase Value", format_inr(total_value))
-            with col2:
-                total_qty = df_purchase[CURRENT_QTY_COL].sum() if CURRENT_QTY_COL in df_purchase.columns else 0
-                st.metric("Total Purchase Quantity", f"{total_qty:,.0f}")
-            with col3:
-                avg_value = df_purchase[CURRENT_VALUE_COL].mean() if CURRENT_VALUE_COL in df_purchase.columns else 0
-                st.metric("Avg Purchase Value", format_inr(avg_value))
-            with col4:
-                num_companies = df_purchase['Company'].nunique() if 'Company' in df_purchase.columns else 0
-                st.metric("Number of Companies", num_companies)
+            # PIE CHARTS
+            st.markdown("#### Revenue Distribution")
+            pie_col1, pie_col2, pie_col3 = st.columns(3)
             
-            # Get available years
-            available_value_years = get_available_years(df_purchase, 'Value\n')
-            available_qty_years = get_available_years(df_purchase, 'Qty\n')
-            
-            sub_tabs = st.tabs(["Overview", "Forecasting", "Trends", "Segmentation", "Inventory Management", "Cross-Selling"])
-            with sub_tabs[0]:
-                st.header("Purchase Insights")
-                if CURRENT_VALUE_COL in df_purchase.columns and 'Company' in df_purchase.columns:
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        pur_pie = px.pie(df_purchase, values=CURRENT_VALUE_COL, names='Company', title="Purchase Value by Company",
-                                        hover_data=[df_purchase[CURRENT_VALUE_COL].apply(format_inr)])
-                        pur_pie.update_traces(textinfo='label+percent', hovertemplate='%{label}: %{value} (%{percent})<br>Value: %{customdata[0]}')
-                        st.plotly_chart(pur_pie, use_container_width=True, key="pur_rev_pie")
-                    with col2:
-                        if CURRENT_QTY_COL in df_purchase.columns:
-                            pur_qty_pie = px.pie(df_purchase, values=CURRENT_QTY_COL, names='Company', title="Purchase Quantity by Company")
-                            st.plotly_chart(pur_qty_pie, use_container_width=True, key="pur_qty_pie")
-                    with col3:
-                        # Year-wise trend
-                        if available_value_years:
-                            yearly_purchase = [df_purchase[f'Value\n{year}'].sum() for year in available_value_years]
-                            pur_trend_df = pd.DataFrame({'Year': available_value_years, 'Purchase Value': yearly_purchase})
-                            pur_trend_df['Purchase Value (INR)'] = pur_trend_df['Purchase Value'].apply(format_inr)
-                            pur_trend_chart = px.line(pur_trend_df, x='Year', y='Purchase Value', title="Yearly Purchase Trend",
-                                                      hover_data=['Purchase Value (INR)'])
-                            st.plotly_chart(pur_trend_chart, use_container_width=True, key="pur_yearly_trend")
-                
-                # Additional: By State and Category
-                if CURRENT_VALUE_COL in df_purchase.columns:
-                    if 'State' in df_purchase.columns:
-                        pur_state_pie = px.pie(df_purchase, values=CURRENT_VALUE_COL, names='State', title="Purchase by State")
-                        st.plotly_chart(pur_state_pie, use_container_width=True, key="pur_state_pie")
-                    if 'Category' in df_purchase.columns:
-                        pur_cat_pie = px.pie(df_purchase, values=CURRENT_VALUE_COL, names='Category', title="Purchase by Category")
-                        st.plotly_chart(pur_cat_pie, use_container_width=True, key="pur_cat_pie")
-                
-                # Comparison by Sub Category
-                if 'Sub Category' in df_purchase.columns and CURRENT_VALUE_COL in df_purchase.columns:
-                    # Get all available subcategories
-                    all_sub_cats = df_purchase['Sub Category'].unique().tolist()
-                    # Add dropdown for subcategory selection
-                    selected_sub_cats = st.multiselect(
-                        "Select Sub Categories to Display:",
-                        options=all_sub_cats,
-                        default=all_sub_cats,
-                        key="purchase_sub_cat_filter"
-                    )
-                    
-                    if selected_sub_cats:
-                        # Filter data based on selected subcategories
-                        filtered_data = df_purchase[df_purchase['Sub Category'].isin(selected_sub_cats)]
-                        sub_cat_data = filtered_data.groupby('Sub Category')[CURRENT_VALUE_COL].sum().reset_index()
-                        
-                        pur_sub_cat_bar = px.bar(sub_cat_data, 
-                                               x='Sub Category', y=CURRENT_VALUE_COL, title="Purchase by Sub Category",
-                                               hover_data=[sub_cat_data[CURRENT_VALUE_COL].apply(format_inr)])
-                        pur_sub_cat_bar.update_traces(hovertemplate='%{x}: %{y}<br>Value: %{customdata[0]}')
-                        st.plotly_chart(pur_sub_cat_bar, use_container_width=True, key="pur_sub_cat_bar")
+            with pie_col1:
+                if 'Dealer Name' in df.columns:
+                    dealer_rev = df.groupby('Dealer Name')[selected_year].sum().reset_index()
+                    dealer_rev = dealer_rev[dealer_rev[selected_year] > 0].nlargest(10, selected_year)
+                    if not dealer_rev.empty:
+                        fig_dealer = px.pie(dealer_rev, values=selected_year, names='Dealer Name', 
+                                           title="Top 10 Dealers by Revenue")
+                        fig_dealer.update_traces(textposition='inside', textinfo='percent+label')
+                        st.plotly_chart(fig_dealer, use_container_width=True, key="pie_dealer")
                     else:
-                        st.write("Please select at least one subcategory to display the chart.")
+                        st.info("No dealer revenue data available")
+                else:
+                    st.info("Dealer Name column not found")
+            
+            with pie_col2:
+                if 'State' in df.columns:
+                    state_rev = df.groupby('State')[selected_year].sum().reset_index()
+                    state_rev = state_rev[state_rev[selected_year] > 0]
+                    if not state_rev.empty:
+                        fig_state = px.pie(state_rev, values=selected_year, names='State', 
+                                          title="Revenue by State")
+                        fig_state.update_traces(textposition='inside', textinfo='percent+label')
+                        st.plotly_chart(fig_state, use_container_width=True, key="pie_state")
+                    else:
+                        st.info("No state revenue data available")
+                else:
+                    st.info("State column not found")
+            
+            with pie_col3:
+                exec_col = 'Sales Executive' if 'Sales Executive' in df.columns else 'Executive' if 'Executive' in df.columns else None
+                if exec_col:
+                    exec_rev = df.groupby(exec_col)[selected_year].sum().reset_index()
+                    exec_rev = exec_rev[exec_rev[selected_year] > 0]
+                    if not exec_rev.empty:
+                        fig_exec = px.pie(exec_rev, values=selected_year, names=exec_col, 
+                                         title="Revenue by Sales Executive")
+                        fig_exec.update_traces(textposition='inside', textinfo='percent+label')
+                        st.plotly_chart(fig_exec, use_container_width=True, key="pie_exec")
+                    else:
+                        st.info("No executive revenue data available")
+                else:
+                    st.info("Sales Executive column not found")
+            
+            # TREND GRAPHS
+            st.markdown("#### Trend Analysis")
+            
+            if 'Month' in df.columns:
+                monthly_rev = df.groupby('Month')[selected_year].sum().reset_index()
+                if not monthly_rev.empty and monthly_rev[selected_year].sum() > 0:
+                    fig_trend = px.line(monthly_rev, x='Month', y=selected_year, 
+                                       title="Month-wise Revenue Trend", markers=True)
+                    fig_trend.update_layout(yaxis_title="Revenue", xaxis_title="Month")
+                    st.plotly_chart(fig_trend, use_container_width=True, key="trend_monthly")
+                else:
+                    st.info("No monthly trend data available")
+            else:
+                st.info("Month column not found for trend analysis")
+            
+            # Category Analysis
+            trend_col1, trend_col2 = st.columns(2)
+            
+            with trend_col1:
+                if 'Category' in df.columns:
+                    cat_rev = df.groupby('Category')[selected_year].sum().reset_index()
+                    cat_rev = cat_rev[cat_rev[selected_year] > 0].sort_values(selected_year, ascending=True)
+                    if not cat_rev.empty:
+                        cat_rev['Formatted'] = cat_rev[selected_year].apply(format_inr)
+                        fig_cat = px.bar(cat_rev, x=selected_year, y='Category', orientation='h',
+                                        title="Revenue by Category", text='Formatted')
+                        fig_cat.update_traces(textposition='outside')
+                        st.plotly_chart(fig_cat, use_container_width=True, key="cat_rev_bar")
+                    else:
+                        st.info("No category revenue data available")
+                else:
+                    st.info("Category column not found")
+            
+            with trend_col2:
+                if 'Category' in df.columns and qty_col and qty_col in df.columns:
+                    cat_qty = df.groupby('Category')[qty_col].sum().reset_index()
+                    cat_qty = cat_qty[cat_qty[qty_col] > 0].sort_values(qty_col, ascending=True)
+                    if not cat_qty.empty:
+                        fig_cat_qty = px.bar(cat_qty, x=qty_col, y='Category', orientation='h',
+                                            title="Quantity by Category", text=qty_col)
+                        fig_cat_qty.update_traces(textposition='outside')
+                        st.plotly_chart(fig_cat_qty, use_container_width=True, key="cat_qty_bar")
+                    else:
+                        st.info("No category quantity data available")
+                else:
+                    st.info("Quantity data not available")
+            
+            # Sub-Category with Filter
+            st.markdown("#### Sub-Category Analysis")
+            if 'Sub Category' in df.columns:
+                all_subcats = df['Sub Category'].dropna().unique().tolist()
+                if all_subcats:
+                    selected_subcats = st.multiselect("Filter Sub-Categories", all_subcats, default=all_subcats[:10] if len(all_subcats) > 10 else all_subcats, key="sales_subcat_filter")
+                    
+                    if selected_subcats:
+                        subcat_data = df[df['Sub Category'].isin(selected_subcats)]
+                        subcat_rev = subcat_data.groupby('Sub Category')[selected_year].sum().reset_index()
+                        subcat_rev = subcat_rev[subcat_rev[selected_year] > 0].sort_values(selected_year, ascending=False)
+                        
+                        if not subcat_rev.empty:
+                            subcat_rev['Formatted'] = subcat_rev[selected_year].apply(format_inr)
+                            fig_subcat = px.bar(subcat_rev, x='Sub Category', y=selected_year,
+                                               title="Revenue by Sub-Category", text='Formatted')
+                            fig_subcat.update_traces(textposition='outside')
+                            fig_subcat.update_layout(xaxis_tickangle=-45)
+                            st.plotly_chart(fig_subcat, use_container_width=True, key="subcat_bar")
+                        else:
+                            st.info("No revenue data for selected sub-categories")
+                    else:
+                        st.info("Please select at least one sub-category")
+                else:
+                    st.info("No sub-categories available")
+            else:
+                st.info("Sub Category column not found")
+    
+    # 1.2 Customer Segmentation (Onion Method)
+    with sales_sub2:
+        st.subheader("Customer Segmentation - Drill-Down Analysis")
+        st.info("Onion Method: State -> City -> Customer")
+        
+        if not VALUE_COLS:
+            st.warning("No value columns found in the dataset")
+        elif 'State' not in df.columns:
+            st.warning("State column not found for segmentation analysis")
+        else:
+            seg_year = st.selectbox("Select Year", VALUE_COLS, key="seg_year")
+            
+            st.markdown("#### Level 1: State Overview")
+            state_summary = df.groupby('State')[seg_year].sum().reset_index()
+            state_summary.columns = ['State', 'Total Revenue']
+            state_summary = state_summary[state_summary['Total Revenue'] > 0]
+            state_summary['Formatted'] = state_summary['Total Revenue'].apply(format_inr)
+            state_summary = state_summary.sort_values('Total Revenue', ascending=False)
+            
+            if state_summary.empty:
+                st.info("No state revenue data available for the selected year")
+            else:
+                fig_state = px.bar(state_summary, x='State', y='Total Revenue', 
+                                  title="Revenue by State", text='Formatted',
+                                  color='Total Revenue', color_continuous_scale='Blues')
+                fig_state.update_traces(textposition='outside')
+                fig_state.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig_state, use_container_width=True, key="seg_state_bar")
                 
-                # Year-wise Quantity Trend
-                if available_qty_years:
-                    yearly_pur_qty = [df_purchase[f'Qty\n{year}'].sum() for year in available_qty_years]
-                    pur_qty_trend_df = pd.DataFrame({'Year': available_qty_years, 'Purchase Quantity': yearly_pur_qty})
-                    pur_qty_trend_chart = px.line(pur_qty_trend_df, x='Year', y='Purchase Quantity', title="Yearly Purchase Quantity Trend")
-                    st.plotly_chart(pur_qty_trend_chart, use_container_width=True, key="pur_qty_trend")
-            with sub_tabs[1]:
-                st.header(" Purchase Forecasting")
-                if available_value_years and len(available_value_years) > 1:
-                    yearly_purchases = [df_purchase[f'Value\n{year}'].sum() for year in available_value_years]
-                    
-                    # Simple linear regression for forecasting
-                    X = np.array(range(len(available_value_years))).reshape(-1, 1)
-                    y = yearly_purchases
-                    model = LinearRegression()
-                    model.fit(X, y)
-                    
-                    # Predict for all years including next
-                    X_all = np.array(range(len(available_value_years) + 1)).reshape(-1, 1)
-                    predicted_all = model.predict(X_all)
-                    
-                    forecast_df = pd.DataFrame({
-                        'Year': list(range(len(available_value_years))) + [len(available_value_years)],
-                        'Purchases': yearly_purchases + [np.nan],
-                        'Predicted': predicted_all
-                    })
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Predicted Purchases for Next Year", format_inr(predicted_all[-1]))
-                    with col2:
-                        forecast_chart = px.line(forecast_df, x='Year', y=['Purchases', 'Predicted'], title="Purchase Forecast")
-                        st.plotly_chart(forecast_chart, use_container_width=True, key="pur_forecast")
-            with sub_tabs[2]:
-                st.header(" Trend Analysis")
-                if available_value_years and 'Category' in df_purchase.columns:
-                    trend_data = {'Year': available_value_years}
-                    for cat in df_purchase['Category'].unique():
-                        trend_data[cat] = [df_purchase[df_purchase['Category'] == cat][f'Value\n{year}'].sum() for year in available_value_years]
-                    trend_df = pd.DataFrame(trend_data)
-                    trend_chart = px.line(trend_df, x='Year', y=trend_df.columns[1:], title="Category-wise Purchase Trend")
-                    st.plotly_chart(trend_chart, use_container_width=True, key="pur_cat_trend")
-            with sub_tabs[3]:
-                st.header(" Customer Segmentation")
-                with st.expander("Click to Drill Down"):
-                    if 'State' in df_purchase.columns and CURRENT_VALUE_COL in df_purchase.columns:
-                        state_rev = px.bar(df_purchase.groupby('State')[CURRENT_VALUE_COL].sum().reset_index(), 
-                                         x='State', y=CURRENT_VALUE_COL, title="State-wise Purchase Value")
-                        st.plotly_chart(state_rev, key="pur_state_rev")
+                selected_state = st.selectbox("Select State to drill down", state_summary['State'].tolist(), key="drill_state")
+                
+                if selected_state and 'City' in df.columns:
+                    with st.expander(f"Level 2: Cities in {selected_state}", expanded=True):
+                        state_df = df[df['State'] == selected_state]
+                        city_summary = state_df.groupby('City')[seg_year].sum().reset_index()
+                        city_summary.columns = ['City', 'Total Revenue']
+                        city_summary = city_summary[city_summary['Total Revenue'] > 0]
+                        city_summary['Formatted'] = city_summary['Total Revenue'].apply(format_inr)
+                        city_summary = city_summary.sort_values('Total Revenue', ascending=False)
                         
-                        # City drill-down
-                        if 'City' in df_purchase.columns:
-                            city_rev = px.bar(df_purchase.groupby(['State','City'])[CURRENT_VALUE_COL].sum().reset_index(), 
-                                            x='City', y=CURRENT_VALUE_COL, color='State', title="City-wise Purchase Value")
-                            st.plotly_chart(city_rev, key="pur_city_rev")
-            with sub_tabs[4]:
-                st.header(" Inventory Management")
-                product_col = 'Product' if 'Product' in df_purchase.columns else ('Product Code' if 'Product Code' in df_purchase.columns else None)
-                if CURRENT_QTY_COL in df_purchase.columns and product_col and CURRENT_VALUE_COL in df_purchase.columns:
-                    months_back = st.slider("Last X months", 1, 12, 3, key="pur_slow_slider")
-                    
-                    # Checkbox to hide null revenue items
-                    hide_null_revenue = st.checkbox("Hide items with null revenue", value=False, key="purchase_hide_null_revenue")
-                    
-                    slow_items = df_purchase[df_purchase[CURRENT_QTY_COL] < df_purchase[CURRENT_QTY_COL].mean() * 0.2]
-                    
-                    # Filter out null revenue if checkbox is checked
-                    if hide_null_revenue:
-                        slow_items = slow_items[slow_items[CURRENT_VALUE_COL].notna()]
-                    
-                    st.dataframe(slow_items[[product_col, CURRENT_QTY_COL, CURRENT_VALUE_COL]].rename(columns={CURRENT_QTY_COL: 'Quantity', CURRENT_VALUE_COL: 'Value'}))
-                else:
-                    st.write("Required columns not found in the data.")
-            with sub_tabs[5]:
-                st.header("Cross-Selling Opportunities")
-                if 'Product' in df_purchase.columns or 'Product Code' in df_purchase.columns:
-                    prod_col = 'Product' if 'Product' in df_purchase.columns else 'Product Code'
-                    top_products = df_purchase[prod_col].value_counts().head(5).index.tolist()
-                    st.write(f"Top products: {', '.join(top_products)}")
-                    # Add product mix table here
-                else:
-                    st.write("Required column ('Product' or 'Product Code') not found in the data.")
-    
-    with tabs[2]:
-        if not df_sales.empty:
-            
-            # Customer Segmentation
-            st.header("Customer Segmentation")
-            with st.expander("Drill-Down Analysis"):
-                if 'state' in df_sales.columns and CURRENT_VALUE_COL in df_sales.columns:
-                    # Create columns for better layout
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        # State-wise Revenue
-                        state_rev = px.bar(df_sales.groupby('state')[CURRENT_VALUE_COL].sum().reset_index().sort_values(CURRENT_VALUE_COL, ascending=False), 
-                                         x='state', y=CURRENT_VALUE_COL, title="State-wise Revenue",
-                                         color=CURRENT_VALUE_COL, color_continuous_scale='Blues')
-                        st.plotly_chart(state_rev, key="ci_state_rev", use_container_width=True)
-                        
-                        # Customer Count by State
-                        state_count = df_sales.groupby('state').size().reset_index(name='Customer Count').sort_values('Customer Count', ascending=False)
-                        state_count_chart = px.bar(state_count, x='state', y='Customer Count', 
-                                                 title="Customer Count by State", color='Customer Count', 
-                                                 color_continuous_scale='Greens')
-                        st.plotly_chart(state_count_chart, key="ci_state_count", use_container_width=True)
-                    
-                    with col2:
-                        # Revenue Distribution Pie Chart
-                        state_rev_pie = px.pie(df_sales.groupby('state')[CURRENT_VALUE_COL].sum().reset_index().sort_values(CURRENT_VALUE_COL, ascending=False).head(10),
-                                             values=CURRENT_VALUE_COL, names='state', title="Top 10 States by Revenue")
-                        st.plotly_chart(state_rev_pie, key="ci_state_pie", use_container_width=True)
-                        
-                        # Average Revenue per Customer by State
-                        state_avg = df_sales.groupby('state')[CURRENT_VALUE_COL].mean().reset_index(name='Avg Revenue per Customer').sort_values('Avg Revenue per Customer', ascending=False)
-                        state_avg_chart = px.bar(state_avg, x='state', y='Avg Revenue per Customer',
-                                               title="Average Revenue per Customer by State", 
-                                               color='Avg Revenue per Customer', color_continuous_scale='Reds')
-                        st.plotly_chart(state_avg_chart, key="ci_state_avg", use_container_width=True)
-                    
-                    # City drill-down (if available)
-                    if 'city' in df_sales.columns:
-                        st.subheader(" City-Level Analysis")
-                        col3, col4 = st.columns(2)
-                        
-                        with col3:
-                            # Top 10 Cities by Revenue
-                            city_rev = px.bar(df_sales.groupby('city')[CURRENT_VALUE_COL].sum().reset_index().sort_values(CURRENT_VALUE_COL, ascending=False).head(10),
-                                            x='city', y=CURRENT_VALUE_COL, title="Top 10 Cities by Revenue",
-                                            color=CURRENT_VALUE_COL, color_continuous_scale='Purples')
-                            st.plotly_chart(city_rev, key="ci_city_rev", use_container_width=True)
-                        
-                        with col4:
-                            # City Revenue by State
-                            city_state = df_sales.groupby(['state','city'])[CURRENT_VALUE_COL].sum().reset_index().sort_values(CURRENT_VALUE_COL, ascending=False).head(15)
-                            city_state_chart = px.bar(city_state, x='city', y=CURRENT_VALUE_COL, color='state',
-                                                    title="Top Cities Revenue by State", barmode='group')
-                            st.plotly_chart(city_state_chart, key="ci_city_state", use_container_width=True)
-                    
-                    # Executive drill-down (if available)
-                    if 'executive' in df_sales.columns:
-                        st.subheader(" Executive Performance")
-                        col5, col6 = st.columns(2)
-                        
-                        with col5:
-                            exec_rev = px.bar(df_sales.groupby('executive')[CURRENT_VALUE_COL].sum().reset_index().sort_values(CURRENT_VALUE_COL, ascending=False),
-                                            x='executive', y=CURRENT_VALUE_COL, title="Executive-wise Revenue",
-                                            color=CURRENT_VALUE_COL, color_continuous_scale='Oranges')
-                            st.plotly_chart(exec_rev, key="ci_exec_rev", use_container_width=True)
-                        
-                        with col6:
-                            # Executive Customer Count
-                            exec_count = df_sales.groupby('executive').size().reset_index(name='Customers').sort_values('Customers', ascending=False)
-                            exec_count_chart = px.bar(exec_count, x='executive', y='Customers', 
-                                                    title="Customers per Executive", color='Customers', 
-                                                    color_continuous_scale='Teals')
-                            st.plotly_chart(exec_count_chart, key="ci_exec_count", use_container_width=True)
-                    
-                    # Additional Insights
-                    st.subheader(" Key Insights")
-                    insight_col1, insight_col2, insight_col3 = st.columns(3)
-                    
-                    with insight_col1:
-                        total_states = df_sales['state'].nunique()
-                        st.metric("Total States", total_states)
-                    
-                    with insight_col2:
-                        if 'city' in df_sales.columns:
-                            total_cities = df_sales['city'].nunique()
-                            st.metric("Total Cities", total_cities)
+                        if city_summary.empty:
+                            st.info(f"No city data available for {selected_state}")
                         else:
-                            st.metric("Cities Data", "Not Available")
-                    
-                    with insight_col3:
-                        if 'executive' in df_sales.columns:
-                            total_execs = df_sales['executive'].nunique()
-                            st.metric("Total Executives", total_execs)
-                        else:
-                            st.metric("Executives Data", "Not Available")
-                    
-                    # Top Customers Analysis
-                    if 'Company' in df_sales.columns:
-                        st.subheader(" Top Customers")
-                        top_customers = df_sales.groupby('Company')[CURRENT_VALUE_COL].sum().reset_index().sort_values(CURRENT_VALUE_COL, ascending=False).head(10)
-                        top_cust_chart = px.bar(top_customers, x='Company', y=CURRENT_VALUE_COL,
-                                              title="Top 10 Customers by Revenue", 
-                                              color=CURRENT_VALUE_COL, color_continuous_scale='Viridis')
-                        st.plotly_chart(top_cust_chart, key="ci_top_customers", use_container_width=True)
-                        
-                        # Customer Segmentation by Revenue Tiers
-                        customer_segments = df_sales.groupby('Company')[CURRENT_VALUE_COL].sum().reset_index()
-                        customer_segments['Segment'] = pd.qcut(customer_segments[CURRENT_VALUE_COL], q=4, labels=['Bronze', 'Silver', 'Gold', 'Platinum'])
-                        segment_chart = px.pie(customer_segments, values=CURRENT_VALUE_COL, names='Segment',
-                                             title="Customer Segmentation by Revenue Tiers")
-                        st.plotly_chart(segment_chart, key="ci_segments", use_container_width=True)
+                            fig_city = px.bar(city_summary, x='City', y='Total Revenue',
+                                             title=f"Cities in {selected_state}", text='Formatted',
+                                             color='Total Revenue', color_continuous_scale='Greens')
+                            fig_city.update_traces(textposition='outside')
+                            st.plotly_chart(fig_city, use_container_width=True, key="seg_city_bar")
+                            
+                            selected_city = st.selectbox("Select City", city_summary['City'].tolist(), key="drill_city")
+                            
+                            if selected_city and 'Dealer Name' in df.columns:
+                                with st.expander(f"Level 3: Customers in {selected_city}", expanded=True):
+                                    city_df = state_df[state_df['City'] == selected_city]
+                                    cust_summary = city_df.groupby('Dealer Name')[seg_year].sum().reset_index()
+                                    cust_summary.columns = ['Customer', 'Total Revenue']
+                                    cust_summary = cust_summary[cust_summary['Total Revenue'] > 0]
+                                    cust_summary['Formatted'] = cust_summary['Total Revenue'].apply(format_inr)
+                                    cust_summary = cust_summary.sort_values('Total Revenue', ascending=False)
+                                    
+                                    if cust_summary.empty:
+                                        st.info(f"No customer data available for {selected_city}")
+                                    else:
+                                        fig_cust = px.bar(cust_summary, x='Customer', y='Total Revenue',
+                                                         title=f"Customers in {selected_city}", text='Formatted',
+                                                         color='Total Revenue', color_continuous_scale='Oranges')
+                                        fig_cust.update_traces(textposition='outside')
+                                        fig_cust.update_layout(xaxis_tickangle=-45)
+                                        st.plotly_chart(fig_cust, use_container_width=True, key="seg_cust_bar")
+                                        
+                                        st.dataframe(cust_summary[['Customer', 'Formatted']], use_container_width=True)
+                            elif 'Dealer Name' not in df.columns:
+                                st.info("Dealer Name column not found")
+                elif 'City' not in df.columns:
+                    st.info("City column not found for drill-down")
+            
+            st.markdown("---")
+            st.markdown("#### Executive Performance")
+            exec_col = 'Sales Executive' if 'Sales Executive' in df.columns else 'Executive' if 'Executive' in df.columns else None
+            
+            if exec_col:
+                exec_perf = df.groupby(exec_col)[seg_year].sum().reset_index()
+                exec_perf.columns = [exec_col, 'Revenue']
+                exec_perf = exec_perf[exec_perf['Revenue'] > 0]
+                exec_perf['Formatted'] = exec_perf['Revenue'].apply(format_inr)
+                exec_perf = exec_perf.sort_values('Revenue', ascending=False)
+                
+                if exec_perf.empty:
+                    st.info("No executive performance data available")
                 else:
-                    st.warning("Required columns ('state' and revenue column) not found for drill-down analysis.")
+                    fig_exec = px.bar(exec_perf, x=exec_col, y='Revenue', 
+                                     title="Executive Performance", text='Formatted',
+                                     color='Revenue', color_continuous_scale='Purples')
+                    fig_exec.update_traces(textposition='outside')
+                    st.plotly_chart(fig_exec, use_container_width=True, key="seg_exec_bar")
+            else:
+                st.info("Sales Executive column not found")
     
-    with tabs[3]:
-        if not df_payment.empty:
+    # 1.3 Non-Moving & Slow-Moving Items
+    with sales_sub3:
+        st.subheader("Non-Moving & Slow-Moving Items")
+        
+        if not VALUE_COLS:
+            st.warning("No value columns found in the dataset")
+        else:
+            analysis_year = st.selectbox("Select Year", VALUE_COLS, key="nonmov_year")
+            hide_null = st.checkbox("Hide null/zero revenue items", value=True, key="sales_hide_null")
             
-            # Get available years
-            available_value_years = get_available_years(df_payment, 'Value\n')
-            available_qty_years = get_available_years(df_payment, 'Qty\n')
+            prod_col = 'Product Name' if 'Product Name' in df.columns else 'Item Name' if 'Item Name' in df.columns else 'Sub Category' if 'Sub Category' in df.columns else None
             
-            # 1. Payment Insights
-            st.header(" Payment Insights")
-            if CURRENT_VALUE_COL in df_payment.columns and 'Company' in df_payment.columns:
-                col1, col2, col3 = st.columns(3)
+            if not prod_col:
+                st.warning("No product/item column found for analysis")
+            else:
+                col1, col2 = st.columns(2)
+                
                 with col1:
-                    pay_pie = px.pie(df_payment, values=CURRENT_VALUE_COL, names='Company', title="Payment Value by Company")
-                    st.plotly_chart(pay_pie, use_container_width=True, key="pay_rev_pie")
+                    st.markdown("#### Non-Moving (Zero Sales)")
+                    product_sales = df.groupby(prod_col)[analysis_year].sum().reset_index()
+                    non_moving = product_sales[product_sales[analysis_year] == 0]
+                    
+                    st.metric("Non-Moving Products", len(non_moving))
+                    if len(non_moving) > 0:
+                        st.dataframe(non_moving.head(20), use_container_width=True)
+                    else:
+                        st.success("No non-moving items found!")
+                
                 with col2:
-                    if CURRENT_QTY_COL in df_payment.columns:
-                        pay_qty_pie = px.pie(df_payment, values=CURRENT_QTY_COL, names='Company', title="Payment Quantity by Company")
-                        st.plotly_chart(pay_qty_pie, use_container_width=True, key="pay_qty_pie")
-                with col3:
-                    # Year-wise trend
-                    if available_value_years:
-                        yearly_payment = [df_payment[f'Value\n{year}'].sum() for year in available_value_years]
-                        pay_trend_df = pd.DataFrame({'Year': available_value_years, 'Payment Value': yearly_payment})
-                        pay_trend_chart = px.line(pay_trend_df, x='Year', y='Payment Value', title="Yearly Payment Trend")
-                        st.plotly_chart(pay_trend_chart, use_container_width=True, key="pay_yearly_trend")
-            
-            # Additional: By State and Category
-            if CURRENT_VALUE_COL in df_payment.columns:
-                if 'State' in df_payment.columns:
-                    pay_state_pie = px.pie(df_payment, values=CURRENT_VALUE_COL, names='State', title="Payment by State")
-                    st.plotly_chart(pay_state_pie, use_container_width=True, key="pay_state_pie")
-                if 'Category' in df_payment.columns:
-                    pay_cat_pie = px.pie(df_payment, values=CURRENT_VALUE_COL, names='Category', title="Payment by Category")
-                    st.plotly_chart(pay_cat_pie, use_container_width=True, key="pay_cat_pie")
-            
-            # Comparison by Sub Category
-            if 'Sub Category' in df_payment.columns and CURRENT_VALUE_COL in df_payment.columns:
-                pay_sub_cat_bar = px.bar(df_payment.groupby('Sub Category')[CURRENT_VALUE_COL].sum().reset_index(), 
-                                       x='Sub Category', y=CURRENT_VALUE_COL, title="Payment by Sub Category")
-                st.plotly_chart(pay_sub_cat_bar, use_container_width=True, key="pay_sub_cat_bar")
-            
-            # Year-wise Quantity Trend
-            if available_qty_years:
-                yearly_pay_qty = [df_payment[f'Qty\n{year}'].sum() for year in available_qty_years]
-                pay_qty_trend_df = pd.DataFrame({'Year': available_qty_years, 'Payment Quantity': yearly_pay_qty})
-                pay_qty_trend_chart = px.line(pay_qty_trend_df, x='Year', y='Payment Quantity', title="Yearly Payment Quantity Trend")
-                st.plotly_chart(pay_qty_trend_chart, use_container_width=True, key="pay_qty_trend")
-
-            # 2. Customer Segmentation (Onion method)
-            with st.expander("👥 Customer Segmentation - Click to Drill Down"):
-                if 'State' in df_payment.columns and CURRENT_VALUE_COL in df_payment.columns:
-                    state_rev = px.bar(df_payment.groupby('State')[CURRENT_VALUE_COL].sum().reset_index(), 
-                                     x='State', y=CURRENT_VALUE_COL, title="State-wise Revenue")
-                    st.plotly_chart(state_rev, key="pay_state_rev")
+                    st.markdown("#### Slow-Moving (Below Average)")
+                    product_sales = df.groupby(prod_col)[analysis_year].sum().reset_index()
+                    if hide_null:
+                        product_sales = product_sales[product_sales[analysis_year] > 0]
                     
-                    # City drill-down
-                    if 'City' in df_payment.columns:
-                        city_rev = px.bar(df_payment.groupby(['State','City'])[CURRENT_VALUE_COL].sum().reset_index(), 
-                                        x='City', y=CURRENT_VALUE_COL, color='State', title="City-wise Revenue")
-                        st.plotly_chart(city_rev, key="pay_city_rev")
-
-            # 3. Non-Moving Items
-            with st.expander("Non-Moving & Slow-Moving Items"):
-                product_col = 'Product' if 'Product' in df_payment.columns else ('Product Code' if 'Product Code' in df_payment.columns else None)
-                if CURRENT_QTY_COL in df_payment.columns and product_col and CURRENT_VALUE_COL in df_payment.columns:
-                    months_back = st.slider("Last X months", 1, 12, 3, key="pay_slow_slider")
+                    if product_sales.empty:
+                        st.info("No product sales data available")
+                    else:
+                        avg_sales = product_sales[analysis_year].mean()
+                        slow_moving = product_sales[
+                            (product_sales[analysis_year] > 0) & 
+                            (product_sales[analysis_year] < avg_sales * 0.5)
+                        ].sort_values(analysis_year)
+                        
+                        slow_moving['Formatted'] = slow_moving[analysis_year].apply(format_inr)
+                        
+                        st.metric("Slow-Moving Products", len(slow_moving))
+                        st.caption(f"Average: {format_inr(avg_sales)}")
+                        
+                        if len(slow_moving) > 0:
+                            fig_slow = px.bar(slow_moving.head(15), x=prod_col, y=analysis_year,
+                                             title="Slow-Moving Items", text='Formatted')
+                            fig_slow.update_traces(textposition='outside')
+                            fig_slow.update_layout(xaxis_tickangle=-45)
+                            st.plotly_chart(fig_slow, use_container_width=True, key="slow_moving_bar")
+                        else:
+                            st.success("No slow-moving items found!")
+                
+                st.markdown("---")
+                st.markdown("#### Category-wise Status")
+                if 'Category' in df.columns:
+                    cat_analysis = df.groupby('Category').agg({
+                        analysis_year: ['sum', 'count', lambda x: (x == 0).sum()]
+                    }).reset_index()
+                    cat_analysis.columns = ['Category', 'Total Revenue', 'Total Items', 'Zero Sales']
+                    cat_analysis['Non-Moving %'] = (cat_analysis['Zero Sales'] / cat_analysis['Total Items'] * 100).round(1)
+                    cat_analysis['Formatted'] = cat_analysis['Total Revenue'].apply(format_inr)
                     
-                    # Checkbox to hide null revenue items
-                    hide_null_revenue = st.checkbox("Hide items with null revenue", value=False, key="payment_hide_null_revenue")
-                    
-                    slow_items = df_payment[df_payment[CURRENT_QTY_COL] < df_payment[CURRENT_QTY_COL].mean() * 0.2]
-                    
-                    # Filter out null revenue if checkbox is checked
-                    if hide_null_revenue:
-                        slow_items = slow_items[slow_items[CURRENT_VALUE_COL].notna()]
-                    
-                    st.dataframe(slow_items[[product_col, CURRENT_QTY_COL, CURRENT_VALUE_COL]].rename(columns={CURRENT_QTY_COL: 'Quantity', CURRENT_VALUE_COL: 'Revenue'}))
+                    if cat_analysis.empty:
+                        st.info("No category data available")
+                    else:
+                        fig_cat = px.bar(cat_analysis, x='Category', y='Non-Moving %',
+                                        title="Non-Moving % by Category", color='Non-Moving %',
+                                        color_continuous_scale='Reds')
+                        st.plotly_chart(fig_cat, use_container_width=True, key="nonmov_cat_bar")
                 else:
-                    st.write("Required columns not found in the data.")
-
-            # 4. Cross-Selling Opportunities
-            with st.expander("Cross-Selling Analysis"):
-                if 'Product' in df_payment.columns or 'Product Code' in df_payment.columns:
-                    prod_col = 'Product' if 'Product' in df_payment.columns else 'Product Code'
-                    top_products = df_payment[prod_col].value_counts().head(5).index.tolist()
-                    st.write(f"Top products: {', '.join(top_products)}")
-                    # Add product mix table here
+                    st.info("Category column not found")
+    
+    # 1.4 Cross-Selling Analytics
+    with sales_sub4:
+        st.subheader("Cross-Selling Analytics")
+        
+        if 'Dealer Name' not in df.columns:
+            st.warning("Dealer Name column not found for cross-selling analysis")
+        elif 'Category' not in df.columns:
+            st.warning("Category column not found for cross-selling analysis")
+        elif not VALUE_COLS:
+            st.warning("No value columns found in the dataset")
+        else:
+            cross_year = st.selectbox("Select Year", VALUE_COLS, key="cross_year")
+            
+            customer_categories = df.groupby(['Dealer Name', 'Category'])[cross_year].sum().unstack(fill_value=0)
+            
+            if customer_categories.empty:
+                st.info("No cross-selling data available")
+            else:
+                st.markdown("#### Customers Buying X but not Y")
+                categories = df['Category'].dropna().unique().tolist()
+                
+                if len(categories) < 2:
+                    st.info("Need at least 2 categories for cross-selling analysis")
                 else:
-                    st.write("Required column ('Product' or 'Product Code') not found in the data.")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        cat_x = st.selectbox("Customers who buy", categories, key="cat_x")
+                    with col2:
+                        cat_y = st.selectbox("But don't buy", categories, key="cat_y")
+                    
+                    if cat_x == cat_y:
+                        st.info("Please select different categories for comparison")
+                    elif cat_x not in customer_categories.columns:
+                        st.info(f"No data available for category: {cat_x}")
+                    elif cat_y not in customer_categories.columns:
+                        st.info(f"No data available for category: {cat_y}")
+                    else:
+                        buying_x = customer_categories[customer_categories[cat_x] > 0]
+                        not_buying_y = buying_x[buying_x[cat_y] == 0]
+                        
+                        st.metric(f"Customers buying {cat_x} but not {cat_y}", len(not_buying_y))
+                        
+                        if len(not_buying_y) > 0:
+                            opportunity = pd.DataFrame({
+                                'Customer': not_buying_y.index,
+                                f'{cat_x} Revenue': not_buying_y[cat_x].values
+                            })
+                            opportunity['Formatted'] = opportunity[f'{cat_x} Revenue'].apply(format_inr)
+                            opportunity = opportunity.sort_values(f'{cat_x} Revenue', ascending=False)
+                            
+                            fig_opp = px.bar(opportunity.head(10), x='Customer', y=f'{cat_x} Revenue',
+                                            title=f"Top Cross-Sell Opportunities for {cat_y}", text='Formatted')
+                            fig_opp.update_traces(textposition='outside')
+                            fig_opp.update_layout(xaxis_tickangle=-45)
+                            st.plotly_chart(fig_opp, use_container_width=True, key="cross_sell_bar")
+                        else:
+                            st.info(f"All customers buying {cat_x} are also buying {cat_y}")
+                
+                st.markdown("---")
+                st.markdown("#### Product Mix - Top Customers")
+                top_custs = df.groupby('Dealer Name')[cross_year].sum().nlargest(10).index.tolist()
+                mix_data = customer_categories.loc[customer_categories.index.isin(top_custs)]
+                
+                if mix_data.empty:
+                    st.info("No product mix data available for top customers")
+                else:
+                    mix_pct = mix_data.div(mix_data.sum(axis=1), axis=0) * 100
+                    mix_melted = mix_pct.reset_index().melt(id_vars='Dealer Name', var_name='Category', value_name='%')
+                    
+                    fig_mix = px.bar(mix_melted, x='Dealer Name', y='%', color='Category',
+                                    title="Category Mix % by Top Customers", barmode='stack')
+                    fig_mix.update_layout(xaxis_tickangle=-45)
+                    st.plotly_chart(fig_mix, use_container_width=True, key="product_mix_bar")
+    
+    # 1.5 Product Drop-Off Tracker
+    with sales_sub5:
+        st.subheader("Product Drop-Off Tracker")
+        
+        if len(VALUE_COLS) < 2:
+            st.warning("Need at least 2 periods for drop-off analysis")
+        else:
+            col1, col2 = st.columns(2)
+            with col1:
+                prev_period = st.selectbox("Previous Period", VALUE_COLS, index=0, key="prev_period")
+            with col2:
+                curr_period = st.selectbox("Current Period", VALUE_COLS, index=min(1, len(VALUE_COLS)-1), key="curr_period")
+            
+            decline_threshold = st.slider("Decline Threshold (%)", 10, 90, 30, key="decline_thresh")
+            
+            prod_col = 'Product Name' if 'Product Name' in df.columns else 'Item Name' if 'Item Name' in df.columns else 'Sub Category' if 'Sub Category' in df.columns else None
+            
+            if not prod_col:
+                st.warning("No product/item column found for drop-off analysis")
+            else:
+                comparison = df.groupby(prod_col).agg({
+                    prev_period: 'sum',
+                    curr_period: 'sum'
+                }).reset_index()
+                
+                comparison['Change %'] = ((comparison[curr_period] - comparison[prev_period]) / 
+                                          comparison[prev_period].replace(0, np.nan) * 100).round(1)
+                
+                declined = comparison[
+                    (comparison['Change %'] <= -decline_threshold) & 
+                    (comparison[prev_period] > 0)
+                ].sort_values('Change %')
+                
+                declined['Previous'] = declined[prev_period].apply(format_inr)
+                declined['Current'] = declined[curr_period].apply(format_inr)
+                
+                st.metric("Products with Decline", len(declined))
+                
+                if len(declined) > 0:
+                    fig_dec = px.bar(declined.head(15), x=prod_col, y='Change %',
+                                    title=f"Products with >{decline_threshold}% Decline",
+                                    color='Change %', color_continuous_scale='Reds_r')
+                    fig_dec.update_layout(xaxis_tickangle=-45)
+                    st.plotly_chart(fig_dec, use_container_width=True, key="dropoff_bar")
+                    
+                    st.dataframe(declined[[prod_col, 'Previous', 'Current', 'Change %']].head(20), use_container_width=True)
+                else:
+                    st.success("No significant decline found!")
+            
+            st.markdown("---")
+            st.markdown("#### Category Trends")
+            if 'Category' in df.columns:
+                cat_trend = df.groupby('Category').agg({
+                    prev_period: 'sum',
+                    curr_period: 'sum'
+                }).reset_index()
+                
+                cat_trend['Change %'] = ((cat_trend[curr_period] - cat_trend[prev_period]) / 
+                                          cat_trend[prev_period].replace(0, np.nan) * 100).round(1)
+                cat_trend['Previous'] = cat_trend[prev_period].apply(format_inr)
+                cat_trend['Current'] = cat_trend[curr_period].apply(format_inr)
+                
+                if cat_trend.empty:
+                    st.info("No category trend data available")
+                else:
+                    fig_cat_trend = px.bar(cat_trend, x='Category', y='Change %',
+                                           title="Category Change", color='Change %',
+                                           color_continuous_scale='RdYlGn', text='Change %')
+                    fig_cat_trend.update_traces(textposition='outside')
+                    st.plotly_chart(fig_cat_trend, use_container_width=True, key="cat_trend_bar")
+            else:
+                st.info("Category column not found")
+
+# ================================
+# TAB 2: PURCHASE ANALYTICS
+# ================================
+with tab2:
+    st.header("Purchase Analytics")
+    
+    purch_sub1, purch_sub2, purch_sub3 = st.tabs(["Overview", "Trends", "Supplier Analysis"])
+    
+    with purch_sub1:
+        st.subheader("Purchase Overview")
+        if not VALUE_COLS:
+            st.warning("No value columns found in the dataset")
+        else:
+            purch_year = st.selectbox("Select Year", VALUE_COLS, key="purch_year")
+            total_purch = df[purch_year].sum()
+            
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Total Value", format_inr(total_purch))
+            if 'Category' in df.columns:
+                m2.metric("Categories", df['Category'].nunique())
+            else:
+                m2.metric("Categories", "N/A")
+            if 'Dealer Name' in df.columns:
+                m3.metric("Dealers", df['Dealer Name'].nunique())
+            else:
+                m3.metric("Dealers", "N/A")
+            
+            if 'Category' in df.columns:
+                cat_purch = df.groupby('Category')[purch_year].sum().reset_index()
+                cat_purch = cat_purch[cat_purch[purch_year] > 0]
+                if not cat_purch.empty:
+                    fig = px.pie(cat_purch, values=purch_year, names='Category', title="By Category")
+                    st.plotly_chart(fig, use_container_width=True, key="purch_cat_pie")
+                else:
+                    st.info("No category data available for the selected year")
+            else:
+                st.info("Category column not found")
+    
+    with purch_sub2:
+        st.subheader("Trends")
+        if 'Month' not in df.columns:
+            st.warning("Month column not found for trend analysis")
+        elif not VALUE_COLS:
+            st.warning("No value columns found in the dataset")
+        else:
+            trend_year = st.selectbox("Select Year", VALUE_COLS, key="purch_trend_year")
+            monthly = df.groupby('Month')[trend_year].sum().reset_index()
+            if monthly.empty or monthly[trend_year].sum() == 0:
+                st.info("No monthly trend data available")
+            else:
+                fig = px.line(monthly, x='Month', y=trend_year, title="Monthly Trend", markers=True)
+                st.plotly_chart(fig, use_container_width=True, key="purch_trend_line")
+    
+    with purch_sub3:
+        st.subheader("Supplier Analysis")
+        if 'Dealer Name' not in df.columns:
+            st.warning("Dealer Name column not found for supplier analysis")
+        elif not VALUE_COLS:
+            st.warning("No value columns found in the dataset")
+        else:
+            supp_year = st.selectbox("Select Year", VALUE_COLS, key="supp_year")
+            supplier = df.groupby('Dealer Name')[supp_year].sum().reset_index()
+            supplier = supplier[supplier[supp_year] > 0].sort_values(supp_year, ascending=False)
+            
+            if supplier.empty:
+                st.info("No supplier data available for the selected year")
+            else:
+                supplier['Formatted'] = supplier[supp_year].apply(format_inr)
+                fig = px.bar(supplier.head(15), x='Dealer Name', y=supp_year,
+                            title="Top 15 Suppliers", text='Formatted')
+                fig.update_traces(textposition='outside')
+                fig.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig, use_container_width=True, key="purch_supplier_bar")
+
+# ================================
+# TAB 3: CUSTOMER INSIGHTS
+# ================================
+with tab3:
+    st.header("Customer Insights")
+    
+    cust_sub1, cust_sub2, cust_sub3 = st.tabs(["Overview", "Geographic", "Performance"])
+    
+    with cust_sub1:
+        st.subheader("Customer Overview")
+        if 'Dealer Name' not in df.columns:
+            st.warning("Dealer Name column not found for customer analysis")
+        elif not VALUE_COLS:
+            st.warning("No value columns found in the dataset")
+        else:
+            cust_year = st.selectbox("Select Year", VALUE_COLS, key="cust_year")
+            top_custs = df.groupby('Dealer Name')[cust_year].sum().reset_index()
+            top_custs = top_custs[top_custs[cust_year] > 0].sort_values(cust_year, ascending=False)
+            
+            if top_custs.empty:
+                st.info("No customer data available for the selected year")
+            else:
+                top_custs['Formatted'] = top_custs[cust_year].apply(format_inr)
+                fig = px.bar(top_custs.head(20), x='Dealer Name', y=cust_year,
+                            title="Top 20 Customers", text='Formatted', color=cust_year,
+                            color_continuous_scale='Blues')
+                fig.update_traces(textposition='outside')
+                fig.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig, use_container_width=True, key="cust_overview_chart")
+    
+    with cust_sub2:
+        st.subheader("Geographic Analysis")
+        if 'State' not in df.columns:
+            st.warning("State column not found for geographic analysis")
+        elif not VALUE_COLS:
+            st.warning("No value columns found in the dataset")
+        else:
+            geo_year = st.selectbox("Select Year", VALUE_COLS, key="geo_year")
+            state_data = df.groupby('State')[geo_year].sum().reset_index()
+            state_data = state_data[state_data[geo_year] > 0].sort_values(geo_year, ascending=False)
+            
+            if state_data.empty:
+                st.info("No state data available for the selected year")
+            else:
+                state_data['Formatted'] = state_data[geo_year].apply(format_inr)
+                fig = px.bar(state_data, x='State', y=geo_year, title="Revenue by State",
+                            text='Formatted', color=geo_year, color_continuous_scale='Viridis')
+                fig.update_traces(textposition='outside')
+                fig.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig, use_container_width=True, key="geo_state_chart")
+                
+                if 'City' in df.columns:
+                    sel_state = st.selectbox("Select State", state_data['State'].tolist(), key="geo_state")
+                    city_data = df[df['State'] == sel_state].groupby('City')[geo_year].sum().reset_index()
+                    city_data = city_data[city_data[geo_year] > 0].sort_values(geo_year, ascending=False)
+                    
+                    if city_data.empty:
+                        st.info(f"No city data available for {sel_state}")
+                    else:
+                        city_data['Formatted'] = city_data[geo_year].apply(format_inr)
+                        fig = px.bar(city_data, x='City', y=geo_year, title=f"Cities in {sel_state}",
+                                    text='Formatted')
+                        fig.update_traces(textposition='outside')
+                        st.plotly_chart(fig, use_container_width=True, key="geo_city_chart")
+                else:
+                    st.info("City column not found for detailed breakdown")
+    
+    with cust_sub3:
+        st.subheader("Customer Performance")
+        if 'Dealer Name' not in df.columns:
+            st.warning("Dealer Name column not found for performance analysis")
+        elif len(VALUE_COLS) < 2:
+            st.warning("Need at least 2 periods for performance comparison")
+        else:
+            prev_y = st.selectbox("Previous", VALUE_COLS, index=0, key="cust_prev")
+            curr_y = st.selectbox("Current", VALUE_COLS, index=min(1, len(VALUE_COLS)-1), key="cust_curr")
+            
+            perf = df.groupby('Dealer Name').agg({prev_y: 'sum', curr_y: 'sum'}).reset_index()
+            perf['Growth %'] = ((perf[curr_y] - perf[prev_y]) / perf[prev_y].replace(0, np.nan) * 100).round(1)
+            
+            growers = perf[perf['Growth %'] > 0].sort_values('Growth %', ascending=False).head(10)
+            decliners = perf[perf['Growth %'] < 0].sort_values('Growth %').head(10)
+            
+            if len(growers) > 0:
+                st.markdown("#### Top Growers")
+                fig = px.bar(growers, x='Dealer Name', y='Growth %', title="Growing Customers",
+                            text='Growth %', color='Growth %', color_continuous_scale='Greens')
+                fig.update_traces(textposition='outside')
+                fig.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig, use_container_width=True, key="cust_growers_chart")
+            else:
+                st.info("No growing customers found for the selected periods")
+            
+            if len(decliners) > 0:
+                st.markdown("#### Declining")
+                fig = px.bar(decliners, x='Dealer Name', y='Growth %', title="Declining Customers",
+                            text='Growth %', color='Growth %', color_continuous_scale='Reds_r')
+                fig.update_traces(textposition='outside')
+                fig.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig, use_container_width=True, key="cust_decliners_chart")
+            else:
+                st.info("No declining customers found for the selected periods")
+
+# ================================
+# TAB 4: PAYMENT ANALYSIS
+# ================================
+with tab4:
+    st.header("Payment Analysis")
+    
+    pay_sub1, pay_sub2 = st.tabs(["Overview", "Outstanding"])
+    
+    with pay_sub1:
+        st.subheader("Payment Overview")
+        if not VALUE_COLS:
+            st.warning("No value columns found in the dataset")
+        else:
+            pay_year = st.selectbox("Select Year", VALUE_COLS, key="pay_year")
+            
+            if 'Category' in df.columns:
+                cat_pay = df.groupby('Category')[pay_year].sum().reset_index()
+                cat_pay = cat_pay[cat_pay[pay_year] > 0]
+                if not cat_pay.empty:
+                    fig = px.pie(cat_pay, values=pay_year, names='Category', title="By Category")
+                    st.plotly_chart(fig, use_container_width=True, key="pay_cat_pie")
+                else:
+                    st.info("No category payment data available")
+            else:
+                st.info("Category column not found")
+            
+            hide_null_pay = st.checkbox("Hide zero values", value=True, key="pay_hide_null")
+            
+            if 'Dealer Name' in df.columns:
+                dealer_pay = df.groupby('Dealer Name')[pay_year].sum().reset_index()
+                if hide_null_pay:
+                    dealer_pay = dealer_pay[dealer_pay[pay_year] > 0]
+                dealer_pay = dealer_pay.sort_values(pay_year, ascending=False)
+                
+                if dealer_pay.empty:
+                    st.info("No dealer payment data available")
+                else:
+                    dealer_pay['Formatted'] = dealer_pay[pay_year].apply(format_inr)
+                    fig = px.bar(dealer_pay.head(15), x='Dealer Name', y=pay_year,
+                                title="Top 15 Dealers", text='Formatted')
+                    fig.update_traces(textposition='outside')
+                    fig.update_layout(xaxis_tickangle=-45)
+                    st.plotly_chart(fig, use_container_width=True, key="pay_dealer_bar")
+            else:
+                st.info("Dealer Name column not found")
+    
+    with pay_sub2:
+        st.subheader("Outstanding Analysis")
+        if 'Outstanding' not in df.columns:
+            st.info("Outstanding column not found in the dataset")
+        elif 'Dealer Name' not in df.columns:
+            st.info("Dealer Name column not found for outstanding analysis")
+        else:
+            outstanding = df.groupby('Dealer Name')['Outstanding'].sum().reset_index()
+            outstanding = outstanding[outstanding['Outstanding'] > 0].sort_values('Outstanding', ascending=False)
+            
+            if outstanding.empty:
+                st.success("No outstanding amounts found!")
+            else:
+                outstanding['Formatted'] = outstanding['Outstanding'].apply(format_inr)
+                st.metric("Total Outstanding", format_inr(outstanding['Outstanding'].sum()))
+                
+                fig = px.bar(outstanding.head(15), x='Dealer Name', y='Outstanding',
+                            title="Top 15 Outstanding", text='Formatted', color='Outstanding',
+                            color_continuous_scale='Reds')
+                fig.update_traces(textposition='outside')
+                fig.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig, use_container_width=True, key="pay_outstanding_bar")
+
+# Footer
+st.markdown("---")
+st.caption("Orthopedic Implant Analytics Dashboard - Stage 1")
