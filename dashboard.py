@@ -3,18 +3,51 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from api_client import (
+    init_session_state, 
+    login_form, 
+    logout_button, 
+    fetch_dashboard_data,
+    clear_cached_data
+)
 
 # Page configuration
 st.set_page_config(page_title="Orthopedic Implant Analytics Dashboard", layout="wide")
 
-# Load data
-@st.cache_data
+# Initialize API session state
+init_session_state()
+
+# Check authentication - show login form if not authenticated
+if not st.session_state.authenticated:
+    login_form()
+    st.stop()
+
+# Load data from API
+@st.cache_data(ttl=300)  # Cache for 5 minutes
 def load_data():
-    df = pd.read_excel("combined_dummy.xlsx", engine="openpyxl")
-    df.columns = df.columns.str.strip()
+    df = fetch_dashboard_data()
+    if df is not None:
+        df.columns = df.columns.str.strip()
     return df
 
+# Sidebar with logout and refresh options
+with st.sidebar:
+    st.title("Dashboard Controls")
+    logout_button()
+    st.markdown("---")
+    if st.button(" Refresh Data", use_container_width=True):
+        clear_cached_data()
+        st.cache_data.clear()
+        st.rerun()
+    st.markdown("---")
+    st.caption("Data loaded from API")
+
 df = load_data()
+
+# Handle case when data couldn't be loaded
+if df is None:
+    st.error("Failed to load data from API. Please try again or contact support.")
+    st.stop()
 
 # Helper function to format currency in Indian format (Lakhs/Crores)
 def format_inr(value):

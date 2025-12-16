@@ -1,8 +1,13 @@
 # Business Analytics Dashboard
 
-A comprehensive, interactive business analytics dashboard built with Streamlit for analyzing sales, purchases, customer insights, and payment data.
+A comprehensive, interactive business analytics dashboard built with Streamlit for analyzing sales, purchases, customer insights, and payment data. Data is fetched from the Avante Medicals ERP API.
 
 ## Features
+
+### 🔐 Secure Authentication
+- Login with your ERP credentials
+- Token-based authentication with automatic refresh
+- Secure session management
 
 ### 📊 Sales Analytics
 - Revenue & Quantity Insights with pie charts by Dealer, State, and Executive
@@ -50,20 +55,36 @@ pip install -r requirements.txt
 
 1. Run the Streamlit app:
 ```bash
+source venv/bin/activate  # Activate virtual environment
 streamlit run dashboard.py
 ```
 
-2. Upload your Excel file with the following structure:
-   - **Required column**: `Type` with values: 'Sales', 'Purchase', or 'Payment'
-   - **Sales columns**: Date, Month, Dealer, State, City, Executive, Product, Product Family, Quantity, Unit Price, Revenue, Payment Status, Days Overdue, Interest Amount
-   - **Purchase columns**: Date, Month, Vendor, Material, Quantity, Unit Price, Purchase Amount
-   - **Payment columns**: Customer, Amount, Due Date, Days Overdue, Interest Amount, Region, Executive
+2. Login with your ERP credentials:
+   - Enter your username and password
+   - Click "Login" to authenticate
 
-3. Explore the analytics across four tabs:
+3. The dashboard will automatically fetch data from the API and display analytics across four tabs:
    - Sales Analytics
    - Purchase Analytics
    - Customer Insights
    - Payment Analysis
+
+4. Use the sidebar controls:
+   - **Refresh Data**: Fetch latest data from the API
+   - **Logout**: End your session securely
+
+## API Integration
+
+The dashboard connects to the Avante Medicals ERP API:
+- **Base URL**: `http://avantemedicals.com/API/api.php`
+- **Authentication**: JWT token-based
+- **Auto-refresh**: Tokens are automatically refreshed when expired
+
+### API Endpoints Used:
+- `POST ?action=login` - User authentication
+- `POST ?action=protected` - Fetch protected sales data
+- `POST ?action=refresh_token` - Refresh access token
+- `POST ?action=logout` - End session
 
 ## Data Format
 
@@ -81,7 +102,8 @@ See `combined_dummy.xlsx` for a sample data format (if included).
 - **Plotly** - Interactive visualizations
 - **Scikit-learn** - Predictive analytics
 - **NumPy** - Numerical computing
-- **OpenPyXL** - Excel file handling
+- **Requests** - API communication
+- **JWT** - Token-based authentication
 
 ## Features Overview
 
@@ -91,6 +113,25 @@ See `combined_dummy.xlsx` for a sample data format (if included).
 - 🎯 Drill-down analysis capabilities
 - ⚡ Fast data preview
 - 🎨 Clean, modern UI
+
+## Project Structure
+
+```
+dashboard/
+├── dashboard.py       # Main Streamlit application
+├── api_client.py      # API client for ERP integration
+├── requirements.txt   # Python dependencies
+├── README.md          # Documentation
+├── venv/              # Virtual environment (not in repo)
+└── .gitignore         # Git ignore file
+```
+
+## Security Notes
+
+- Credentials are never stored locally
+- Tokens are stored in session state only
+- Automatic logout on session end
+- Secure HTTPS communication with API
 
 ## Contributing
 
