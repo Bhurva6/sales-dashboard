@@ -173,7 +173,7 @@ def login_form():
     """
     Display login form and handle authentication
     """
-    st.title("🔐 Login to Dashboard")
+    st.title("Login to Dashboard")
     st.markdown("---")
     
     with st.form("login_form"):
