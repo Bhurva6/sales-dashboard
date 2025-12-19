@@ -68,6 +68,19 @@ def format_inr(value):
     else:
         return f"Rs. {value:,.0f}"
 
+# Helper function to format quantity in Indian format (Thousands/Lakhs/Crores)
+def format_qty(value):
+    if pd.isna(value):
+        return "0"
+    if value >= 1e7:
+        return f"{value/1e7:.2f} Cr"
+    elif value >= 1e5:
+        return f"{value/1e5:.2f} Lakh"
+    elif value >= 1e3:
+        return f"{value/1e3:.2f} K"
+    else:
+        return f"{value:,.0f}"
+
 # Helper function to format chart Y-axis in Lakhs/Crores
 def format_yaxis_inr(fig, yaxis_col=None):
     """Update chart to show Y-axis values in Lakhs/Crores format"""
@@ -250,9 +263,10 @@ with tab1:
                     cat_qty = df.groupby('Category')[selected_qty_col].sum().reset_index()
                     cat_qty = cat_qty[cat_qty[selected_qty_col] > 0].sort_values(selected_qty_col, ascending=True)
                     if not cat_qty.empty:
+                        cat_qty['Formatted'] = cat_qty[selected_qty_col].apply(format_qty)
                         fig_cat_qty = px.bar(cat_qty, x=selected_qty_col, y='Category', orientation='h',
-                                            title="Quantity by Category", text=selected_qty_col)
-                        fig_cat_qty.update_traces(textposition='outside')
+                                            title="Quantity by Category", text='Formatted', custom_data=['Formatted'])
+                        fig_cat_qty.update_traces(textposition='outside', hovertemplate='%{y}<br>%{customdata[0]}<extra></extra>')
                         st.plotly_chart(fig_cat_qty, use_container_width=True, key="cat_qty_bar")
                     else:
                         st.info("No category quantity data available")
