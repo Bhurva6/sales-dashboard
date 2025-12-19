@@ -40,6 +40,9 @@ with st.sidebar:
         st.cache_data.clear()
         st.rerun()
     st.markdown("---")
+    # Filter to hide "Innovative" dealers
+    hide_innovative = st.checkbox("Hide 'Innovative Ortho Surgicals' Dealer", value=False, key="hide_innovative")
+    st.markdown("---")
     st.caption("Data loaded from API")
 
 df = load_data()
@@ -48,6 +51,11 @@ df = load_data()
 if df is None:
     st.error("Failed to load data from API. Please try again or contact support.")
     st.stop()
+
+# Apply filter to hide "Innovative" dealers if checkbox is checked
+if 'hide_innovative' in st.session_state and st.session_state.hide_innovative:
+    if 'Dealer Name' in df.columns:
+        df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
 
 # Helper function to format currency in Indian format (Lakhs/Crores)
 def format_inr(value):
