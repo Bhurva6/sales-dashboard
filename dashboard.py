@@ -68,6 +68,30 @@ def format_inr(value):
     else:
         return f"Rs. {value:,.0f}"
 
+# Helper function to format chart Y-axis in Lakhs/Crores
+def format_yaxis_inr(fig, yaxis_col=None):
+    """Update chart to show Y-axis values in Lakhs/Crores format"""
+    fig.update_layout(
+        yaxis=dict(
+            tickformat='.2s',
+            tickprefix='Rs. ',
+        )
+    )
+    # Custom tick formatting for Indian numbering
+    fig.update_yaxes(
+        tickvals=None,
+        ticktext=None,
+    )
+    return fig
+
+# Helper function to update hover template for INR values
+def add_inr_hover(fig, value_col):
+    """Add custom hover template showing values in Lakhs/Crores"""
+    fig.update_traces(
+        hovertemplate='%{x}<br>%{customdata}<extra></extra>'
+    )
+    return fig
+
 # Dynamic year detection - for backward compatibility with Excel data
 def get_available_years(dataframe, prefix='Value'):
     cols = [c for c in dataframe.columns if c.startswith(prefix) and c != prefix]
@@ -138,9 +162,12 @@ with tab1:
                     dealer_rev = df.groupby('Dealer Name')[selected_value_col].sum().reset_index()
                     dealer_rev = dealer_rev[dealer_rev[selected_value_col] > 0].nlargest(10, selected_value_col)
                     if not dealer_rev.empty:
+                        dealer_rev['Formatted'] = dealer_rev[selected_value_col].apply(format_inr)
                         fig_dealer = px.pie(dealer_rev, values=selected_value_col, names='Dealer Name', 
-                                           title="Top 10 Dealers by Revenue")
-                        fig_dealer.update_traces(textposition='inside', textinfo='percent+label')
+                                           title="Top 10 Dealers by Revenue",
+                                           custom_data=['Formatted'])
+                        fig_dealer.update_traces(textposition='inside', textinfo='percent+label',
+                                                hovertemplate='%{label}<br>%{customdata[0]}<extra></extra>')
                         st.plotly_chart(fig_dealer, use_container_width=True, key="pie_dealer")
                     else:
                         st.info("No dealer revenue data available")
@@ -152,9 +179,12 @@ with tab1:
                     state_rev = df.groupby('State')[selected_value_col].sum().reset_index()
                     state_rev = state_rev[state_rev[selected_value_col] > 0]
                     if not state_rev.empty:
+                        state_rev['Formatted'] = state_rev[selected_value_col].apply(format_inr)
                         fig_state = px.pie(state_rev, values=selected_value_col, names='State', 
-                                          title="Revenue by State")
-                        fig_state.update_traces(textposition='inside', textinfo='percent+label')
+                                          title="Revenue by State",
+                                          custom_data=['Formatted'])
+                        fig_state.update_traces(textposition='inside', textinfo='percent+label',
+                                               hovertemplate='%{label}<br>%{customdata[0]}<extra></extra>')
                         st.plotly_chart(fig_state, use_container_width=True, key="pie_state")
                     else:
                         st.info("No state revenue data available")
@@ -167,9 +197,12 @@ with tab1:
                     exec_rev = df.groupby(exec_col)[selected_value_col].sum().reset_index()
                     exec_rev = exec_rev[exec_rev[selected_value_col] > 0]
                     if not exec_rev.empty:
+                        exec_rev['Formatted'] = exec_rev[selected_value_col].apply(format_inr)
                         fig_exec = px.pie(exec_rev, values=selected_value_col, names=exec_col, 
-                                         title="Revenue by Sales Executive")
-                        fig_exec.update_traces(textposition='inside', textinfo='percent+label')
+                                         title="Revenue by Sales Executive",
+                                         custom_data=['Formatted'])
+                        fig_exec.update_traces(textposition='inside', textinfo='percent+label',
+                                              hovertemplate='%{label}<br>%{customdata[0]}<extra></extra>')
                         st.plotly_chart(fig_exec, use_container_width=True, key="pie_exec")
                     else:
                         st.info("No executive revenue data available")
@@ -182,9 +215,12 @@ with tab1:
             if 'Month' in df.columns:
                 monthly_rev = df.groupby('Month')[selected_value_col].sum().reset_index()
                 if not monthly_rev.empty and monthly_rev[selected_value_col].sum() > 0:
+                    monthly_rev['Formatted'] = monthly_rev[selected_value_col].apply(format_inr)
                     fig_trend = px.line(monthly_rev, x='Month', y=selected_value_col, 
-                                       title="Month-wise Revenue Trend", markers=True)
+                                       title="Month-wise Revenue Trend", markers=True,
+                                       custom_data=['Formatted'])
                     fig_trend.update_layout(yaxis_title="Revenue", xaxis_title="Month")
+                    fig_trend.update_traces(hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                     st.plotly_chart(fig_trend, use_container_width=True, key="trend_monthly")
                 else:
                     st.info("No monthly trend data available")
@@ -201,8 +237,8 @@ with tab1:
                     if not cat_rev.empty:
                         cat_rev['Formatted'] = cat_rev[selected_value_col].apply(format_inr)
                         fig_cat = px.bar(cat_rev, x=selected_value_col, y='Category', orientation='h',
-                                        title="Revenue by Category", text='Formatted')
-                        fig_cat.update_traces(textposition='outside')
+                                        title="Revenue by Category", text='Formatted', custom_data=['Formatted'])
+                        fig_cat.update_traces(textposition='outside', hovertemplate='%{y}<br>%{customdata[0]}<extra></extra>')
                         st.plotly_chart(fig_cat, use_container_width=True, key="cat_rev_bar")
                     else:
                         st.info("No category revenue data available")
@@ -238,8 +274,8 @@ with tab1:
                         if not subcat_rev.empty:
                             subcat_rev['Formatted'] = subcat_rev[selected_value_col].apply(format_inr)
                             fig_subcat = px.bar(subcat_rev, x='Sub Category', y=selected_value_col,
-                                               title="Revenue by Sub-Category", text='Formatted')
-                            fig_subcat.update_traces(textposition='outside')
+                                               title="Revenue by Sub-Category", text='Formatted', custom_data=['Formatted'])
+                            fig_subcat.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                             fig_subcat.update_layout(xaxis_tickangle=-45)
                             st.plotly_chart(fig_subcat, use_container_width=True, key="subcat_bar")
                         else:
@@ -279,8 +315,9 @@ with tab1:
             else:
                 fig_state = px.bar(state_summary, x='State', y='Total Revenue', 
                                   title="Revenue by State", text='Formatted',
-                                  color='Total Revenue', color_continuous_scale='Blues')
-                fig_state.update_traces(textposition='outside')
+                                  color='Total Revenue', color_continuous_scale='Blues',
+                                  custom_data=['Formatted'])
+                fig_state.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                 fig_state.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig_state, use_container_width=True, key="seg_state_bar")
                 
@@ -300,8 +337,9 @@ with tab1:
                         else:
                             fig_city = px.bar(city_summary, x='City', y='Total Revenue',
                                              title=f"Cities in {selected_state}", text='Formatted',
-                                             color='Total Revenue', color_continuous_scale='Greens')
-                            fig_city.update_traces(textposition='outside')
+                                             color='Total Revenue', color_continuous_scale='Greens',
+                                             custom_data=['Formatted'])
+                            fig_city.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                             st.plotly_chart(fig_city, use_container_width=True, key="seg_city_bar")
                             
                             selected_city = st.selectbox("Select City", city_summary['City'].tolist(), key="drill_city")
@@ -320,8 +358,9 @@ with tab1:
                                     else:
                                         fig_cust = px.bar(cust_summary, x='Customer', y='Total Revenue',
                                                          title=f"Customers in {selected_city}", text='Formatted',
-                                                         color='Total Revenue', color_continuous_scale='Oranges')
-                                        fig_cust.update_traces(textposition='outside')
+                                                         color='Total Revenue', color_continuous_scale='Oranges',
+                                                         custom_data=['Formatted'])
+                                        fig_cust.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                                         fig_cust.update_layout(xaxis_tickangle=-45)
                                         st.plotly_chart(fig_cust, use_container_width=True, key="seg_cust_bar")
                                         
@@ -347,8 +386,9 @@ with tab1:
                 else:
                     fig_exec = px.bar(exec_perf, x=exec_col, y='Revenue', 
                                      title="Executive Performance", text='Formatted',
-                                     color='Revenue', color_continuous_scale='Purples')
-                    fig_exec.update_traces(textposition='outside')
+                                     color='Revenue', color_continuous_scale='Purples',
+                                     custom_data=['Formatted'])
+                    fig_exec.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                     st.plotly_chart(fig_exec, use_container_width=True, key="seg_exec_bar")
             else:
                 st.info("Sales Executive column not found")
@@ -407,8 +447,8 @@ with tab1:
                         
                         if len(slow_moving) > 0:
                             fig_slow = px.bar(slow_moving.head(15), x=prod_col, y=analysis_value_col,
-                                             title="Slow-Moving Items", text='Formatted')
-                            fig_slow.update_traces(textposition='outside')
+                                             title="Slow-Moving Items", text='Formatted', custom_data=['Formatted'])
+                            fig_slow.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                             fig_slow.update_layout(xaxis_tickangle=-45)
                             st.plotly_chart(fig_slow, use_container_width=True, key="slow_moving_bar")
                         else:
@@ -489,8 +529,9 @@ with tab1:
                             opportunity = opportunity.sort_values(f'{cat_x} Revenue', ascending=False)
                             
                             fig_opp = px.bar(opportunity.head(10), x='Customer', y=f'{cat_x} Revenue',
-                                            title=f"Top Cross-Sell Opportunities for {cat_y}", text='Formatted')
-                            fig_opp.update_traces(textposition='outside')
+                                            title=f"Top Cross-Sell Opportunities for {cat_y}", text='Formatted',
+                                            custom_data=['Formatted'])
+                            fig_opp.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                             fig_opp.update_layout(xaxis_tickangle=-45)
                             st.plotly_chart(fig_opp, use_container_width=True, key="cross_sell_bar")
                         else:
@@ -620,7 +661,10 @@ with tab2:
                 cat_purch = df.groupby('Category')[purch_value_col].sum().reset_index()
                 cat_purch = cat_purch[cat_purch[purch_value_col] > 0]
                 if not cat_purch.empty:
-                    fig = px.pie(cat_purch, values=purch_value_col, names='Category', title="By Category")
+                    cat_purch['Formatted'] = cat_purch[purch_value_col].apply(format_inr)
+                    fig = px.pie(cat_purch, values=purch_value_col, names='Category', title="By Category",
+                                custom_data=['Formatted'])
+                    fig.update_traces(hovertemplate='%{label}<br>%{customdata[0]}<extra></extra>')
                     st.plotly_chart(fig, use_container_width=True, key="purch_cat_pie")
                 else:
                     st.info("No category data available for the selected year")
@@ -643,7 +687,10 @@ with tab2:
             if monthly.empty or monthly[trend_value_col].sum() == 0:
                 st.info("No monthly trend data available")
             else:
-                fig = px.line(monthly, x='Month', y=trend_value_col, title="Monthly Trend", markers=True)
+                monthly['Formatted'] = monthly[trend_value_col].apply(format_inr)
+                fig = px.line(monthly, x='Month', y=trend_value_col, title="Monthly Trend", markers=True,
+                             custom_data=['Formatted'])
+                fig.update_traces(hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                 st.plotly_chart(fig, use_container_width=True, key="purch_trend_line")
     
     with purch_sub3:
@@ -666,8 +713,8 @@ with tab2:
             else:
                 supplier['Formatted'] = supplier[supp_value_col].apply(format_inr)
                 fig = px.bar(supplier.head(15), x='Dealer Name', y=supp_value_col,
-                            title="Top 15 Suppliers", text='Formatted')
-                fig.update_traces(textposition='outside')
+                            title="Top 15 Suppliers", text='Formatted', custom_data=['Formatted'])
+                fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True, key="purch_supplier_bar")
 
@@ -700,8 +747,8 @@ with tab3:
                 top_custs['Formatted'] = top_custs[cust_value_col].apply(format_inr)
                 fig = px.bar(top_custs.head(20), x='Dealer Name', y=cust_value_col,
                             title="Top 20 Customers", text='Formatted', color=cust_value_col,
-                            color_continuous_scale='Blues')
-                fig.update_traces(textposition='outside')
+                            color_continuous_scale='Blues', custom_data=['Formatted'])
+                fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True, key="cust_overview_chart")
     
@@ -725,8 +772,9 @@ with tab3:
             else:
                 state_data['Formatted'] = state_data[geo_value_col].apply(format_inr)
                 fig = px.bar(state_data, x='State', y=geo_value_col, title="Revenue by State",
-                            text='Formatted', color=geo_value_col, color_continuous_scale='Viridis')
-                fig.update_traces(textposition='outside')
+                            text='Formatted', color=geo_value_col, color_continuous_scale='Viridis',
+                            custom_data=['Formatted'])
+                fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True, key="geo_state_chart")
                 
@@ -740,8 +788,8 @@ with tab3:
                     else:
                         city_data['Formatted'] = city_data[geo_value_col].apply(format_inr)
                         fig = px.bar(city_data, x='City', y=geo_value_col, title=f"Cities in {sel_state}",
-                                    text='Formatted')
-                        fig.update_traces(textposition='outside')
+                                    text='Formatted', custom_data=['Formatted'])
+                        fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                         st.plotly_chart(fig, use_container_width=True, key="geo_city_chart")
                 else:
                     st.info("City column not found for detailed breakdown")
@@ -764,9 +812,10 @@ with tab3:
             
             if len(growers) > 0:
                 st.markdown("#### Top Growers")
+                growers['Growth Text'] = growers['Growth %'].apply(lambda x: f"{x:.1f}%")
                 fig = px.bar(growers, x='Dealer Name', y='Growth %', title="Growing Customers",
-                            text='Growth %', color='Growth %', color_continuous_scale='Greens')
-                fig.update_traces(textposition='outside')
+                            text='Growth Text', color='Growth %', color_continuous_scale='Greens')
+                fig.update_traces(textposition='outside', hovertemplate='%{x}<br>Growth: %{y:.1f}%<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True, key="cust_growers_chart")
             else:
@@ -774,9 +823,10 @@ with tab3:
             
             if len(decliners) > 0:
                 st.markdown("#### Declining")
+                decliners['Growth Text'] = decliners['Growth %'].apply(lambda x: f"{x:.1f}%")
                 fig = px.bar(decliners, x='Dealer Name', y='Growth %', title="Declining Customers",
-                            text='Growth %', color='Growth %', color_continuous_scale='Reds_r')
-                fig.update_traces(textposition='outside')
+                            text='Growth Text', color='Growth %', color_continuous_scale='Reds_r')
+                fig.update_traces(textposition='outside', hovertemplate='%{x}<br>Growth: %{y:.1f}%<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True, key="cust_decliners_chart")
             else:
@@ -801,7 +851,10 @@ with tab4:
                 cat_pay = df.groupby('Category')[VALUE_COL].sum().reset_index()
                 cat_pay = cat_pay[cat_pay[VALUE_COL] > 0]
                 if not cat_pay.empty:
-                    fig = px.pie(cat_pay, values=VALUE_COL, names='Category', title="By Category")
+                    cat_pay['Formatted'] = cat_pay[VALUE_COL].apply(format_inr)
+                    fig = px.pie(cat_pay, values=VALUE_COL, names='Category', title="By Category",
+                                custom_data=['Formatted'])
+                    fig.update_traces(hovertemplate='%{label}<br>%{customdata[0]}<extra></extra>')
                     st.plotly_chart(fig, use_container_width=True, key="pay_cat_pie")
                 else:
                     st.info("No category payment data available")
@@ -821,8 +874,8 @@ with tab4:
                 else:
                     dealer_pay['Formatted'] = dealer_pay[VALUE_COL].apply(format_inr)
                     fig = px.bar(dealer_pay.head(15), x='Dealer Name', y=VALUE_COL,
-                                title="Top 15 Dealers", text='Formatted')
-                    fig.update_traces(textposition='outside')
+                                title="Top 15 Dealers", text='Formatted', custom_data=['Formatted'])
+                    fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                     fig.update_layout(xaxis_tickangle=-45)
                     st.plotly_chart(fig, use_container_width=True, key="pay_dealer_bar")
             else:
@@ -846,8 +899,8 @@ with tab4:
                 
                 fig = px.bar(outstanding.head(15), x='Dealer Name', y='Outstanding',
                             title="Top 15 Outstanding", text='Formatted', color='Outstanding',
-                            color_continuous_scale='Reds')
-                fig.update_traces(textposition='outside')
+                            color_continuous_scale='Reds', custom_data=['Formatted'])
+                fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True, key="pay_outstanding_bar")
 
