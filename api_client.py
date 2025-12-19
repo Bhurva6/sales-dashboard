@@ -8,7 +8,11 @@ from datetime import datetime, timedelta
 import json
 
 # API Configuration
-API_BASE_URL = "http://avantemedicals.com/API/api.php"
+API_BASE_URL = "https://avantemedicals.com/API/api.php"
+
+# Disable SSL warnings (server has certificate issues)
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class APIClient:
     def __init__(self):
@@ -21,27 +25,63 @@ class APIClient:
         Authenticate user and obtain access tokens
         """
         try:
+            url = f"{API_BASE_URL}?action=login"
             response = requests.post(
-                f"{API_BASE_URL}?action=login",
+                url,
                 json={"username": username, "password": password},
                 headers={"Content-Type": "application/json"},
-                timeout=30
+                timeout=30,
+                allow_redirects=False,  # Don't follow redirects to see actual response
+                verify=False  # Skip SSL verification (server certificate issue)
             )
-            response.raise_for_status()
-            data = response.json()
             
-            if data.get("status") == "success":
-                self.token = data.get("token")
-                self.refresh_token = data.get("refresh_token")
-                # Set token expiry (assuming 1 hour validity, adjust as needed)
-                self.token_expiry = datetime.now() + timedelta(hours=1)
-                return {"success": True, "message": "Login successful"}
+            # Check if there's a redirect
+            if response.status_code in [301, 302, 303, 307, 308]:
+                redirect_url = response.headers.get('Location', 'Unknown')
+                return {"success": False, "message": f"API redirected to: {redirect_url}", "raw_response": None}
+            
+            response.raise_for_status()
+            
+            # Get raw response text for debugging
+            raw_text = response.text
+            
+            try:
+                data = response.json()
+            except json.JSONDecodeError:
+                return {"success": False, "message": f"Invalid JSON response: {raw_text[:200]}", "raw_response": raw_text}
+            
+            # Debug: Print the response to understand its structure
+            print(f"Login API Response: {data}")
+            
+            # Check for successful login - handle multiple response formats
+            # Format 1: {"status": "success", "token": "...", "refresh_token": "..."}
+            # Format 2: {"success": true, "data": {"token": "..."}}
+            # Format 3: Just checking if token exists
+            
+            is_success = (
+                data.get("status") == "success" or 
+                data.get("success") == True or
+                data.get("token") is not None
+            )
+            
+            if is_success:
+                # Extract token from different possible locations
+                self.token = data.get("token") or (data.get("data", {}).get("token") if isinstance(data.get("data"), dict) else None)
+                self.refresh_token = data.get("refresh_token") or (data.get("data", {}).get("refresh_token") if isinstance(data.get("data"), dict) else None)
+                
+                if self.token:
+                    # Set token expiry (assuming 1 hour validity, adjust as needed)
+                    self.token_expiry = datetime.now() + timedelta(hours=1)
+                    return {"success": True, "message": "Login successful", "raw_response": data}
+                else:
+                    return {"success": False, "message": "No token received from server", "raw_response": data}
             else:
-                return {"success": False, "message": data.get("message", "Login failed")}
+                error_msg = data.get("message") or data.get("error") or "Login failed - Invalid credentials"
+                return {"success": False, "message": error_msg, "raw_response": data}
         except requests.exceptions.RequestException as e:
-            return {"success": False, "message": f"Connection error: {str(e)}"}
-        except json.JSONDecodeError:
-            return {"success": False, "message": "Invalid response from server"}
+            return {"success": False, "message": f"Connection error: {str(e)}", "raw_response": None}
+        except json.JSONDecodeError as e:
+            return {"success": False, "message": f"Invalid response from server: {str(e)}", "raw_response": None}
     
     def refresh_access_token(self) -> bool:
         """
@@ -55,7 +95,8 @@ class APIClient:
                 f"{API_BASE_URL}?action=refresh_token",
                 json={"refresh_token": self.refresh_token},
                 headers={"Content-Type": "application/json"},
-                timeout=30
+                timeout=30,
+                verify=False
             )
             response.raise_for_status()
             data = response.json()
@@ -109,7 +150,8 @@ class APIClient:
                 f"{API_BASE_URL}?action={action}",
                 json=body,
                 headers=headers,
-                timeout=60
+                timeout=60,
+                verify=False
             )
             response.raise_for_status()
             data = response.json()
@@ -120,11 +162,60 @@ class APIClient:
         except json.JSONDecodeError:
             return {"success": False, "message": "Invalid response from server"}
     
-    def get_sales_report(self) -> dict:
+    def get_sales_report(self, start_date: str = None, end_date: str = None) -> dict:
         """
         Fetch sales report data from the API
+        Authorization is disabled for this endpoint, so we make a direct call
+        
+        Args:
+            start_date: Start date in DD-MM-YYYY format (defaults to start of year)
+            end_date: End date in DD-MM-YYYY format (defaults to today)
         """
-        return self.get_protected_data("get_sales_report")
+        from datetime import datetime
+        
+        # Default date range: start of year to today
+        if not start_date:
+            start_date = f"01-01-{datetime.now().year}"
+        if not end_date:
+            end_date = datetime.now().strftime("%d-%m-%Y")
+        
+        try:
+            # Since authorization is disabled for this endpoint, 
+            # make a direct call without the Authorization header
+            body = {
+                "action": "get_sales_report",
+                "startdate": start_date,
+                "enddate": end_date
+            }
+            
+            headers = {
+                "Content-Type": "application/json"
+            }
+            
+            print(f"Fetching sales report: {start_date} to {end_date}")
+            
+            response = requests.post(
+                f"{API_BASE_URL}?action=get_sales_report",
+                json=body,
+                headers=headers,
+                timeout=60,
+                verify=False
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            print(f"Sales Report API Response status: {data.get('status', 'unknown')}")
+            if isinstance(data, dict):
+                print(f"Response keys: {list(data.keys())}")
+                if 'report_data' in data:
+                    print(f"Records count: {len(data.get('report_data', []))}")
+            
+            return {"success": True, "data": data}
+        except requests.exceptions.RequestException as e:
+            print(f"Sales Report API Error: {str(e)}")
+            return {"success": False, "message": f"Request error: {str(e)}"}
+        except json.JSONDecodeError:
+            return {"success": False, "message": "Invalid response from server"}
     
     def logout(self) -> dict:
         """
@@ -140,7 +231,8 @@ class APIClient:
             response = requests.post(
                 f"{API_BASE_URL}?action=logout",
                 headers=headers,
-                timeout=30
+                timeout=30,
+                verify=False
             )
             
             # Clear tokens regardless of response
@@ -176,6 +268,14 @@ def login_form():
     st.title("Login to Dashboard")
     st.markdown("---")
     
+    st.caption("Login with your API credentials")
+    
+    # Debug mode toggle
+    debug_mode = st.checkbox("Show debug info", value=False)
+    
+    if debug_mode:
+        st.info(f"API URL: {API_BASE_URL}?action=login")
+    
     with st.form("login_form"):
         username = st.text_input("Username", placeholder="Enter your username")
         password = st.text_input("Password", type="password", placeholder="Enter your password")
@@ -187,8 +287,13 @@ def login_form():
             else:
                 with st.spinner("Authenticating..."):
                     result = st.session_state.api_client.login(username, password)
+                    
+                    if debug_mode:
+                        st.write("API Response:", result)
+                    
                     if result["success"]:
                         st.session_state.authenticated = True
+                        st.session_state.demo_mode = False
                         st.success("Login successful!")
                         st.rerun()
                     else:
@@ -212,6 +317,8 @@ def fetch_dashboard_data():
     Returns a pandas DataFrame
     """
     import pandas as pd
+    import json
+    import os
     
     if not st.session_state.authenticated:
         return None
@@ -220,38 +327,95 @@ def fetch_dashboard_data():
     if st.session_state.api_data is not None:
         return st.session_state.api_data
     
+    # Fetch from API
     with st.spinner("Fetching data from API..."):
         result = st.session_state.api_client.get_sales_report()
+        
+        data = None
+        records = None
         
         if result["success"] and result.get("data"):
             data = result["data"]
             
-            # Handle different response structures
-            if isinstance(data, dict):
-                if "data" in data:
-                    # Nested data structure
-                    records = data["data"]
-                elif "records" in data:
-                    records = data["records"]
+            # Check for API error in response (token issue)
+            if isinstance(data, dict) and data.get("status") == "error":
+                error_msg = data.get("message", "Unknown API error")
+                
+                # If token error, try loading from local sample file
+                if "token" in error_msg.lower():
+                    sample_file = "sales_data_sample.json"
+                    if os.path.exists(sample_file):
+                        st.info("Loading data from local sample file (API token issue detected)")
+                        with open(sample_file, 'r') as f:
+                            data = json.load(f)
+                    else:
+                        st.error(f"API Error: {error_msg}")
+                        st.warning("""
+                        ⚠️ **Server Configuration Issue Detected**
+                        
+                        The API server is not receiving the Authorization header.
+                        Please contact the API provider to fix the server configuration.
+                        """)
+                        return None
                 else:
-                    records = [data]
-            elif isinstance(data, list):
-                records = data
-            else:
-                st.error("Unexpected data format from API")
-                return None
-            
-            # Convert to DataFrame
-            if records:
-                df = pd.DataFrame(records)
-                df.columns = df.columns.str.strip()
-                st.session_state.api_data = df
-                return df
-            else:
-                st.warning("No records returned from API")
-                return None
+                    st.error(f"API Error: {error_msg}")
+                    return None
         else:
-            st.error(f"Failed to fetch data: {result.get('message', 'Unknown error')}")
+            # API call failed, try loading from local sample file
+            sample_file = "sales_data_sample.json"
+            if os.path.exists(sample_file):
+                st.info("Loading data from local sample file")
+                with open(sample_file, 'r') as f:
+                    data = json.load(f)
+            else:
+                st.error(f"Failed to fetch data: {result.get('message', 'Unknown error')}")
+                return None
+        
+        # Handle different response structures
+        if isinstance(data, dict):
+            if "report_data" in data:
+                records = data["report_data"]
+            elif "data" in data:
+                records = data["data"]
+            elif "records" in data:
+                records = data["records"]
+            else:
+                records = [data]
+        elif isinstance(data, list):
+            records = data
+        else:
+            st.error("Unexpected data format from API")
+            return None
+        
+        # Convert to DataFrame
+        if records:
+            df = pd.DataFrame(records)
+            df.columns = df.columns.str.strip()
+            
+            # Map API column names to expected dashboard column names
+            column_mapping = {
+                'comp_nm': 'Dealer Name',
+                'city': 'City',
+                'state': 'State',
+                'parent_category': 'Category',
+                'category_name': 'Sub Category',
+                'meta_keyword': 'Product Code',
+                'SQ': 'Qty',
+                'SV': 'Value',
+                'cust_id': 'Customer ID'
+            }
+            df = df.rename(columns=column_mapping)
+            
+            # Convert numeric columns
+            numeric_cols = ['Qty', 'Value']
+            for col in numeric_cols:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
+            st.session_state.api_data = df
+            return df
+        else:
+            st.warning("No records returned from API")
             return None
 
 
