@@ -82,19 +82,48 @@ def format_qty(value):
         return f"{value:,.0f}"
 
 # Helper function to format chart Y-axis in Lakhs/Crores
-def format_yaxis_inr(fig, yaxis_col=None):
-    """Update chart to show Y-axis values in Lakhs/Crores format"""
+def format_yaxis_inr(fig):
+    """Update chart to show Y-axis values in Indian format (Lakhs/Crores)"""
     fig.update_layout(
         yaxis=dict(
-            tickformat='.2s',
             tickprefix='Rs. ',
         )
     )
-    # Custom tick formatting for Indian numbering
-    fig.update_yaxes(
-        tickvals=None,
-        ticktext=None,
-    )
+    return fig
+
+# Helper function to format Y-axis for quantity charts
+def format_yaxis_qty(fig):
+    """Update chart to show Y-axis values in Indian format for quantities"""
+    return fig
+
+# Helper function to format axis ticks in Indian number format
+def format_indian_ticks(value):
+    """Format a single value for axis tick in Indian format"""
+    if value >= 1e7:
+        return f"{value/1e7:.1f} Cr"
+    elif value >= 1e5:
+        return f"{value/1e5:.1f} L"
+    elif value >= 1e3:
+        return f"{value/1e3:.1f} K"
+    else:
+        return f"{value:.0f}"
+
+# Helper function to update chart axes with Indian formatting
+def apply_indian_format_to_chart(fig, axis='y', prefix=''):
+    """Apply Indian number formatting to chart axis ticks"""
+    import plotly.graph_objects as go
+    
+    # Update tick format to avoid M/B suffixes
+    if axis == 'y':
+        fig.update_yaxes(
+            tickformat=',.0f',
+            separatethousands=True
+        )
+    elif axis == 'x':
+        fig.update_xaxes(
+            tickformat=',.0f',
+            separatethousands=True
+        )
     return fig
 
 # Helper function to update hover template for INR values
@@ -104,6 +133,21 @@ def add_inr_hover(fig, value_col):
         hovertemplate='%{x}<br>%{customdata}<extra></extra>'
     )
     return fig
+
+# Helper function to get display limit from dropdown
+def get_display_limit(key, default=10, options=None):
+    """Return the number of items to display based on user selection"""
+    if options is None:
+        options = {"Top 10": 10, "Top 20": 20, "Top 50": 50, "All": None}
+    selected = st.selectbox("Show", list(options.keys()), index=0, key=key)
+    return options[selected]
+
+# Helper function to apply display limit to dataframe
+def apply_limit(df, limit):
+    """Apply row limit to dataframe, return all if limit is None"""
+    if limit is None:
+        return df
+    return df.head(limit)
 
 # Dynamic year detection - for backward compatibility with Excel data
 def get_available_years(dataframe, prefix='Value'):
@@ -168,16 +212,19 @@ with tab1:
             
             # PIE CHARTS
             st.markdown("#### Revenue Distribution")
+            dealer_limit = get_display_limit("dealer_pie_limit", default=10)
             pie_col1, pie_col2, pie_col3 = st.columns(3)
             
             with pie_col1:
                 if 'Dealer Name' in df.columns:
                     dealer_rev = df.groupby('Dealer Name')[selected_value_col].sum().reset_index()
-                    dealer_rev = dealer_rev[dealer_rev[selected_value_col] > 0].nlargest(10, selected_value_col)
+                    dealer_rev = dealer_rev[dealer_rev[selected_value_col] > 0].sort_values(selected_value_col, ascending=False)
+                    dealer_rev = apply_limit(dealer_rev, dealer_limit)
                     if not dealer_rev.empty:
                         dealer_rev['Formatted'] = dealer_rev[selected_value_col].apply(format_inr)
+                        title_suffix = f"Top {dealer_limit}" if dealer_limit else "All"
                         fig_dealer = px.pie(dealer_rev, values=selected_value_col, names='Dealer Name', 
-                                           title="Top 10 Dealers by Revenue",
+                                           title=f"{title_suffix} Dealers by Revenue",
                                            custom_data=['Formatted'])
                         fig_dealer.update_traces(textposition='inside', textinfo='percent+label',
                                                 hovertemplate='%{label}<br>%{customdata[0]}<extra></extra>')
@@ -233,6 +280,7 @@ with tab1:
                                        title="Month-wise Revenue Trend", markers=True,
                                        custom_data=['Formatted'])
                     fig_trend.update_layout(yaxis_title="Revenue", xaxis_title="Month")
+                    fig_trend.update_yaxes(tickformat=',.0f')
                     fig_trend.update_traces(hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                     st.plotly_chart(fig_trend, use_container_width=True, key="trend_monthly")
                 else:
@@ -252,6 +300,7 @@ with tab1:
                         fig_cat = px.bar(cat_rev, x=selected_value_col, y='Category', orientation='h',
                                         title="Revenue by Category", text='Formatted', custom_data=['Formatted'])
                         fig_cat.update_traces(textposition='outside', hovertemplate='%{y}<br>%{customdata[0]}<extra></extra>')
+                        fig_cat.update_xaxes(tickformat=',.0f')
                         st.plotly_chart(fig_cat, use_container_width=True, key="cat_rev_bar")
                     else:
                         st.info("No category revenue data available")
@@ -267,6 +316,7 @@ with tab1:
                         fig_cat_qty = px.bar(cat_qty, x=selected_qty_col, y='Category', orientation='h',
                                             title="Quantity by Category", text='Formatted', custom_data=['Formatted'])
                         fig_cat_qty.update_traces(textposition='outside', hovertemplate='%{y}<br>%{customdata[0]}<extra></extra>')
+                        fig_cat_qty.update_xaxes(tickformat=',.0f')
                         st.plotly_chart(fig_cat_qty, use_container_width=True, key="cat_qty_bar")
                     else:
                         st.info("No category quantity data available")
@@ -291,6 +341,7 @@ with tab1:
                                                title="Revenue by Sub-Category", text='Formatted', custom_data=['Formatted'])
                             fig_subcat.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                             fig_subcat.update_layout(xaxis_tickangle=-45)
+                            fig_subcat.update_yaxes(tickformat=',.0f')
                             st.plotly_chart(fig_subcat, use_container_width=True, key="subcat_bar")
                         else:
                             st.info("No revenue data for selected sub-categories")
@@ -333,6 +384,7 @@ with tab1:
                                   custom_data=['Formatted'])
                 fig_state.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                 fig_state.update_layout(xaxis_tickangle=-45)
+                fig_state.update_yaxes(tickformat=',.0f')
                 st.plotly_chart(fig_state, use_container_width=True, key="seg_state_bar")
                 
                 selected_state = st.selectbox("Select State to drill down", state_summary['State'].tolist(), key="drill_state")
@@ -354,6 +406,7 @@ with tab1:
                                              color='Total Revenue', color_continuous_scale='Greens',
                                              custom_data=['Formatted'])
                             fig_city.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
+                            fig_city.update_yaxes(tickformat=',.0f')
                             st.plotly_chart(fig_city, use_container_width=True, key="seg_city_bar")
                             
                             selected_city = st.selectbox("Select City", city_summary['City'].tolist(), key="drill_city")
@@ -376,6 +429,7 @@ with tab1:
                                                          custom_data=['Formatted'])
                                         fig_cust.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                                         fig_cust.update_layout(xaxis_tickangle=-45)
+                                        fig_cust.update_yaxes(tickformat=',.0f')
                                         st.plotly_chart(fig_cust, use_container_width=True, key="seg_cust_bar")
                                         
                                         st.dataframe(cust_summary[['Customer', 'Formatted']], use_container_width=True)
@@ -403,6 +457,7 @@ with tab1:
                                      color='Revenue', color_continuous_scale='Purples',
                                      custom_data=['Formatted'])
                     fig_exec.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
+                    fig_exec.update_yaxes(tickformat=',.0f')
                     st.plotly_chart(fig_exec, use_container_width=True, key="seg_exec_bar")
             else:
                 st.info("Sales Executive column not found")
@@ -419,7 +474,11 @@ with tab1:
                 analysis_value_col = st.selectbox("Select Year", VALUE_COLS, key="nonmov_year")
             else:
                 analysis_value_col = VALUE_COL
-            hide_null = st.checkbox("Hide null/zero revenue items", value=True, key="sales_hide_null")
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                hide_null = st.checkbox("Hide null/zero revenue items", value=True, key="sales_hide_null")
+            with col2:
+                nonmov_limit = get_display_limit("nonmov_limit", default=20)
             
             prod_col = 'Product Name' if 'Product Name' in df.columns else 'Item Name' if 'Item Name' in df.columns else 'Sub Category' if 'Sub Category' in df.columns else None
             
@@ -435,7 +494,8 @@ with tab1:
                     
                     st.metric("Non-Moving Products", len(non_moving))
                     if len(non_moving) > 0:
-                        st.dataframe(non_moving.head(20), use_container_width=True)
+                        display_non_moving = apply_limit(non_moving, nonmov_limit)
+                        st.dataframe(display_non_moving, use_container_width=True)
                     else:
                         st.success("No non-moving items found!")
                 
@@ -460,10 +520,12 @@ with tab1:
                         st.caption(f"Average: {format_inr(avg_sales)}")
                         
                         if len(slow_moving) > 0:
-                            fig_slow = px.bar(slow_moving.head(15), x=prod_col, y=analysis_value_col,
+                            display_slow = apply_limit(slow_moving, nonmov_limit)
+                            fig_slow = px.bar(display_slow, x=prod_col, y=analysis_value_col,
                                              title="Slow-Moving Items", text='Formatted', custom_data=['Formatted'])
                             fig_slow.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                             fig_slow.update_layout(xaxis_tickangle=-45)
+                            fig_slow.update_yaxes(tickformat=',.0f')
                             st.plotly_chart(fig_slow, use_container_width=True, key="slow_moving_bar")
                         else:
                             st.success("No slow-moving items found!")
@@ -505,65 +567,82 @@ with tab1:
             else:
                 cross_value_col = VALUE_COL
             
-            customer_categories = df.groupby(['Dealer Name', 'Category'])[cross_value_col].sum().unstack(fill_value=0)
+            # Analysis type selector
+            analysis_type = st.radio("Analyze by", ["Category", "Sub Category"], horizontal=True, key="cross_analysis_type")
             
-            if customer_categories.empty:
+            if analysis_type == "Category":
+                group_col = 'Category'
+            else:
+                group_col = 'Sub Category' if 'Sub Category' in df.columns else 'Category'
+                if 'Sub Category' not in df.columns:
+                    st.warning("Sub Category column not found, using Category instead")
+            
+            customer_groups = df.groupby(['Dealer Name', group_col])[cross_value_col].sum().unstack(fill_value=0)
+            
+            if customer_groups.empty:
                 st.info("No cross-selling data available")
             else:
-                st.markdown("#### Customers Buying X but not Y")
-                categories = df['Category'].dropna().unique().tolist()
+                st.markdown(f"#### Customers Buying X but not Y (by {group_col})")
+                group_options = df[group_col].dropna().unique().tolist()
                 
-                if len(categories) < 2:
-                    st.info("Need at least 2 categories for cross-selling analysis")
+                if len(group_options) < 2:
+                    st.info(f"Need at least 2 {group_col.lower()}s for cross-selling analysis")
                 else:
-                    col1, col2 = st.columns(2)
+                    col1, col2, col3 = st.columns([2, 2, 1])
                     with col1:
-                        cat_x = st.selectbox("Customers who buy", categories, key="cat_x")
+                        group_x = st.selectbox(f"Customers who buy", group_options, key="group_x")
                     with col2:
-                        cat_y = st.selectbox("But don't buy", categories, key="cat_y")
+                        group_y = st.selectbox(f"But don't buy", group_options, key="group_y")
+                    with col3:
+                        cross_sell_limit = get_display_limit("cross_sell_limit", default=10)
                     
-                    if cat_x == cat_y:
-                        st.info("Please select different categories for comparison")
-                    elif cat_x not in customer_categories.columns:
-                        st.info(f"No data available for category: {cat_x}")
-                    elif cat_y not in customer_categories.columns:
-                        st.info(f"No data available for category: {cat_y}")
+                    if group_x == group_y:
+                        st.info("Please select different options for comparison")
+                    elif group_x not in customer_groups.columns:
+                        st.info(f"No data available for: {group_x}")
+                    elif group_y not in customer_groups.columns:
+                        st.info(f"No data available for: {group_y}")
                     else:
-                        buying_x = customer_categories[customer_categories[cat_x] > 0]
-                        not_buying_y = buying_x[buying_x[cat_y] == 0]
+                        buying_x = customer_groups[customer_groups[group_x] > 0]
+                        not_buying_y = buying_x[buying_x[group_y] == 0]
                         
-                        st.metric(f"Customers buying {cat_x} but not {cat_y}", len(not_buying_y))
+                        st.metric(f"Customers buying {group_x} but not {group_y}", len(not_buying_y))
                         
                         if len(not_buying_y) > 0:
                             opportunity = pd.DataFrame({
                                 'Customer': not_buying_y.index,
-                                f'{cat_x} Revenue': not_buying_y[cat_x].values
+                                f'{group_x} Revenue': not_buying_y[group_x].values
                             })
-                            opportunity['Formatted'] = opportunity[f'{cat_x} Revenue'].apply(format_inr)
-                            opportunity = opportunity.sort_values(f'{cat_x} Revenue', ascending=False)
+                            opportunity['Formatted'] = opportunity[f'{group_x} Revenue'].apply(format_inr)
+                            opportunity = opportunity.sort_values(f'{group_x} Revenue', ascending=False)
                             
-                            fig_opp = px.bar(opportunity.head(10), x='Customer', y=f'{cat_x} Revenue',
-                                            title=f"Top Cross-Sell Opportunities for {cat_y}", text='Formatted',
+                            display_opportunity = apply_limit(opportunity, cross_sell_limit)
+                            title_suffix = f"Top {cross_sell_limit}" if cross_sell_limit else "All"
+                            fig_opp = px.bar(display_opportunity, x='Customer', y=f'{group_x} Revenue',
+                                            title=f"{title_suffix} Cross-Sell Opportunities for {group_y}", text='Formatted',
                                             custom_data=['Formatted'])
                             fig_opp.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                             fig_opp.update_layout(xaxis_tickangle=-45)
+                            fig_opp.update_yaxes(tickformat=',.0f')
                             st.plotly_chart(fig_opp, use_container_width=True, key="cross_sell_bar")
                         else:
-                            st.info(f"All customers buying {cat_x} are also buying {cat_y}")
+                            st.info(f"All customers buying {group_x} are also buying {group_y}")
                 
                 st.markdown("---")
-                st.markdown("#### Product Mix - Top Customers")
-                top_custs = df.groupby('Dealer Name')[cross_value_col].sum().nlargest(10).index.tolist()
-                mix_data = customer_categories.loc[customer_categories.index.isin(top_custs)]
+                st.markdown(f"#### Product Mix - Top Customers (by {group_col})")
+                mix_limit = get_display_limit("mix_limit", default=10)
+                top_custs_for_mix = df.groupby('Dealer Name')[cross_value_col].sum().sort_values(ascending=False)
+                top_custs_for_mix = apply_limit(top_custs_for_mix, mix_limit).index.tolist()
+                mix_data = customer_groups.loc[customer_groups.index.isin(top_custs_for_mix)]
                 
                 if mix_data.empty:
                     st.info("No product mix data available for top customers")
                 else:
                     mix_pct = mix_data.div(mix_data.sum(axis=1), axis=0) * 100
-                    mix_melted = mix_pct.reset_index().melt(id_vars='Dealer Name', var_name='Category', value_name='%')
+                    mix_melted = mix_pct.reset_index().melt(id_vars='Dealer Name', var_name=group_col, value_name='%')
                     
-                    fig_mix = px.bar(mix_melted, x='Dealer Name', y='%', color='Category',
-                                    title="Category Mix % by Top Customers", barmode='stack')
+                    fig_mix = px.bar(mix_melted, x='Dealer Name', y='%', color=group_col,
+                                    title=f"{group_col} Mix % by Top Customers", barmode='stack')
                     fig_mix.update_layout(xaxis_tickangle=-45)
                     st.plotly_chart(fig_mix, use_container_width=True, key="product_mix_bar")
     
@@ -580,7 +659,11 @@ with tab1:
             with col2:
                 curr_period = st.selectbox("Current Period", VALUE_COLS, index=min(1, len(VALUE_COLS)-1), key="curr_period")
             
-            decline_threshold = st.slider("Decline Threshold (%)", 10, 90, 30, key="decline_thresh")
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                decline_threshold = st.slider("Decline Threshold (%)", 10, 90, 30, key="decline_thresh")
+            with col2:
+                dropoff_limit = get_display_limit("dropoff_limit", default=20)
             
             prod_col = 'Product Name' if 'Product Name' in df.columns else 'Item Name' if 'Item Name' in df.columns else 'Sub Category' if 'Sub Category' in df.columns else None
             
@@ -606,13 +689,14 @@ with tab1:
                 st.metric("Products with Decline", len(declined))
                 
                 if len(declined) > 0:
-                    fig_dec = px.bar(declined.head(15), x=prod_col, y='Change %',
+                    display_declined = apply_limit(declined, dropoff_limit)
+                    fig_dec = px.bar(display_declined, x=prod_col, y='Change %',
                                     title=f"Products with >{decline_threshold}% Decline",
                                     color='Change %', color_continuous_scale='Reds_r')
                     fig_dec.update_layout(xaxis_tickangle=-45)
                     st.plotly_chart(fig_dec, use_container_width=True, key="dropoff_bar")
                     
-                    st.dataframe(declined[[prod_col, 'Previous', 'Current', 'Change %']].head(20), use_container_width=True)
+                    st.dataframe(display_declined[[prod_col, 'Previous', 'Current', 'Change %']], use_container_width=True)
                 else:
                     st.success("No significant decline found!")
             
@@ -705,6 +789,7 @@ with tab2:
                 fig = px.line(monthly, x='Month', y=trend_value_col, title="Monthly Trend", markers=True,
                              custom_data=['Formatted'])
                 fig.update_traces(hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
+                fig.update_yaxes(tickformat=',.0f')
                 st.plotly_chart(fig, use_container_width=True, key="purch_trend_line")
     
     with purch_sub3:
@@ -715,10 +800,15 @@ with tab2:
             st.warning("No value columns found in the dataset")
         else:
             # For API data, use single Value column; for Excel, allow year selection
-            if len(VALUE_COLS) > 1:
-                supp_value_col = st.selectbox("Select Year", VALUE_COLS, key="supp_year")
-            else:
-                supp_value_col = VALUE_COL
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                if len(VALUE_COLS) > 1:
+                    supp_value_col = st.selectbox("Select Year", VALUE_COLS, key="supp_year")
+                else:
+                    supp_value_col = VALUE_COL
+            with col2:
+                supplier_limit = get_display_limit("supplier_limit", default=10)
+            
             supplier = df.groupby('Dealer Name')[supp_value_col].sum().reset_index()
             supplier = supplier[supplier[supp_value_col] > 0].sort_values(supp_value_col, ascending=False)
             
@@ -726,10 +816,13 @@ with tab2:
                 st.info("No supplier data available for the selected year")
             else:
                 supplier['Formatted'] = supplier[supp_value_col].apply(format_inr)
-                fig = px.bar(supplier.head(15), x='Dealer Name', y=supp_value_col,
-                            title="Top 15 Suppliers", text='Formatted', custom_data=['Formatted'])
+                display_supplier = apply_limit(supplier, supplier_limit)
+                title_suffix = f"Top {supplier_limit}" if supplier_limit else "All"
+                fig = px.bar(display_supplier, x='Dealer Name', y=supp_value_col,
+                            title=f"{title_suffix} Suppliers", text='Formatted', custom_data=['Formatted'])
                 fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
+                fig.update_yaxes(tickformat=',.0f')
                 st.plotly_chart(fig, use_container_width=True, key="purch_supplier_bar")
 
 # ================================
@@ -748,10 +841,15 @@ with tab3:
             st.warning("No value columns found in the dataset")
         else:
             # For API data, use single Value column; for Excel, allow year selection
-            if len(VALUE_COLS) > 1:
-                cust_value_col = st.selectbox("Select Year", VALUE_COLS, key="cust_year")
-            else:
-                cust_value_col = VALUE_COL
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                if len(VALUE_COLS) > 1:
+                    cust_value_col = st.selectbox("Select Year", VALUE_COLS, key="cust_year")
+                else:
+                    cust_value_col = VALUE_COL
+            with col2:
+                cust_limit = get_display_limit("cust_overview_limit", default=20)
+            
             top_custs = df.groupby('Dealer Name')[cust_value_col].sum().reset_index()
             top_custs = top_custs[top_custs[cust_value_col] > 0].sort_values(cust_value_col, ascending=False)
             
@@ -759,11 +857,14 @@ with tab3:
                 st.info("No customer data available for the selected year")
             else:
                 top_custs['Formatted'] = top_custs[cust_value_col].apply(format_inr)
-                fig = px.bar(top_custs.head(20), x='Dealer Name', y=cust_value_col,
-                            title="Top 20 Customers", text='Formatted', color=cust_value_col,
+                display_custs = apply_limit(top_custs, cust_limit)
+                title_suffix = f"Top {cust_limit}" if cust_limit else "All"
+                fig = px.bar(display_custs, x='Dealer Name', y=cust_value_col,
+                            title=f"{title_suffix} Customers", text='Formatted', color=cust_value_col,
                             color_continuous_scale='Blues', custom_data=['Formatted'])
                 fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
+                fig.update_yaxes(tickformat=',.0f')
                 st.plotly_chart(fig, use_container_width=True, key="cust_overview_chart")
     
     with cust_sub2:
@@ -790,6 +891,7 @@ with tab3:
                             custom_data=['Formatted'])
                 fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
+                fig.update_yaxes(tickformat=',.0f')
                 st.plotly_chart(fig, use_container_width=True, key="geo_state_chart")
                 
                 if 'City' in df.columns:
@@ -804,6 +906,7 @@ with tab3:
                         fig = px.bar(city_data, x='City', y=geo_value_col, title=f"Cities in {sel_state}",
                                     text='Formatted', custom_data=['Formatted'])
                         fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
+                        fig.update_yaxes(tickformat=',.0f')
                         st.plotly_chart(fig, use_container_width=True, key="geo_city_chart")
                 else:
                     st.info("City column not found for detailed breakdown")
@@ -815,19 +918,27 @@ with tab3:
         elif len(VALUE_COLS) < 2:
             st.info("Performance comparison requires multiple time periods. Current data shows single period aggregated values.")
         else:
-            prev_y = st.selectbox("Previous", VALUE_COLS, index=0, key="cust_prev")
-            curr_y = st.selectbox("Current", VALUE_COLS, index=min(1, len(VALUE_COLS)-1), key="cust_curr")
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                prev_y = st.selectbox("Previous", VALUE_COLS, index=0, key="cust_prev")
+            with col2:
+                curr_y = st.selectbox("Current", VALUE_COLS, index=min(1, len(VALUE_COLS)-1), key="cust_curr")
+            with col3:
+                perf_limit = get_display_limit("perf_limit", default=10)
             
             perf = df.groupby('Dealer Name').agg({prev_y: 'sum', curr_y: 'sum'}).reset_index()
             perf['Growth %'] = ((perf[curr_y] - perf[prev_y]) / perf[prev_y].replace(0, np.nan) * 100).round(1)
             
-            growers = perf[perf['Growth %'] > 0].sort_values('Growth %', ascending=False).head(10)
-            decliners = perf[perf['Growth %'] < 0].sort_values('Growth %').head(10)
+            growers = perf[perf['Growth %'] > 0].sort_values('Growth %', ascending=False)
+            decliners = perf[perf['Growth %'] < 0].sort_values('Growth %')
             
-            if len(growers) > 0:
+            display_growers = apply_limit(growers, perf_limit)
+            display_decliners = apply_limit(decliners, perf_limit)
+            
+            if len(display_growers) > 0:
                 st.markdown("#### Top Growers")
-                growers['Growth Text'] = growers['Growth %'].apply(lambda x: f"{x:.1f}%")
-                fig = px.bar(growers, x='Dealer Name', y='Growth %', title="Growing Customers",
+                display_growers['Growth Text'] = display_growers['Growth %'].apply(lambda x: f"{x:.1f}%")
+                fig = px.bar(display_growers, x='Dealer Name', y='Growth %', title="Growing Customers",
                             text='Growth Text', color='Growth %', color_continuous_scale='Greens')
                 fig.update_traces(textposition='outside', hovertemplate='%{x}<br>Growth: %{y:.1f}%<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
@@ -835,10 +946,10 @@ with tab3:
             else:
                 st.info("No growing customers found for the selected periods")
             
-            if len(decliners) > 0:
+            if len(display_decliners) > 0:
                 st.markdown("#### Declining")
-                decliners['Growth Text'] = decliners['Growth %'].apply(lambda x: f"{x:.1f}%")
-                fig = px.bar(decliners, x='Dealer Name', y='Growth %', title="Declining Customers",
+                display_decliners['Growth Text'] = display_decliners['Growth %'].apply(lambda x: f"{x:.1f}%")
+                fig = px.bar(display_decliners, x='Dealer Name', y='Growth %', title="Declining Customers",
                             text='Growth Text', color='Growth %', color_continuous_scale='Reds_r')
                 fig.update_traces(textposition='outside', hovertemplate='%{x}<br>Growth: %{y:.1f}%<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
@@ -875,7 +986,11 @@ with tab4:
             else:
                 st.info("Category column not found")
             
-            hide_null_pay = st.checkbox("Hide zero values", value=True, key="pay_hide_null")
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                hide_null_pay = st.checkbox("Hide zero values", value=True, key="pay_hide_null")
+            with col2:
+                pay_dealer_limit = get_display_limit("pay_dealer_limit", default=10)
             
             if 'Dealer Name' in df.columns:
                 dealer_pay = df.groupby('Dealer Name')[VALUE_COL].sum().reset_index()
@@ -887,10 +1002,13 @@ with tab4:
                     st.info("No dealer payment data available")
                 else:
                     dealer_pay['Formatted'] = dealer_pay[VALUE_COL].apply(format_inr)
-                    fig = px.bar(dealer_pay.head(15), x='Dealer Name', y=VALUE_COL,
-                                title="Top 15 Dealers", text='Formatted', custom_data=['Formatted'])
+                    display_dealer_pay = apply_limit(dealer_pay, pay_dealer_limit)
+                    title_suffix = f"Top {pay_dealer_limit}" if pay_dealer_limit else "All"
+                    fig = px.bar(display_dealer_pay, x='Dealer Name', y=VALUE_COL,
+                                title=f"{title_suffix} Dealers", text='Formatted', custom_data=['Formatted'])
                     fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                     fig.update_layout(xaxis_tickangle=-45)
+                    fig.update_yaxes(tickformat=',.0f')
                     st.plotly_chart(fig, use_container_width=True, key="pay_dealer_bar")
             else:
                 st.info("Dealer Name column not found")
@@ -902,6 +1020,7 @@ with tab4:
         elif 'Dealer Name' not in df.columns:
             st.info("Dealer Name column not found for outstanding analysis")
         else:
+            outstanding_limit = get_display_limit("outstanding_limit", default=10)
             outstanding = df.groupby('Dealer Name')['Outstanding'].sum().reset_index()
             outstanding = outstanding[outstanding['Outstanding'] > 0].sort_values('Outstanding', ascending=False)
             
@@ -911,11 +1030,14 @@ with tab4:
                 outstanding['Formatted'] = outstanding['Outstanding'].apply(format_inr)
                 st.metric("Total Outstanding", format_inr(outstanding['Outstanding'].sum()))
                 
-                fig = px.bar(outstanding.head(15), x='Dealer Name', y='Outstanding',
-                            title="Top 15 Outstanding", text='Formatted', color='Outstanding',
+                display_outstanding = apply_limit(outstanding, outstanding_limit)
+                title_suffix = f"Top {outstanding_limit}" if outstanding_limit else "All"
+                fig = px.bar(display_outstanding, x='Dealer Name', y='Outstanding',
+                            title=f"{title_suffix} Outstanding", text='Formatted', color='Outstanding',
                             color_continuous_scale='Reds', custom_data=['Formatted'])
                 fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                 fig.update_layout(xaxis_tickangle=-45)
+                fig.update_yaxes(tickformat=',.0f')
                 st.plotly_chart(fig, use_container_width=True, key="pay_outstanding_bar")
 
 # Footer
