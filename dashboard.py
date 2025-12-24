@@ -638,13 +638,59 @@ with tab1:
                 if mix_data.empty:
                     st.info("No product mix data available for top customers")
                 else:
-                    mix_pct = mix_data.div(mix_data.sum(axis=1), axis=0) * 100
-                    mix_melted = mix_pct.reset_index().melt(id_vars='Dealer Name', var_name=group_col, value_name='%')
+                    # Create options for category selection
+                    all_categories = list(mix_data.columns)
+                    default_categories = all_categories[:5] if len(all_categories) > 5 else all_categories
                     
-                    fig_mix = px.bar(mix_melted, x='Dealer Name', y='%', color=group_col,
-                                    title=f"{group_col} Mix % by Top Customers", barmode='stack')
-                    fig_mix.update_layout(xaxis_tickangle=-45)
-                    st.plotly_chart(fig_mix, use_container_width=True, key="product_mix_bar")
+                    col1, col2 = st.columns([4, 1])
+                    with col1:
+                        selected_mix_categories = st.multiselect(
+                            f"Select {group_col}s to display", 
+                            all_categories, 
+                            default=default_categories,
+                            key="mix_category_selector"
+                        )
+                    with col2:
+                        mix_display_type = st.radio("Show", ["Values Only", "% Only"], horizontal=True, key="mix_display_type", label_visibility="collapsed")
+                    
+                    if selected_mix_categories:
+                        # Filter mix_data for selected categories
+                        mix_data_filtered = mix_data[selected_mix_categories]
+                        
+                        # Prepare data for visualization
+                        if mix_display_type == "Values Only":
+                            # Display actual values
+                            mix_values = mix_data_filtered.reset_index().melt(id_vars='Dealer Name', var_name=group_col, value_name='Value')
+                            mix_melted = mix_values.copy()
+                            mix_melted['Label'] = mix_melted.apply(
+                                lambda row: f"{format_inr(row['Value'])}" if row['Value'] > 0 else "Rs. 0",
+                                axis=1
+                            )
+                            fig_mix = px.bar(mix_melted, x='Dealer Name', y='Value', color=group_col,
+                                            title=f"{group_col} Mix by Top Customers", barmode='stack')
+                            fig_mix.update_layout(xaxis_tickangle=-45, yaxis_title="Revenue")
+                            fig_mix.update_yaxes(tickformat=',.0f')
+                            fig_mix.update_traces(
+                                text=mix_melted['Label'],
+                                textposition='inside',
+                                hovertemplate='<b>%{fullData.name}</b><br>Customer: %{x}<br>%{customdata[0]}<extra></extra>',
+                                customdata=mix_melted[['Label']].values
+                            )
+                        else:
+                            # Display percentages
+                            mix_pct = mix_data_filtered.div(mix_data_filtered.sum(axis=1), axis=0) * 100
+                            mix_melted = mix_pct.reset_index().melt(id_vars='Dealer Name', var_name=group_col, value_name='%')
+                            mix_melted['Label'] = mix_melted['%'].apply(lambda x: f"{x:.1f}%")
+                            fig_mix = px.bar(mix_melted, x='Dealer Name', y='%', color=group_col,
+                                            title=f"{group_col} Mix % by Top Customers", barmode='stack')
+                            fig_mix.update_layout(xaxis_tickangle=-45)
+                            fig_mix.update_traces(
+                                hovertemplate='<b>%{fullData.name}</b><br>Customer: %{x}<br>%{y:.1f}%<extra></extra>'
+                            )
+                        
+                        st.plotly_chart(fig_mix, use_container_width=True, key="product_mix_bar")
+                    else:
+                        st.info(f"Please select at least one {group_col}")
     
     # 1.5 Product Drop-Off Tracker
     with sales_sub5:
