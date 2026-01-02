@@ -22,10 +22,10 @@ if not st.session_state.authenticated:
     login_form()
     st.stop()
 
-# Load data from API
-@st.cache_data(ttl=300)  # Cache for 5 minutes
-def load_data():
-    df = fetch_dashboard_data()
+# Load data from API with period selection
+def load_data_by_period(period):
+    """Load data for the selected time period"""
+    df = fetch_dashboard_data(period=period)
     if df is not None:
         df.columns = df.columns.str.strip()
     return df
@@ -36,7 +36,9 @@ with st.sidebar:
     logout_button()
     st.markdown("---")
     if st.button(" Refresh Data", use_container_width=True):
-        clear_cached_data()
+        for key in list(st.session_state.keys()):
+            if key.startswith("api_data_"):
+                del st.session_state[key]
         st.cache_data.clear()
         st.rerun()
     st.markdown("---")
@@ -45,7 +47,26 @@ with st.sidebar:
     st.markdown("---")
     st.caption("Data loaded from API")
 
-df = load_data()
+# Time period selector (moved to sidebar for better UX)
+selected_period = st.sidebar.selectbox(
+    "📅 Select Time Period",
+    ["Today", "This Week", "This Month", "This Year"],
+    index=2,  # Default to "This Month"
+    key="time_period_select"
+)
+
+# Map display names to period codes
+period_map = {
+    "Today": "today",
+    "This Week": "week",
+    "This Month": "month",
+    "This Year": "year"
+}
+
+period_code = period_map[selected_period]
+
+# Load data for selected period
+df = load_data_by_period(period_code)
 
 # Handle case when data couldn't be loaded
 if df is None:
@@ -177,8 +198,115 @@ if df.empty:
     st.error("No data available. Please check your data file.")
     st.stop()
 
+# ================================
+# KEY STATISTICS SECTION
+# ================================
+st.subheader("📊 Key Metrics")
+
+# Get period label for display
+period_labels = {
+    "today": "Today",
+    "week": "This Week",
+    "month": "This Month",
+    "year": "This Year"
+}
+
+current_period_label = period_labels.get(period_code, "Selected Period")
+
+# Since we're fetching filtered data from API, use all data for metrics
+current_period_data = df
+
+# Calculate key statistics
+if not current_period_data.empty:
+    # 1. Revenue this period
+    revenue_this_period = current_period_data[VALUE_COL].sum() if VALUE_COL else 0
+    
+    # 2. Quantity this period
+    quantity_this_period = current_period_data[QTY_COL].sum() if QTY_COL else 0
+    
+    # 3. Most sold item (by quantity)
+    if QTY_COL and QTY_COL in current_period_data.columns:
+        prod_col = 'Product Name' if 'Product Name' in current_period_data.columns else 'Item Name' if 'Item Name' in current_period_data.columns else 'Sub Category' if 'Sub Category' in current_period_data.columns else None
+        if prod_col:
+            most_sold = current_period_data.groupby(prod_col)[QTY_COL].sum().idxmax() if not current_period_data.empty else "N/A"
+        else:
+            most_sold = "N/A"
+    else:
+        most_sold = "N/A"
+    
+    # 4. Most orders from state
+    if 'State' in current_period_data.columns:
+        most_orders_state = current_period_data['State'].value_counts().idxmax() if len(current_period_data) > 0 else "N/A"
+        state_orders_count = current_period_data['State'].value_counts().max() if len(current_period_data) > 0 else 0
+    else:
+        most_orders_state = "N/A"
+        state_orders_count = 0
+    
+    # 5. Most orders from area/city
+    if 'City' in current_period_data.columns:
+        most_orders_area = current_period_data['City'].value_counts().idxmax() if len(current_period_data) > 0 else "N/A"
+        area_orders_count = current_period_data['City'].value_counts().max() if len(current_period_data) > 0 else 0
+    else:
+        most_orders_area = "N/A"
+        area_orders_count = 0
+    
+    # 6. Most orders from dealer
+    if 'Dealer Name' in current_period_data.columns:
+        most_orders_dealer = current_period_data['Dealer Name'].value_counts().idxmax() if len(current_period_data) > 0 else "N/A"
+        dealer_orders_count = current_period_data['Dealer Name'].value_counts().max() if len(current_period_data) > 0 else 0
+    else:
+        most_orders_dealer = "N/A"
+        dealer_orders_count = 0
+    
+    # Create metric boxes in a grid layout
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("💰 Revenue", format_inr(revenue_this_period))
+        st.caption(current_period_label)
+    
+    with col2:
+        st.metric("📦 Total Quantity", format_qty(quantity_this_period))
+        st.caption(current_period_label)
+    
+    with col3:
+        st.metric("🏆 Most Sold Item", most_sold)
+        st.caption("By Quantity")
+    
+    with col4:
+        st.metric("📊 Total Orders", len(current_period_data))
+        st.caption(current_period_label)
+    
+    # Second row of statistics
+    col5, col6, col7, col8 = st.columns(4)
+    
+    with col5:
+        st.metric("🗺️ Top State", most_orders_state)
+        st.caption(f"{state_orders_count} orders")
+    
+    with col6:
+        st.metric("🏙️ Top Area", most_orders_area)
+        st.caption(f"{area_orders_count} orders")
+    
+    with col7:
+        st.metric("🤝 Top Dealer", most_orders_dealer)
+        st.caption(f"{dealer_orders_count} orders")
+    
+    with col8:
+        # Category count
+        if 'Category' in current_period_data.columns:
+            category_count = current_period_data['Category'].nunique()
+            st.metric("📂 Categories", category_count)
+        else:
+            st.metric("📂 Categories", "N/A")
+        st.caption("Unique")
+    
+    st.markdown("---")
+else:
+    st.warning(f"No data available for {current_period_label}")
+
 # Main Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["Sales Analytics", "Purchase Analytics", "Customer Insights", "Payment Analysis"])
+tab1, tab2, tab3 = st.tabs(["Sales Analytics", "Customer Insights", "Payment Analysis"])
 
 # ================================
 # TAB 1: SALES ANALYTICS
@@ -186,12 +314,15 @@ tab1, tab2, tab3, tab4 = st.tabs(["Sales Analytics", "Purchase Analytics", "Cust
 with tab1:
     st.header("Sales Analytics")
     
-    sales_sub1, sales_sub2, sales_sub3, sales_sub4, sales_sub5 = st.tabs([
+    sales_sub1, sales_sub2, sales_sub3, sales_sub4, sales_sub5, sales_sub6, sales_sub7, sales_sub8 = st.tabs([
         "Revenue & Quantity Insights", 
         "Customer Segmentation", 
         "Non-Moving & Slow-Moving Items",
         "Cross-Selling Analytics",
-        "Product Drop-Off Tracker"
+        "Product Drop-Off Tracker",
+        "Day & Date-wise Analytics",
+        "State-wise Revenue Analysis",
+        "Dealer & State Comparative Analysis"
     ])
     
     # 1.1 Revenue & Quantity Insights
@@ -474,10 +605,13 @@ with tab1:
                 analysis_value_col = st.selectbox("Select Year", VALUE_COLS, key="nonmov_year")
             else:
                 analysis_value_col = VALUE_COL
-            col1, col2 = st.columns([3, 1])
+            
+            col1, col2, col3 = st.columns([2, 1, 1])
             with col1:
                 hide_null = st.checkbox("Hide null/zero revenue items", value=True, key="sales_hide_null")
             with col2:
+                nonmov_analysis_view = st.selectbox("View by", ["Overall", "Category-wise", "State-wise"], key="nonmov_view_type")
+            with col3:
                 nonmov_limit = get_display_limit("nonmov_limit", default=20)
             
             prod_col = 'Product Name' if 'Product Name' in df.columns else 'Item Name' if 'Item Name' in df.columns else 'Sub Category' if 'Sub Category' in df.columns else None
@@ -485,70 +619,233 @@ with tab1:
             if not prod_col:
                 st.warning("No product/item column found for analysis")
             else:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.markdown("#### Non-Moving (Zero Sales)")
-                    product_sales = df.groupby(prod_col)[analysis_value_col].sum().reset_index()
-                    non_moving = product_sales[product_sales[analysis_value_col] == 0]
+                # OVERALL VIEW
+                if nonmov_analysis_view == "Overall":
+                    col1, col2 = st.columns(2)
                     
-                    st.metric("Non-Moving Products", len(non_moving))
-                    if len(non_moving) > 0:
-                        display_non_moving = apply_limit(non_moving, nonmov_limit)
-                        st.dataframe(display_non_moving, use_container_width=True)
-                    else:
-                        st.success("No non-moving items found!")
-                
-                with col2:
-                    st.markdown("#### Slow-Moving (Below Average)")
-                    product_sales = df.groupby(prod_col)[analysis_value_col].sum().reset_index()
-                    if hide_null:
-                        product_sales = product_sales[product_sales[analysis_value_col] > 0]
-                    
-                    if product_sales.empty:
-                        st.info("No product sales data available")
-                    else:
-                        avg_sales = product_sales[analysis_value_col].mean()
-                        slow_moving = product_sales[
-                            (product_sales[analysis_value_col] > 0) & 
-                            (product_sales[analysis_value_col] < avg_sales * 0.5)
-                        ].sort_values(analysis_value_col)
+                    with col1:
+                        st.markdown("#### Non-Moving (Zero Sales)")
+                        product_sales = df.groupby(prod_col)[analysis_value_col].sum().reset_index()
+                        non_moving = product_sales[product_sales[analysis_value_col] == 0]
                         
-                        slow_moving['Formatted'] = slow_moving[analysis_value_col].apply(format_inr)
-                        
-                        st.metric("Slow-Moving Products", len(slow_moving))
-                        st.caption(f"Average: {format_inr(avg_sales)}")
-                        
-                        if len(slow_moving) > 0:
-                            display_slow = apply_limit(slow_moving, nonmov_limit)
-                            fig_slow = px.bar(display_slow, x=prod_col, y=analysis_value_col,
-                                             title="Slow-Moving Items", text='Formatted', custom_data=['Formatted'])
-                            fig_slow.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
-                            fig_slow.update_layout(xaxis_tickangle=-45)
-                            fig_slow.update_yaxes(tickformat=',.0f')
-                            st.plotly_chart(fig_slow, use_container_width=True, key="slow_moving_bar")
+                        st.metric("Non-Moving Products", len(non_moving))
+                        if len(non_moving) > 0:
+                            display_non_moving = apply_limit(non_moving, nonmov_limit)
+                            st.dataframe(display_non_moving, use_container_width=True)
                         else:
-                            st.success("No slow-moving items found!")
-                
-                st.markdown("---")
-                st.markdown("#### Category-wise Status")
-                if 'Category' in df.columns:
-                    cat_analysis = df.groupby('Category').agg({
-                        analysis_value_col: ['sum', 'count', lambda x: (x == 0).sum()]
-                    }).reset_index()
-                    cat_analysis.columns = ['Category', 'Total Revenue', 'Total Items', 'Zero Sales']
-                    cat_analysis['Non-Moving %'] = (cat_analysis['Zero Sales'] / cat_analysis['Total Items'] * 100).round(1)
-                    cat_analysis['Formatted'] = cat_analysis['Total Revenue'].apply(format_inr)
+                            st.success("No non-moving items found!")
                     
-                    if cat_analysis.empty:
-                        st.info("No category data available")
+                    with col2:
+                        st.markdown("#### Slow-Moving (Below Average)")
+                        product_sales = df.groupby(prod_col)[analysis_value_col].sum().reset_index()
+                        if hide_null:
+                            product_sales = product_sales[product_sales[analysis_value_col] > 0]
+                        
+                        if product_sales.empty:
+                            st.info("No product sales data available")
+                        else:
+                            avg_sales = product_sales[analysis_value_col].mean()
+                            slow_moving = product_sales[
+                                (product_sales[analysis_value_col] > 0) & 
+                                (product_sales[analysis_value_col] < avg_sales * 0.5)
+                            ].sort_values(analysis_value_col)
+                            
+                            slow_moving['Formatted'] = slow_moving[analysis_value_col].apply(format_inr)
+                            
+                            st.metric("Slow-Moving Products", len(slow_moving))
+                            st.caption(f"Average: {format_inr(avg_sales)}")
+                            
+                            if len(slow_moving) > 0:
+                                display_slow = apply_limit(slow_moving, nonmov_limit)
+                                fig_slow = px.bar(display_slow, x=prod_col, y=analysis_value_col,
+                                                 title="Slow-Moving Items", text='Formatted', custom_data=['Formatted'])
+                                fig_slow.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
+                                fig_slow.update_layout(xaxis_tickangle=-45)
+                                fig_slow.update_yaxes(tickformat=',.0f')
+                                st.plotly_chart(fig_slow, use_container_width=True, key="slow_moving_bar")
+                            else:
+                                st.success("No slow-moving items found!")
+                    
+                    st.markdown("---")
+                    st.markdown("#### Category-wise Status")
+                    if 'Category' in df.columns:
+                        cat_analysis = df.groupby('Category').agg({
+                            analysis_value_col: ['sum', 'count', lambda x: (x == 0).sum()]
+                        }).reset_index()
+                        cat_analysis.columns = ['Category', 'Total Revenue', 'Total Items', 'Zero Sales']
+                        cat_analysis['Non-Moving %'] = (cat_analysis['Zero Sales'] / cat_analysis['Total Items'] * 100).round(1)
+                        cat_analysis['Formatted'] = cat_analysis['Total Revenue'].apply(format_inr)
+                        
+                        if cat_analysis.empty:
+                            st.info("No category data available")
+                        else:
+                            fig_cat = px.bar(cat_analysis, x='Category', y='Non-Moving %',
+                                            title="Non-Moving % by Category", color='Non-Moving %',
+                                            color_continuous_scale='Reds')
+                            st.plotly_chart(fig_cat, use_container_width=True, key="nonmov_cat_bar")
                     else:
-                        fig_cat = px.bar(cat_analysis, x='Category', y='Non-Moving %',
-                                        title="Non-Moving % by Category", color='Non-Moving %',
-                                        color_continuous_scale='Reds')
-                        st.plotly_chart(fig_cat, use_container_width=True, key="nonmov_cat_bar")
-                else:
-                    st.info("Category column not found")
+                        st.info("Category column not found")
+                
+                # CATEGORY-WISE VIEW
+                elif nonmov_analysis_view == "Category-wise":
+                    if 'Category' not in df.columns:
+                        st.warning("Category column not found for category-wise analysis")
+                    else:
+                        all_categories = df['Category'].dropna().unique().tolist()
+                        all_categories = sorted(all_categories)
+                        
+                        selected_cat_nonmov = st.selectbox("Select Category", all_categories, key="nonmov_cat_select")
+                        
+                        if selected_cat_nonmov:
+                            cat_df = df[df['Category'] == selected_cat_nonmov]
+                            
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.markdown(f"#### Non-Moving in {selected_cat_nonmov}")
+                                cat_product_sales = cat_df.groupby(prod_col)[analysis_value_col].sum().reset_index()
+                                cat_non_moving = cat_product_sales[cat_product_sales[analysis_value_col] == 0]
+                                
+                                st.metric("Non-Moving Products", len(cat_non_moving))
+                                if len(cat_non_moving) > 0:
+                                    display_cat_non_moving = apply_limit(cat_non_moving, nonmov_limit)
+                                    st.dataframe(display_cat_non_moving, use_container_width=True)
+                                else:
+                                    st.success("No non-moving items in this category!")
+                            
+                            with col2:
+                                st.markdown(f"#### Slow-Moving in {selected_cat_nonmov}")
+                                cat_product_sales = cat_df.groupby(prod_col)[analysis_value_col].sum().reset_index()
+                                if hide_null:
+                                    cat_product_sales = cat_product_sales[cat_product_sales[analysis_value_col] > 0]
+                                
+                                if cat_product_sales.empty:
+                                    st.info("No product sales data in this category")
+                                else:
+                                    cat_avg_sales = cat_product_sales[analysis_value_col].mean()
+                                    cat_slow_moving = cat_product_sales[
+                                        (cat_product_sales[analysis_value_col] > 0) & 
+                                        (cat_product_sales[analysis_value_col] < cat_avg_sales * 0.5)
+                                    ].sort_values(analysis_value_col)
+                                    
+                                    cat_slow_moving['Formatted'] = cat_slow_moving[analysis_value_col].apply(format_inr)
+                                    
+                                    st.metric("Slow-Moving Products", len(cat_slow_moving))
+                                    st.caption(f"Average: {format_inr(cat_avg_sales)}")
+                                    
+                                    if len(cat_slow_moving) > 0:
+                                        display_cat_slow = apply_limit(cat_slow_moving, nonmov_limit)
+                                        fig_cat_slow = px.bar(display_cat_slow, x=prod_col, y=analysis_value_col,
+                                                             title=f"Slow-Moving Items in {selected_cat_nonmov}", text='Formatted', 
+                                                             custom_data=['Formatted'])
+                                        fig_cat_slow.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
+                                        fig_cat_slow.update_layout(xaxis_tickangle=-45)
+                                        fig_cat_slow.update_yaxes(tickformat=',.0f')
+                                        st.plotly_chart(fig_cat_slow, use_container_width=True, key="slow_moving_cat_bar")
+                                    else:
+                                        st.success("No slow-moving items in this category!")
+                            
+                            st.markdown("---")
+                            st.markdown(f"#### Sub-Category Status in {selected_cat_nonmov}")
+                            if 'Sub Category' in df.columns:
+                                subcat_analysis = cat_df.groupby('Sub Category').agg({
+                                    analysis_value_col: ['sum', 'count', lambda x: (x == 0).sum()]
+                                }).reset_index()
+                                subcat_analysis.columns = ['Sub Category', 'Total Revenue', 'Total Items', 'Zero Sales']
+                                subcat_analysis['Non-Moving %'] = (subcat_analysis['Zero Sales'] / subcat_analysis['Total Items'] * 100).round(1)
+                                subcat_analysis['Formatted'] = subcat_analysis['Total Revenue'].apply(format_inr)
+                                
+                                if subcat_analysis.empty:
+                                    st.info("No sub-category data available")
+                                else:
+                                    fig_subcat = px.bar(subcat_analysis, x='Sub Category', y='Non-Moving %',
+                                                       title=f"Non-Moving % by Sub-Category in {selected_cat_nonmov}", 
+                                                       color='Non-Moving %',
+                                                       color_continuous_scale='Oranges')
+                                    fig_subcat.update_layout(xaxis_tickangle=-45)
+                                    st.plotly_chart(fig_subcat, use_container_width=True, key="nonmov_subcat_bar")
+                            else:
+                                st.info("Sub Category column not found")
+                
+                # STATE-WISE VIEW
+                elif nonmov_analysis_view == "State-wise":
+                    if 'State' not in df.columns:
+                        st.warning("State column not found for state-wise analysis")
+                    else:
+                        all_states = df['State'].dropna().unique().tolist()
+                        all_states = sorted(all_states)
+                        
+                        selected_state_nonmov = st.selectbox("Select State", all_states, key="nonmov_state_select")
+                        
+                        if selected_state_nonmov:
+                            state_df = df[df['State'] == selected_state_nonmov]
+                            
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.markdown(f"#### Non-Moving in {selected_state_nonmov}")
+                                state_product_sales = state_df.groupby(prod_col)[analysis_value_col].sum().reset_index()
+                                state_non_moving = state_product_sales[state_product_sales[analysis_value_col] == 0]
+                                
+                                st.metric("Non-Moving Products", len(state_non_moving))
+                                if len(state_non_moving) > 0:
+                                    display_state_non_moving = apply_limit(state_non_moving, nonmov_limit)
+                                    st.dataframe(display_state_non_moving, use_container_width=True)
+                                else:
+                                    st.success("No non-moving items in this state!")
+                            
+                            with col2:
+                                st.markdown(f"#### Slow-Moving in {selected_state_nonmov}")
+                                state_product_sales = state_df.groupby(prod_col)[analysis_value_col].sum().reset_index()
+                                if hide_null:
+                                    state_product_sales = state_product_sales[state_product_sales[analysis_value_col] > 0]
+                                
+                                if state_product_sales.empty:
+                                    st.info("No product sales data in this state")
+                                else:
+                                    state_avg_sales = state_product_sales[analysis_value_col].mean()
+                                    state_slow_moving = state_product_sales[
+                                        (state_product_sales[analysis_value_col] > 0) & 
+                                        (state_product_sales[analysis_value_col] < state_avg_sales * 0.5)
+                                    ].sort_values(analysis_value_col)
+                                    
+                                    state_slow_moving['Formatted'] = state_slow_moving[analysis_value_col].apply(format_inr)
+                                    
+                                    st.metric("Slow-Moving Products", len(state_slow_moving))
+                                    st.caption(f"Average: {format_inr(state_avg_sales)}")
+                                    
+                                    if len(state_slow_moving) > 0:
+                                        display_state_slow = apply_limit(state_slow_moving, nonmov_limit)
+                                        fig_state_slow = px.bar(display_state_slow, x=prod_col, y=analysis_value_col,
+                                                               title=f"Slow-Moving Items in {selected_state_nonmov}", text='Formatted', 
+                                                               custom_data=['Formatted'])
+                                        fig_state_slow.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
+                                        fig_state_slow.update_layout(xaxis_tickangle=-45)
+                                        fig_state_slow.update_yaxes(tickformat=',.0f')
+                                        st.plotly_chart(fig_state_slow, use_container_width=True, key="slow_moving_state_bar")
+                                    else:
+                                        st.success("No slow-moving items in this state!")
+                            
+                            st.markdown("---")
+                            st.markdown(f"#### Category Status in {selected_state_nonmov}")
+                            if 'Category' in df.columns:
+                                state_cat_analysis = state_df.groupby('Category').agg({
+                                    analysis_value_col: ['sum', 'count', lambda x: (x == 0).sum()]
+                                }).reset_index()
+                                state_cat_analysis.columns = ['Category', 'Total Revenue', 'Total Items', 'Zero Sales']
+                                state_cat_analysis['Non-Moving %'] = (state_cat_analysis['Zero Sales'] / state_cat_analysis['Total Items'] * 100).round(1)
+                                state_cat_analysis['Formatted'] = state_cat_analysis['Total Revenue'].apply(format_inr)
+                                
+                                if state_cat_analysis.empty:
+                                    st.info("No category data available")
+                                else:
+                                    fig_state_cat = px.bar(state_cat_analysis, x='Category', y='Non-Moving %',
+                                                           title=f"Non-Moving % by Category in {selected_state_nonmov}", 
+                                                           color='Non-Moving %',
+                                                           color_continuous_scale='Reds')
+                                    st.plotly_chart(fig_state_cat, use_container_width=True, key="nonmov_state_cat_bar")
+                            else:
+                                st.info("Category column not found")
     
     # 1.4 Cross-Selling Analytics
     with sales_sub4:
@@ -734,6 +1031,105 @@ with tab1:
                         
                         if fig_mix is not None:
                             st.plotly_chart(fig_mix, use_container_width=True, key="product_mix_bar")
+                        
+                        # Dealer Drill-Down Section
+                        st.markdown("---")
+                        st.markdown(f"#### Drill-Down by Dealer (by {group_col})")
+                        
+                        dealer_options = list(top_custs_for_mix)
+                        selected_dealer = st.selectbox(
+                            "Select a dealer to view detailed breakdown",
+                            dealer_options,
+                            key="drill_down_dealer"
+                        )
+                        
+                        if selected_dealer:
+                            dealer_detail = mix_data_filtered.loc[selected_dealer]
+                            
+                            # Create two columns for detail view
+                            detail_col1, detail_col2 = st.columns(2)
+                            
+                            with detail_col1:
+                                st.subheader(f"📊 Dealer: {selected_dealer}")
+                                
+                                # Show breakdown by selected metric
+                                if mix_display_type == "Value":
+                                    dealer_breakdown = pd.DataFrame({
+                                        group_col: dealer_detail.index,
+                                        'Value': dealer_detail.values
+                                    }).sort_values('Value', ascending=False)
+                                    dealer_breakdown['Formatted'] = dealer_breakdown['Value'].apply(format_inr)
+                                    dealer_breakdown['%'] = (dealer_breakdown['Value'] / dealer_breakdown['Value'].sum() * 100).round(1)
+                                    
+                                    fig_dealer_pie = px.pie(dealer_breakdown, values='Value', names=group_col,
+                                                           title=f"{selected_dealer} - {group_col} Mix (by Value)",
+                                                           custom_data=['Formatted', '%'])
+                                    fig_dealer_pie.update_traces(
+                                        hovertemplate='<b>%{label}</b><br>Value: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>'
+                                    )
+                                    st.plotly_chart(fig_dealer_pie, use_container_width=True, key=f"dealer_pie_{selected_dealer}")
+                                
+                                elif mix_display_type == "Revenue":
+                                    dealer_breakdown = pd.DataFrame({
+                                        group_col: dealer_detail.index,
+                                        'Revenue': dealer_detail.values
+                                    }).sort_values('Revenue', ascending=False)
+                                    dealer_breakdown['Formatted'] = dealer_breakdown['Revenue'].apply(format_inr)
+                                    dealer_breakdown['%'] = (dealer_breakdown['Revenue'] / dealer_breakdown['Revenue'].sum() * 100).round(1)
+                                    
+                                    fig_dealer_pie = px.pie(dealer_breakdown, values='Revenue', names=group_col,
+                                                           title=f"{selected_dealer} - {group_col} Mix (by Revenue)",
+                                                           custom_data=['Formatted', '%'])
+                                    fig_dealer_pie.update_traces(
+                                        hovertemplate='<b>%{label}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>'
+                                    )
+                                    st.plotly_chart(fig_dealer_pie, use_container_width=True, key=f"dealer_pie_{selected_dealer}")
+                                
+                                elif mix_display_type == "Quantity":
+                                    qty_col_check = selected_value_col.replace('Value', 'Qty') if 'Value' in selected_value_col else QTY_COL if QTY_COL else None
+                                    if qty_col_check and qty_col_check in df.columns:
+                                        qty_detail = df[df['Dealer Name'] == selected_dealer].groupby(group_col)[qty_col_check].sum()
+                                        dealer_breakdown = pd.DataFrame({
+                                            group_col: qty_detail.index,
+                                            'Quantity': qty_detail.values
+                                        }).sort_values('Quantity', ascending=False)
+                                        dealer_breakdown['Formatted'] = dealer_breakdown['Quantity'].apply(format_qty)
+                                        dealer_breakdown['%'] = (dealer_breakdown['Quantity'] / dealer_breakdown['Quantity'].sum() * 100).round(1)
+                                        
+                                        fig_dealer_pie = px.pie(dealer_breakdown, values='Quantity', names=group_col,
+                                                               title=f"{selected_dealer} - {group_col} Mix (by Quantity)",
+                                                               custom_data=['Formatted', '%'])
+                                        fig_dealer_pie.update_traces(
+                                            hovertemplate='<b>%{label}</b><br>Qty: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>'
+                                        )
+                                        st.plotly_chart(fig_dealer_pie, use_container_width=True, key=f"dealer_pie_{selected_dealer}")
+                                
+                                else:  # Percentage
+                                    dealer_breakdown = pd.DataFrame({
+                                        group_col: dealer_detail.index,
+                                        'Value': dealer_detail.values
+                                    }).sort_values('Value', ascending=False)
+                                    dealer_breakdown['%'] = (dealer_breakdown['Value'] / dealer_breakdown['Value'].sum() * 100).round(1)
+                                    dealer_breakdown['Formatted'] = dealer_breakdown['%'].apply(lambda x: f"{x:.1f}%")
+                                    
+                                    fig_dealer_pie = px.pie(dealer_breakdown, values='Value', names=group_col,
+                                                           title=f"{selected_dealer} - {group_col} Mix (%)",
+                                                           custom_data=['%'])
+                                    fig_dealer_pie.update_traces(
+                                        hovertemplate='<b>%{label}</b><br>%{customdata[0]:.1f}%<extra></extra>'
+                                    )
+                                    st.plotly_chart(fig_dealer_pie, use_container_width=True, key=f"dealer_pie_{selected_dealer}")
+                            
+                            with detail_col2:
+                                st.subheader(f"📋 Detailed Breakdown")
+                                st.dataframe(dealer_breakdown[[group_col, 'Formatted', '%']], use_container_width=True)
+                                
+                                # Show summary metrics
+                                st.markdown("**Summary**")
+                                total_val = dealer_breakdown['Value'].sum() if 'Value' in dealer_breakdown.columns else dealer_breakdown['Revenue'].sum() if 'Revenue' in dealer_breakdown.columns else dealer_breakdown['Quantity'].sum()
+                                st.metric("Total Value", format_inr(total_val) if mix_display_type in ["Value", "Revenue"] else format_qty(total_val))
+                                st.metric(f"Number of {group_col}s", len(dealer_breakdown))
+                                st.metric("Top Category", dealer_breakdown[group_col].iloc[0] if len(dealer_breakdown) > 0 else "N/A")
                     else:
                         st.info(f"Please select at least one {group_col}")
     
@@ -814,112 +1210,722 @@ with tab1:
                     st.plotly_chart(fig_cat_trend, use_container_width=True, key="cat_trend_bar")
             else:
                 st.info("Category column not found")
-
-# ================================
-# TAB 2: PURCHASE ANALYTICS
-# ================================
-with tab2:
-    st.header("Purchase Analytics")
     
-    purch_sub1, purch_sub2, purch_sub3 = st.tabs(["Overview", "Trends", "Supplier Analysis"])
-    
-    with purch_sub1:
-        st.subheader("Purchase Overview")
+    # 1.6 Day & Date-wise Analytics
+    with sales_sub6:
+        st.subheader("Day & Date-wise Analytics")
+        
         if not VALUE_COL:
             st.warning("No value columns found in the dataset")
         else:
             # For API data, use single Value column; for Excel, allow year selection
             if len(VALUE_COLS) > 1:
-                purch_value_col = st.selectbox("Select Year", VALUE_COLS, key="purch_year")
+                date_value_col = st.selectbox("Select Year", VALUE_COLS, key="date_year_select")
             else:
-                purch_value_col = VALUE_COL
-            total_purch = df[purch_value_col].sum()
+                date_value_col = VALUE_COL
             
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Total Value", format_inr(total_purch))
-            if 'Category' in df.columns:
-                m2.metric("Categories", df['Category'].nunique())
-            else:
-                m2.metric("Categories", "N/A")
-            if 'Dealer Name' in df.columns:
-                m3.metric("Dealers", df['Dealer Name'].nunique())
-            else:
-                m3.metric("Dealers", "N/A")
+            # Check if Date column exists
+            has_date = 'Date' in df.columns or 'Transaction Date' in df.columns or 'Order Date' in df.columns
             
-            if 'Category' in df.columns:
-                cat_purch = df.groupby('Category')[purch_value_col].sum().reset_index()
-                cat_purch = cat_purch[cat_purch[purch_value_col] > 0]
-                if not cat_purch.empty:
-                    cat_purch['Formatted'] = cat_purch[purch_value_col].apply(format_inr)
-                    fig = px.pie(cat_purch, values=purch_value_col, names='Category', title="By Category",
-                                custom_data=['Formatted'])
-                    fig.update_traces(hovertemplate='%{label}<br>%{customdata[0]}<extra></extra>')
-                    st.plotly_chart(fig, use_container_width=True, key="purch_cat_pie")
+            if not has_date:
+                st.info("📅 No specific date column found in the dataset.")
+                st.info("The current data appears to be aggregated at period level (Year/Month format).")
+                
+                # Show period-wise analysis instead
+                st.markdown("#### Period-wise Analysis")
+                if 'Month' in df.columns:
+                    period_data = df.groupby('Month')[date_value_col].sum().reset_index()
+                    period_data = period_data[period_data[date_value_col] > 0].sort_values(date_value_col, ascending=False)
+                    
+                    if not period_data.empty:
+                        period_data['Formatted'] = period_data[date_value_col].apply(format_inr)
+                        
+                        fig_period = px.bar(period_data, x='Month', y=date_value_col,
+                                          title="Revenue by Month", text='Formatted',
+                                          color=date_value_col, color_continuous_scale='Viridis',
+                                          custom_data=['Formatted'])
+                        fig_period.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
+                        fig_period.update_layout(xaxis_tickangle=-45)
+                        fig_period.update_yaxes(tickformat=',.0f')
+                        st.plotly_chart(fig_period, use_container_width=True, key="period_bar")
+                        
+                        # Show table view
+                        st.markdown("#### Monthly Summary")
+                        summary_df = period_data[['Month', 'Formatted']].copy()
+                        summary_df.columns = ['Month', 'Revenue']
+                        st.dataframe(summary_df, use_container_width=True)
+                    else:
+                        st.info("No monthly data available")
                 else:
-                    st.info("No category data available for the selected year")
+                    st.info("No month or date data available in the dataset")
+                
+                st.markdown("---")
+                st.markdown("#### Dealer Activity by Period")
+                if 'Dealer Name' in df.columns and 'Month' in df.columns:
+                    dealer_period = df.groupby(['Month', 'Dealer Name'])[date_value_col].sum().reset_index()
+                    dealer_period = dealer_period[dealer_period[date_value_col] > 0]
+                    
+                    if not dealer_period.empty:
+                        # Get top dealers
+                        top_dealers_period = df.groupby('Dealer Name')[date_value_col].sum().nlargest(5).index.tolist()
+                        dealer_period_filtered = dealer_period[dealer_period['Dealer Name'].isin(top_dealers_period)]
+                        
+                        dealer_period_filtered['Formatted'] = dealer_period_filtered[date_value_col].apply(format_inr)
+                        
+                        fig_dealer_period = px.line(dealer_period_filtered, x='Month', y=date_value_col, 
+                                                   color='Dealer Name', markers=True,
+                                                   title="Top 5 Dealers - Monthly Trend",
+                                                   custom_data=['Formatted'])
+                        fig_dealer_period.update_traces(hovertemplate='%{x}<br>%{fullData.name}<br>%{customdata[0]}<extra></extra>')
+                        fig_dealer_period.update_yaxes(tickformat=',.0f')
+                        st.plotly_chart(fig_dealer_period, use_container_width=True, key="dealer_period_line")
+                    else:
+                        st.info("No dealer period data available")
+                else:
+                    st.info("Dealer Name or Month column not found")
+            
             else:
-                st.info("Category column not found")
+                # Process date data
+                date_col = None
+                if 'Date' in df.columns:
+                    date_col = 'Date'
+                elif 'Transaction Date' in df.columns:
+                    date_col = 'Transaction Date'
+                elif 'Order Date' in df.columns:
+                    date_col = 'Order Date'
+                
+                # Convert to datetime
+                try:
+                    df_date = df.copy()
+                    df_date[date_col] = pd.to_datetime(df_date[date_col], errors='coerce')
+                    df_date = df_date[df_date[date_col].notna()]
+                    
+                    if df_date.empty:
+                        st.warning("Could not parse dates properly")
+                    else:
+                        # Add helper columns
+                        df_date['Date Only'] = df_date[date_col].dt.date
+                        df_date['Day Name'] = df_date[date_col].dt.day_name()
+                        df_date['Week Number'] = df_date[date_col].dt.isocalendar().week
+                        df_date['Day of Month'] = df_date[date_col].dt.day
+                        
+                        # Tabs for different views
+                        date_view1, date_view2, date_view3, date_view4 = st.tabs(
+                            ["Daily Analysis", "Weekday Analysis", "Weekly Analysis", "Calendar Heatmap"]
+                        )
+                        
+                        with date_view1:
+                            st.markdown("#### Daily Revenue Trend")
+                            daily_data = df_date.groupby('Date Only')[date_value_col].sum().reset_index()
+                            daily_data = daily_data[daily_data[date_value_col] > 0].sort_values('Date Only')
+                            daily_data['Formatted'] = daily_data[date_value_col].apply(format_inr)
+                            
+                            if not daily_data.empty:
+                                fig_daily = px.line(daily_data, x='Date Only', y=date_value_col,
+                                                   title="Daily Revenue Trend", markers=True,
+                                                   custom_data=['Formatted'])
+                                fig_daily.update_layout(xaxis_title="Date", yaxis_title="Revenue")
+                                fig_daily.update_traces(hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
+                                fig_daily.update_yaxes(tickformat=',.0f')
+                                st.plotly_chart(fig_daily, use_container_width=True, key="daily_trend")
+                                
+                                # Top days
+                                st.markdown("#### Top 10 Best Days")
+                                top_daily = daily_data.nlargest(10, date_value_col)[['Date Only', 'Formatted']].copy()
+                                top_daily.columns = ['Date', 'Revenue']
+                                st.dataframe(top_daily, use_container_width=True)
+                            else:
+                                st.info("No daily data available")
+                        
+                        with date_view2:
+                            st.markdown("#### Weekday Analysis")
+                            day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                            weekday_data = df_date.groupby('Day Name')[date_value_col].sum().reset_index()
+                            weekday_data['Day Name'] = pd.Categorical(weekday_data['Day Name'], categories=day_order, ordered=True)
+                            weekday_data = weekday_data.sort_values('Day Name')
+                            weekday_data['Formatted'] = weekday_data[date_value_col].apply(format_inr)
+                            weekday_data['Count'] = df_date.groupby('Day Name').size().values
+                            
+                            if not weekday_data.empty:
+                                # Revenue by weekday
+                                fig_weekday = px.bar(weekday_data, x='Day Name', y=date_value_col,
+                                                    title="Revenue by Weekday", text='Formatted',
+                                                    color=date_value_col, color_continuous_scale='Blues',
+                                                    custom_data=['Formatted', 'Count'])
+                                fig_weekday.update_traces(
+                                    textposition='outside',
+                                    hovertemplate='<b>%{x}</b><br>Revenue: %{customdata[0]}<br>Transactions: %{customdata[1]}<extra></extra>'
+                                )
+                                fig_weekday.update_layout(xaxis_title="Day of Week")
+                                fig_weekday.update_yaxes(tickformat=',.0f')
+                                st.plotly_chart(fig_weekday, use_container_width=True, key="weekday_bar")
+                                
+                                # Summary table
+                                summary_weekday = weekday_data[['Day Name', 'Formatted', 'Count']].copy()
+                                summary_weekday.columns = ['Day', 'Revenue', 'Transactions']
+                                st.dataframe(summary_weekday, use_container_width=True)
+                            else:
+                                st.info("No weekday data available")
+                        
+                        with date_view3:
+                            st.markdown("#### Weekly Analysis")
+                            weekly_data = df_date.groupby('Week Number')[date_value_col].sum().reset_index()
+                            weekly_data = weekly_data[weekly_data[date_value_col] > 0].sort_values('Week Number')
+                            weekly_data['Formatted'] = weekly_data[date_value_col].apply(format_inr)
+                            weekly_data['Week'] = 'Week ' + weekly_data['Week Number'].astype(str)
+                            
+                            if not weekly_data.empty:
+                                fig_weekly = px.bar(weekly_data, x='Week', y=date_value_col,
+                                                   title="Revenue by Week", text='Formatted',
+                                                   color=date_value_col, color_continuous_scale='Greens',
+                                                   custom_data=['Formatted'])
+                                fig_weekly.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
+                                fig_weekly.update_yaxes(tickformat=',.0f')
+                                st.plotly_chart(fig_weekly, use_container_width=True, key="weekly_bar")
+                                
+                                # Summary
+                                summary_weekly = weekly_data[['Week', 'Formatted']].copy()
+                                summary_weekly.columns = ['Week', 'Revenue']
+                                st.dataframe(summary_weekly, use_container_width=True)
+                            else:
+                                st.info("No weekly data available")
+                        
+                        with date_view4:
+                            st.markdown("#### Calendar Heatmap (Day of Month)")
+                            day_month_data = df_date.groupby('Day of Month')[date_value_col].sum().reset_index()
+                            day_month_data = day_month_data[day_month_data[date_value_col] > 0]
+                            day_month_data['Formatted'] = day_month_data[date_value_col].apply(format_inr)
+                            
+                            if not day_month_data.empty:
+                                fig_calendar = px.bar(day_month_data, x='Day of Month', y=date_value_col,
+                                                     title="Revenue by Day of Month", text='Formatted',
+                                                     color=date_value_col, color_continuous_scale='Oranges',
+                                                     custom_data=['Formatted'])
+                                fig_calendar.update_traces(textposition='outside', hovertemplate='Day %{x}<br>%{customdata[0]}<extra></extra>')
+                                fig_calendar.update_layout(xaxis_title="Day of Month (1-31)")
+                                fig_calendar.update_yaxes(tickformat=',.0f')
+                                st.plotly_chart(fig_calendar, use_container_width=True, key="calendar_bar")
+                                
+                                # Insights
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    best_day = day_month_data.loc[day_month_data[date_value_col].idxmax()]
+                                    st.metric("🏆 Best Day of Month", f"Day {int(best_day['Day of Month'])}", best_day['Formatted'])
+                                with col2:
+                                    worst_day = day_month_data.loc[day_month_data[date_value_col].idxmin()]
+                                    st.metric("📉 Lowest Day", f"Day {int(worst_day['Day of Month'])}", worst_day['Formatted'])
+                                with col3:
+                                    avg_revenue = day_month_data[date_value_col].mean()
+                                    st.metric("📊 Average Daily", format_inr(avg_revenue))
+                            else:
+                                st.info("No day-of-month data available")
+                
+                except Exception as e:
+                    st.error(f"Error processing date data: {str(e)}")
     
-    with purch_sub2:
-        st.subheader("Trends")
-        if 'Month' not in df.columns:
-            st.info("Month column not found for trend analysis. API data shows aggregated values.")
-        elif not VALUE_COL:
+    # 1.7 State-wise Revenue Analysis
+    with sales_sub7:
+        st.subheader("State-wise Revenue Analysis")
+        
+        if not VALUE_COL:
             st.warning("No value columns found in the dataset")
+        elif 'State' not in df.columns:
+            st.warning("State column not found for state-wise analysis")
         else:
             # For API data, use single Value column; for Excel, allow year selection
             if len(VALUE_COLS) > 1:
-                trend_value_col = st.selectbox("Select Year", VALUE_COLS, key="purch_trend_year")
+                state_rev_col = st.selectbox("Select Year", VALUE_COLS, key="state_year_select")
             else:
-                trend_value_col = VALUE_COL
-            monthly = df.groupby('Month')[trend_value_col].sum().reset_index()
-            if monthly.empty or monthly[trend_value_col].sum() == 0:
-                st.info("No monthly trend data available")
-            else:
-                monthly['Formatted'] = monthly[trend_value_col].apply(format_inr)
-                fig = px.line(monthly, x='Month', y=trend_value_col, title="Monthly Trend", markers=True,
-                             custom_data=['Formatted'])
-                fig.update_traces(hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
-                fig.update_yaxes(tickformat=',.0f')
-                st.plotly_chart(fig, use_container_width=True, key="purch_trend_line")
+                state_rev_col = VALUE_COL
+            
+            # Get all states
+            all_states = df['State'].dropna().unique().tolist()
+            all_states = sorted(all_states)
+            
+            st.markdown("#### Overall State-wise Revenue")
+            state_revenue = df.groupby('State')[state_rev_col].sum().reset_index()
+            state_revenue = state_revenue[state_revenue[state_rev_col] > 0].sort_values(state_rev_col, ascending=False)
+            state_revenue['Formatted'] = state_revenue[state_rev_col].apply(format_inr)
+            state_revenue['%'] = (state_revenue[state_rev_col] / state_revenue[state_rev_col].sum() * 100).round(1)
+            
+            # Create visualization
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                fig_state_rev = px.bar(state_revenue, x='State', y=state_rev_col,
+                                       title="Revenue by State", text='Formatted',
+                                       color=state_rev_col, color_continuous_scale='Viridis',
+                                       custom_data=['Formatted', '%'])
+                fig_state_rev.update_traces(textposition='outside', 
+                                           hovertemplate='<b>%{x}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>')
+                fig_state_rev.update_layout(xaxis_tickangle=-45)
+                fig_state_rev.update_yaxes(tickformat=',.0f')
+                st.plotly_chart(fig_state_rev, use_container_width=True, key="state_revenue_bar")
+            
+            with col2:
+                st.markdown("#### State Summary")
+                summary_states = state_revenue[['State', 'Formatted', '%']].copy()
+                summary_states.columns = ['State', 'Revenue', '%']
+                st.dataframe(summary_states, use_container_width=True, height=400)
+            
+            st.markdown("---")
+            st.markdown("#### Drill-Down Analysis by State")
+            
+            # State selector
+            selected_state = st.selectbox("Select State", all_states, key="state_analysis_select")
+            
+            if selected_state:
+                state_data = df[df['State'] == selected_state]
+                
+                # Create tabs for different views
+                view_dealers, view_products = st.tabs(["State Dealers", "State Product-wise"])
+                
+                with view_dealers:
+                    st.markdown(f"#### Dealers in {selected_state}")
+                    
+                    dealers_in_state = state_data.groupby('Dealer Name')[state_rev_col].sum().reset_index()
+                    dealers_in_state = dealers_in_state[dealers_in_state[state_rev_col] > 0].sort_values(state_rev_col, ascending=False)
+                    dealers_in_state['Formatted'] = dealers_in_state[state_rev_col].apply(format_inr)
+                    dealers_in_state['%'] = (dealers_in_state[state_rev_col] / dealers_in_state[state_rev_col].sum() * 100).round(1)
+                    
+                    if not dealers_in_state.empty:
+                        # Show metrics
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Total Revenue", format_inr(dealers_in_state[state_rev_col].sum()))
+                        with col2:
+                            st.metric("Number of Dealers", len(dealers_in_state))
+                        with col3:
+                            st.metric("Top Dealer", dealers_in_state['Dealer Name'].iloc[0] if len(dealers_in_state) > 0 else "N/A")
+                        with col4:
+                            avg_per_dealer = dealers_in_state[state_rev_col].mean()
+                            st.metric("Avg per Dealer", format_inr(avg_per_dealer))
+                        
+                        st.markdown("##### Dealer Performance")
+                        # Bar chart
+                        fig_dealers = px.bar(dealers_in_state, x='Dealer Name', y=state_rev_col,
+                                            title=f"Dealers Revenue in {selected_state}", text='Formatted',
+                                            color=state_rev_col, color_continuous_scale='Blues',
+                                            custom_data=['Formatted', '%'])
+                        fig_dealers.update_traces(textposition='outside',
+                                                 hovertemplate='<b>%{x}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>')
+                        fig_dealers.update_layout(xaxis_tickangle=-45)
+                        fig_dealers.update_yaxes(tickformat=',.0f')
+                        st.plotly_chart(fig_dealers, use_container_width=True, key=f"dealers_{selected_state}")
+                        
+                        # Data table
+                        st.markdown("##### Dealer Details")
+                        dealer_details = dealers_in_state[['Dealer Name', 'Formatted', '%']].copy()
+                        dealer_details.columns = ['Dealer Name', 'Revenue', '%']
+                        st.dataframe(dealer_details, use_container_width=True)
+                        
+                        # Additional analysis by dealer
+                        st.markdown("---")
+                        st.markdown("##### Dealer Category Mix")
+                        
+                        dealer_options = dealers_in_state['Dealer Name'].tolist()
+                        selected_dealer_state = st.selectbox("Select Dealer for Category Analysis", dealer_options, 
+                                                             key="dealer_category_select")
+                        
+                        if selected_dealer_state:
+                            dealer_cat_data = state_data[state_data['Dealer Name'] == selected_dealer_state]
+                            
+                            if 'Category' in dealer_cat_data.columns:
+                                dealer_categories = dealer_cat_data.groupby('Category')[state_rev_col].sum().reset_index()
+                                dealer_categories = dealer_categories[dealer_categories[state_rev_col] > 0].sort_values(state_rev_col, ascending=False)
+                                dealer_categories['Formatted'] = dealer_categories[state_rev_col].apply(format_inr)
+                                dealer_categories['%'] = (dealer_categories[state_rev_col] / dealer_categories[state_rev_col].sum() * 100).round(1)
+                                
+                                if not dealer_categories.empty:
+                                    # Pie chart
+                                    fig_dealer_cat_pie = px.pie(dealer_categories, values=state_rev_col, names='Category',
+                                                               title=f"{selected_dealer_state} - Category Mix",
+                                                               custom_data=['Formatted', '%'])
+                                    fig_dealer_cat_pie.update_traces(
+                                        hovertemplate='<b>%{label}</b><br>%{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>'
+                                    )
+                                    st.plotly_chart(fig_dealer_cat_pie, use_container_width=True, key=f"dealer_cat_pie_{selected_dealer_state}")
+                                    
+                                    # Table
+                                    cat_table = dealer_categories[['Category', 'Formatted', '%']].copy()
+                                    cat_table.columns = ['Category', 'Revenue', '%']
+                                    st.dataframe(cat_table, use_container_width=True)
+                            else:
+                                st.info("Category data not available")
+                    else:
+                        st.info(f"No dealer data available for {selected_state}")
+                
+                with view_products:
+                    st.markdown(f"#### Products in {selected_state}")
+                    
+                    # Determine product column
+                    prod_col = 'Product Name' if 'Product Name' in state_data.columns else ('Item Name' if 'Item Name' in state_data.columns else ('Sub Category' if 'Sub Category' in state_data.columns else None))
+                    
+                    if not prod_col:
+                        st.warning("No product/item column found for product analysis")
+                    else:
+                        # Get categories for filtering
+                        if 'Category' in state_data.columns:
+                            all_categories = state_data['Category'].dropna().unique().tolist()
+                            all_categories = sorted(all_categories)
+                            
+                            selected_categories_prod = st.multiselect(
+                                "Select Categories to display",
+                                all_categories,
+                                default=all_categories[:5] if len(all_categories) > 5 else all_categories,
+                                key="state_prod_category_filter"
+                            )
+                            
+                            if selected_categories_prod:
+                                prod_data = state_data[state_data['Category'].isin(selected_categories_prod)]
+                            else:
+                                prod_data = state_data
+                        else:
+                            prod_data = state_data
+                        
+                        products_in_state = prod_data.groupby(prod_col)[state_rev_col].sum().reset_index()
+                        products_in_state = products_in_state[products_in_state[state_rev_col] > 0].sort_values(state_rev_col, ascending=False)
+                        products_in_state['Formatted'] = products_in_state[state_rev_col].apply(format_inr)
+                        products_in_state['%'] = (products_in_state[state_rev_col] / products_in_state[state_rev_col].sum() * 100).round(1)
+                        
+                        if not products_in_state.empty:
+                            # Show metrics
+                            col1, col2, col3, col4 = st.columns(4)
+                            with col1:
+                                st.metric("Total Revenue", format_inr(products_in_state[state_rev_col].sum()))
+                            with col2:
+                                st.metric(f"Number of {prod_col}s", len(products_in_state))
+                            with col3:
+                                st.metric("Top Product", products_in_state[prod_col].iloc[0][:30] if len(products_in_state) > 0 else "N/A")
+                            with col4:
+                                avg_per_prod = products_in_state[state_rev_col].mean()
+                                st.metric("Avg per Product", format_inr(avg_per_prod))
+                            
+                            st.markdown(f"##### Top 20 {prod_col}s by Revenue")
+                            
+                            # Bar chart (top 20)
+                            top_products = products_in_state.head(20)
+                            fig_products = px.bar(top_products, x=prod_col, y=state_rev_col,
+                                                 title=f"Top {prod_col}s Revenue in {selected_state}", text='Formatted',
+                                                 color=state_rev_col, color_continuous_scale='Greens',
+                                                 custom_data=['Formatted', '%'])
+                            fig_products.update_traces(textposition='outside',
+                                                      hovertemplate='<b>%{x}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>')
+                            fig_products.update_layout(xaxis_tickangle=-45, height=600)
+                            fig_products.update_yaxes(tickformat=',.0f')
+                            st.plotly_chart(fig_products, use_container_width=True, key=f"products_{selected_state}")
+                            
+                            # Data table with all products
+                            st.markdown(f"##### All {prod_col}s Details")
+                            prod_details = products_in_state[[prod_col, 'Formatted', '%']].copy()
+                            prod_details.columns = [prod_col, 'Revenue', '%']
+                            st.dataframe(prod_details, use_container_width=True)
+                            
+                            # Category-wise product breakdown
+                            if 'Category' in state_data.columns:
+                                st.markdown("---")
+                                st.markdown("##### Category-wise Product Summary")
+                                
+                                cat_prod_summary = prod_data.groupby(['Category', prod_col])[state_rev_col].sum().reset_index()
+                                cat_prod_summary = cat_prod_summary[cat_prod_summary[state_rev_col] > 0].sort_values(['Category', state_rev_col], ascending=[True, False])
+                                cat_prod_summary['Formatted'] = cat_prod_summary[state_rev_col].apply(format_inr)
+                                
+                                # Show for each category
+                                for category in sorted(prod_data['Category'].unique()):
+                                    cat_prod = cat_prod_summary[cat_prod_summary['Category'] == category]
+                                    if not cat_prod.empty:
+                                        with st.expander(f"📦 {category} Products", expanded=False):
+                                            cat_prod_display = cat_prod[[prod_col, 'Formatted']].copy()
+                                            cat_prod_display.columns = [prod_col, 'Revenue']
+                                            st.dataframe(cat_prod_display, use_container_width=True)
+                        else:
+                            st.info(f"No product data available for {selected_state}")
     
-    with purch_sub3:
-        st.subheader("Supplier Analysis")
-        if 'Dealer Name' not in df.columns:
-            st.warning("Dealer Name column not found for supplier analysis")
-        elif not VALUE_COL:
+    # 1.8 Dealer & State Comparative Analysis
+    with sales_sub8:
+        st.subheader("Dealer & State Comparative Analysis")
+        
+        if not VALUE_COL:
             st.warning("No value columns found in the dataset")
+        elif 'State' not in df.columns or 'Dealer Name' not in df.columns:
+            st.warning("State or Dealer Name column not found for comparative analysis")
         else:
             # For API data, use single Value column; for Excel, allow year selection
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                if len(VALUE_COLS) > 1:
-                    supp_value_col = st.selectbox("Select Year", VALUE_COLS, key="supp_year")
-                else:
-                    supp_value_col = VALUE_COL
-            with col2:
-                supplier_limit = get_display_limit("supplier_limit", default=10)
-            
-            supplier = df.groupby('Dealer Name')[supp_value_col].sum().reset_index()
-            supplier = supplier[supplier[supp_value_col] > 0].sort_values(supp_value_col, ascending=False)
-            
-            if supplier.empty:
-                st.info("No supplier data available for the selected year")
+            if len(VALUE_COLS) > 1:
+                comp_value_col = st.selectbox("Select Year", VALUE_COLS, key="comp_year_select")
             else:
-                supplier['Formatted'] = supplier[supp_value_col].apply(format_inr)
-                display_supplier = apply_limit(supplier, supplier_limit)
-                title_suffix = f"Top {supplier_limit}" if supplier_limit else "All"
-                fig = px.bar(display_supplier, x='Dealer Name', y=supp_value_col,
-                            title=f"{title_suffix} Suppliers", text='Formatted', custom_data=['Formatted'])
-                fig.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
-                fig.update_layout(xaxis_tickangle=-45)
-                fig.update_yaxes(tickformat=',.0f')
-                st.plotly_chart(fig, use_container_width=True, key="purch_supplier_bar")
+                comp_value_col = VALUE_COL
+            
+            # Get all states
+            all_states = df['State'].dropna().unique().tolist()
+            all_states = sorted(all_states)
+            
+            st.markdown("#### State Revenue Comparison")
+            state_comp = df.groupby('State')[comp_value_col].sum().reset_index()
+            state_comp = state_comp[state_comp[comp_value_col] > 0].sort_values(comp_value_col, ascending=False)
+            state_comp['Formatted'] = state_comp[comp_value_col].apply(format_inr)
+            state_comp['%'] = (state_comp[comp_value_col] / state_comp[comp_value_col].sum() * 100).round(1)
+            
+            # Bar chart
+            fig_state_comp = px.bar(state_comp, x='State', y=comp_value_col,
+                                   title="Revenue Distribution by State", text='Formatted',
+                                   color=comp_value_col, color_continuous_scale='Viridis',
+                                   custom_data=['Formatted', '%'])
+            fig_state_comp.update_traces(textposition='outside',
+                                        hovertemplate='<b>%{x}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>')
+            fig_state_comp.update_layout(xaxis_tickangle=-45)
+            fig_state_comp.update_yaxes(tickformat=',.0f')
+            st.plotly_chart(fig_state_comp, use_container_width=True, key="state_comp_bar")
+            
+            st.markdown("---")
+            st.markdown("#### Select State for Detailed Analysis")
+            
+            selected_comp_state = st.selectbox("Choose State", all_states, key="comp_state_select")
+            
+            if selected_comp_state:
+                state_data_comp = df[df['State'] == selected_comp_state]
+                
+                # Get dealers in this state
+                dealers_in_comp_state = state_data_comp.groupby('Dealer Name')[comp_value_col].sum().reset_index()
+                dealers_in_comp_state = dealers_in_comp_state[dealers_in_comp_state[comp_value_col] > 0].sort_values(comp_value_col, ascending=False)
+                dealers_in_comp_state['Formatted'] = dealers_in_comp_state[comp_value_col].apply(format_inr)
+                dealers_in_comp_state['%'] = (dealers_in_comp_state[comp_value_col] / dealers_in_comp_state[comp_value_col].sum() * 100).round(1)
+                
+                st.markdown(f"#### 📍 State: {selected_comp_state}")
+                
+                # Metrics
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Total Revenue", format_inr(dealers_in_comp_state[comp_value_col].sum()))
+                with col2:
+                    st.metric("Number of Dealers", len(dealers_in_comp_state))
+                with col3:
+                    top_dealer = dealers_in_comp_state['Dealer Name'].iloc[0] if len(dealers_in_comp_state) > 0 else "N/A"
+                    st.metric("Top Dealer", top_dealer[:25])
+                with col4:
+                    avg_dealer_rev = dealers_in_comp_state[comp_value_col].mean()
+                    st.metric("Avg Dealer Revenue", format_inr(avg_dealer_rev))
+                
+                st.markdown("---")
+                
+                # Create tabs for different views
+                tab_dealers_comp, tab_cat_comp, tab_subcat_comp = st.tabs([
+                    "Dealer Comparison",
+                    "Category Mix Analysis",
+                    "Sub-Category Mix Analysis"
+                ])
+                
+                with tab_dealers_comp:
+                    st.markdown(f"#### Dealers in {selected_comp_state}")
+                    
+                    # Pie chart for dealer distribution
+                    col1, col2 = st.columns([2, 1])
+                    
+                    with col1:
+                        fig_dealers_pie = px.pie(dealers_in_comp_state, values=comp_value_col, names='Dealer Name',
+                                                title=f"Dealer Revenue Distribution in {selected_comp_state}",
+                                                custom_data=['Formatted', '%'])
+                        fig_dealers_pie.update_traces(
+                            hovertemplate='<b>%{label}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>'
+                        )
+                        st.plotly_chart(fig_dealers_pie, use_container_width=True, key=f"dealers_pie_{selected_comp_state}")
+                    
+                    with col2:
+                        st.markdown("##### Dealer Ranking")
+                        dealer_rank = dealers_in_comp_state[['Dealer Name', 'Formatted', '%']].copy()
+                        dealer_rank.columns = ['Dealer', 'Revenue', '%']
+                        st.dataframe(dealer_rank, use_container_width=True, height=400)
+                    
+                    # Dealer comparison bar chart
+                    st.markdown("---")
+                    st.markdown("##### Dealer Revenue Comparison")
+                    fig_dealers_bar = px.bar(dealers_in_comp_state, x='Dealer Name', y=comp_value_col,
+                                            title=f"Dealer Revenue in {selected_comp_state}", text='Formatted',
+                                            color=comp_value_col, color_continuous_scale='Blues',
+                                            custom_data=['Formatted', '%'])
+                    fig_dealers_bar.update_traces(textposition='outside',
+                                                 hovertemplate='<b>%{x}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>')
+                    fig_dealers_bar.update_layout(xaxis_tickangle=-45)
+                    fig_dealers_bar.update_yaxes(tickformat=',.0f')
+                    st.plotly_chart(fig_dealers_bar, use_container_width=True, key=f"dealers_bar_{selected_comp_state}")
+                
+                with tab_cat_comp:
+                    st.markdown(f"#### Category Mix in {selected_comp_state}")
+                    
+                    if 'Category' not in state_data_comp.columns:
+                        st.warning("Category column not found")
+                    else:
+                        # Overall category distribution
+                        cat_comp = state_data_comp.groupby('Category')[comp_value_col].sum().reset_index()
+                        cat_comp = cat_comp[cat_comp[comp_value_col] > 0].sort_values(comp_value_col, ascending=False)
+                        cat_comp['Formatted'] = cat_comp[comp_value_col].apply(format_inr)
+                        cat_comp['%'] = (cat_comp[comp_value_col] / cat_comp[comp_value_col].sum() * 100).round(1)
+                        
+                        # Metrics
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Total Categories", len(cat_comp))
+                        with col2:
+                            top_cat = cat_comp['Category'].iloc[0] if len(cat_comp) > 0 else "N/A"
+                            st.metric("Top Category", top_cat)
+                        with col3:
+                            top_cat_rev = cat_comp[comp_value_col].iloc[0] if len(cat_comp) > 0 else 0
+                            st.metric("Top Category Revenue", format_inr(top_cat_rev))
+                        
+                        st.markdown("---")
+                        
+                        # Pie chart and table
+                        col1, col2 = st.columns([2, 1])
+                        
+                        with col1:
+                            fig_cat_pie = px.pie(cat_comp, values=comp_value_col, names='Category',
+                                               title=f"Category Revenue Distribution in {selected_comp_state}",
+                                               custom_data=['Formatted', '%'])
+                            fig_cat_pie.update_traces(
+                                hovertemplate='<b>%{label}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>'
+                            )
+                            st.plotly_chart(fig_cat_pie, use_container_width=True, key=f"cat_pie_{selected_comp_state}")
+                        
+                        with col2:
+                            st.markdown("##### Category Ranking")
+                            cat_rank = cat_comp[['Category', 'Formatted', '%']].copy()
+                            cat_rank.columns = ['Category', 'Revenue', '%']
+                            st.dataframe(cat_rank, use_container_width=True, height=400)
+                        
+                        st.markdown("---")
+                        st.markdown("##### Category Revenue Comparison")
+                        fig_cat_bar = px.bar(cat_comp, x='Category', y=comp_value_col,
+                                            title=f"Category Revenue in {selected_comp_state}", text='Formatted',
+                                            color=comp_value_col, color_continuous_scale='Greens',
+                                            custom_data=['Formatted', '%'])
+                        fig_cat_bar.update_traces(textposition='outside',
+                                                 hovertemplate='<b>%{x}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>')
+                        fig_cat_bar.update_layout(xaxis_tickangle=-45)
+                        fig_cat_bar.update_yaxes(tickformat=',.0f')
+                        st.plotly_chart(fig_cat_bar, use_container_width=True, key=f"cat_bar_{selected_comp_state}")
+                        
+                        # Category-wise dealer breakdown
+                        st.markdown("---")
+                        st.markdown("##### Category-wise Dealer Analysis")
+                        
+                        selected_cat = st.selectbox("Select Category to see dealer breakdown",
+                                                    cat_comp['Category'].tolist(),
+                                                    key="comp_cat_select")
+                        
+                        if selected_cat:
+                            cat_dealer_data = state_data_comp[state_data_comp['Category'] == selected_cat]
+                            cat_dealer_comp = cat_dealer_data.groupby('Dealer Name')[comp_value_col].sum().reset_index()
+                            cat_dealer_comp = cat_dealer_comp[cat_dealer_comp[comp_value_col] > 0].sort_values(comp_value_col, ascending=False)
+                            cat_dealer_comp['Formatted'] = cat_dealer_comp[comp_value_col].apply(format_inr)
+                            cat_dealer_comp['%'] = (cat_dealer_comp[comp_value_col] / cat_dealer_comp[comp_value_col].sum() * 100).round(1)
+                            
+                            if not cat_dealer_comp.empty:
+                                fig_cat_dealer_pie = px.pie(cat_dealer_comp, values=comp_value_col, names='Dealer Name',
+                                                           title=f"{selected_cat} - Dealer Distribution",
+                                                           custom_data=['Formatted', '%'])
+                                fig_cat_dealer_pie.update_traces(
+                                    hovertemplate='<b>%{label}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>'
+                                )
+                                st.plotly_chart(fig_cat_dealer_pie, use_container_width=True, key=f"cat_dealer_pie_{selected_cat}")
+                            else:
+                                st.info(f"No dealer data for {selected_cat}")
+                
+                with tab_subcat_comp:
+                    st.markdown(f"#### Sub-Category Mix in {selected_comp_state}")
+                    
+                    if 'Sub Category' not in state_data_comp.columns:
+                        st.warning("Sub Category column not found")
+                    else:
+                        # Get categories for filtering
+                        state_categories = state_data_comp['Category'].dropna().unique().tolist()
+                        state_categories = sorted(state_categories)
+                        
+                        selected_cat_for_subcat = st.selectbox("Select Category to see Sub-Categories",
+                                                               state_categories,
+                                                               key="comp_cat_for_subcat")
+                        
+                        if selected_cat_for_subcat:
+                            subcat_data = state_data_comp[state_data_comp['Category'] == selected_cat_for_subcat]
+                            subcat_comp = subcat_data.groupby('Sub Category')[comp_value_col].sum().reset_index()
+                            subcat_comp = subcat_comp[subcat_comp[comp_value_col] > 0].sort_values(comp_value_col, ascending=False)
+                            subcat_comp['Formatted'] = subcat_comp[comp_value_col].apply(format_inr)
+                            subcat_comp['%'] = (subcat_comp[comp_value_col] / subcat_comp[comp_value_col].sum() * 100).round(1)
+                            
+                            if not subcat_comp.empty:
+                                # Metrics
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("Sub-Categories", len(subcat_comp))
+                                with col2:
+                                    top_subcat = subcat_comp['Sub Category'].iloc[0] if len(subcat_comp) > 0 else "N/A"
+                                    st.metric("Top Sub-Category", top_subcat[:25])
+                                with col3:
+                                    total_subcat_rev = subcat_comp[comp_value_col].sum()
+                                    st.metric("Category Total", format_inr(total_subcat_rev))
+                                
+                                st.markdown("---")
+                                
+                                # Pie chart and table
+                                col1, col2 = st.columns([2, 1])
+                                
+                                with col1:
+                                    fig_subcat_pie = px.pie(subcat_comp, values=comp_value_col, names='Sub Category',
+                                                           title=f"{selected_cat_for_subcat} - Sub-Category Distribution",
+                                                           custom_data=['Formatted', '%'])
+                                    fig_subcat_pie.update_traces(
+                                        hovertemplate='<b>%{label}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>'
+                                    )
+                                    st.plotly_chart(fig_subcat_pie, use_container_width=True, key=f"subcat_pie_{selected_cat_for_subcat}")
+                                
+                                with col2:
+                                    st.markdown("##### Sub-Category Ranking")
+                                    subcat_rank = subcat_comp[['Sub Category', 'Formatted', '%']].copy()
+                                    subcat_rank.columns = ['Sub-Category', 'Revenue', '%']
+                                    st.dataframe(subcat_rank, use_container_width=True, height=400)
+                                
+                                st.markdown("---")
+                                st.markdown("##### Sub-Category Revenue Comparison")
+                                fig_subcat_bar = px.bar(subcat_comp, x='Sub Category', y=comp_value_col,
+                                                       title=f"{selected_cat_for_subcat} - Sub-Categories", text='Formatted',
+                                                       color=comp_value_col, color_continuous_scale='Oranges',
+                                                       custom_data=['Formatted', '%'])
+                                fig_subcat_bar.update_traces(textposition='outside',
+                                                            hovertemplate='<b>%{x}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>')
+                                fig_subcat_bar.update_layout(xaxis_tickangle=-45, height=600)
+                                fig_subcat_bar.update_yaxes(tickformat=',.0f')
+                                st.plotly_chart(fig_subcat_bar, use_container_width=True, key=f"subcat_bar_{selected_cat_for_subcat}")
+                                
+                                # Sub-Category dealer breakdown
+                                st.markdown("---")
+                                st.markdown("##### Sub-Category Dealer Analysis")
+                                
+                                selected_subcat = st.selectbox("Select Sub-Category to see dealer breakdown",
+                                                               subcat_comp['Sub Category'].tolist(),
+                                                               key="comp_subcat_select")
+                                
+                                if selected_subcat:
+                                    subcat_dealer_data = subcat_data[subcat_data['Sub Category'] == selected_subcat]
+                                    subcat_dealer_comp = subcat_dealer_data.groupby('Dealer Name')[comp_value_col].sum().reset_index()
+                                    subcat_dealer_comp = subcat_dealer_comp[subcat_dealer_comp[comp_value_col] > 0].sort_values(comp_value_col, ascending=False)
+                                    subcat_dealer_comp['Formatted'] = subcat_dealer_comp[comp_value_col].apply(format_inr)
+                                    subcat_dealer_comp['%'] = (subcat_dealer_comp[comp_value_col] / subcat_dealer_comp[comp_value_col].sum() * 100).round(1)
+                                    
+                                    if not subcat_dealer_comp.empty:
+                                        fig_subcat_dealer_pie = px.pie(subcat_dealer_comp, values=comp_value_col, names='Dealer Name',
+                                                                      title=f"{selected_subcat} - Dealer Distribution",
+                                                                      custom_data=['Formatted', '%'])
+                                        fig_subcat_dealer_pie.update_traces(
+                                            hovertemplate='<b>%{label}</b><br>Revenue: %{customdata[0]}<br>%{customdata[1]:.1f}%<extra></extra>'
+                                        )
+                                        st.plotly_chart(fig_subcat_dealer_pie, use_container_width=True, key=f"subcat_dealer_pie_{selected_subcat}")
+                                    else:
+                                        st.info(f"No dealer data for {selected_subcat}")
+                            else:
+                                st.info(f"No sub-category data for {selected_cat_for_subcat}")
 
 # ================================
-# TAB 3: CUSTOMER INSIGHTS
+# TAB 2: CUSTOMER INSIGHTS
 # ================================
-with tab3:
+with tab2:
     st.header("Customer Insights")
     
     cust_sub1, cust_sub2, cust_sub3 = st.tabs(["Overview", "Geographic", "Performance"])
@@ -1049,9 +2055,9 @@ with tab3:
                 st.info("No declining customers found for the selected periods")
 
 # ================================
-# TAB 4: PAYMENT ANALYSIS
+# TAB 3: PAYMENT ANALYSIS
 # ================================
-with tab4:
+with tab3:
     st.header("Payment Analysis")
     
     pay_sub1, pay_sub2 = st.tabs(["Overview", "Outstanding"])

@@ -162,19 +162,63 @@ class APIClient:
         except json.JSONDecodeError:
             return {"success": False, "message": "Invalid response from server"}
     
-    def get_sales_report(self, start_date: str = None, end_date: str = None) -> dict:
+    def get_date_range(self, period: str = "year") -> tuple:
+        """
+        Get start and end dates based on the period
+        
+        Args:
+            period: One of 'today', 'week', 'month', 'year'
+        
+        Returns:
+            Tuple of (start_date, end_date) in DD-MM-YYYY format
+        """
+        from datetime import datetime, timedelta
+        
+        today = datetime.now()
+        
+        if period == "today":
+            start_date = today
+            end_date = today
+        elif period == "week":
+            # Start of this week (Monday)
+            start_date = today - timedelta(days=today.weekday())
+            end_date = today
+        elif period == "month":
+            # Start of this month
+            start_date = today.replace(day=1)
+            end_date = today
+        elif period == "year":
+            # Start of this year
+            start_date = today.replace(month=1, day=1)
+            end_date = today
+        else:
+            # Default to year
+            start_date = today.replace(month=1, day=1)
+            end_date = today
+        
+        # Format dates as DD-MM-YYYY
+        start_date_str = start_date.strftime("%d-%m-%Y")
+        end_date_str = end_date.strftime("%d-%m-%Y")
+        
+        return start_date_str, end_date_str
+    
+    def get_sales_report(self, start_date: str = None, end_date: str = None, period: str = None) -> dict:
         """
         Fetch sales report data from the API
         Authorization is disabled for this endpoint, so we make a direct call
         
         Args:
-            start_date: Start date in DD-MM-YYYY format (defaults to start of year)
-            end_date: End date in DD-MM-YYYY format (defaults to today)
+            start_date: Start date in DD-MM-YYYY format (optional if period is provided)
+            end_date: End date in DD-MM-YYYY format (optional if period is provided)
+            period: One of 'today', 'week', 'month', 'year' (takes precedence over explicit dates)
         """
         from datetime import datetime
         
+        # If period is provided, calculate dates from it
+        if period:
+            start_date, end_date = self.get_date_range(period)
         # Default date range: start of year to today
-        if not start_date:
+        elif not start_date:
             start_date = f"01-01-{datetime.now().year}"
         if not end_date:
             end_date = datetime.now().strftime("%d-%m-%Y")
@@ -311,10 +355,13 @@ def logout_button():
         st.rerun()
 
 
-def fetch_dashboard_data():
+def fetch_dashboard_data(period: str = "year"):
     """
-    Fetch data from the API for the dashboard
+    Fetch data from the API for the dashboard based on time period
     Returns a pandas DataFrame
+    
+    Args:
+        period: One of 'today', 'week', 'month', 'year'
     """
     import pandas as pd
     import json
@@ -323,13 +370,14 @@ def fetch_dashboard_data():
     if not st.session_state.authenticated:
         return None
     
-    # Check if we already have cached data
-    if st.session_state.api_data is not None:
-        return st.session_state.api_data
+    # Check if we already have cached data for this period
+    cache_key = f"api_data_{period}"
+    if cache_key in st.session_state and st.session_state.get(cache_key) is not None:
+        return st.session_state.get(cache_key)
     
-    # Fetch from API
+    # Fetch from API with the appropriate date range
     with st.spinner("Fetching data from API..."):
-        result = st.session_state.api_client.get_sales_report()
+        result = st.session_state.api_client.get_sales_report(period=period)
         
         data = None
         records = None
@@ -412,7 +460,9 @@ def fetch_dashboard_data():
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
-            st.session_state.api_data = df
+            # Cache the data for this period
+            cache_key = f"api_data_{period}"
+            st.session_state[cache_key] = df
             return df
         else:
             st.warning("No records returned from API")
