@@ -355,13 +355,15 @@ def logout_button():
         st.rerun()
 
 
-def fetch_dashboard_data(period: str = "year"):
+def fetch_dashboard_data(period: str = "year", start_date: str = None, end_date: str = None):
     """
-    Fetch data from the API for the dashboard based on time period
+    Fetch data from the API for the dashboard based on time period or date range
     Returns a pandas DataFrame
     
     Args:
-        period: One of 'today', 'week', 'month', 'year'
+        period: One of 'today', 'week', 'month', 'year' (ignored if start_date and end_date are provided)
+        start_date: Start date in DD-MM-YYYY format (optional)
+        end_date: End date in DD-MM-YYYY format (optional)
     """
     import pandas as pd
     import json
@@ -370,14 +372,19 @@ def fetch_dashboard_data(period: str = "year"):
     if not st.session_state.authenticated:
         return None
     
+    # Create cache key based on dates or period
+    if start_date and end_date:
+        cache_key = f"api_data_{start_date}_{end_date}"
+    else:
+        cache_key = f"api_data_{period}"
+    
     # Check if we already have cached data for this period
-    cache_key = f"api_data_{period}"
     if cache_key in st.session_state and st.session_state.get(cache_key) is not None:
         return st.session_state.get(cache_key)
     
     # Fetch from API with the appropriate date range
     with st.spinner("Fetching data from API..."):
-        result = st.session_state.api_client.get_sales_report(period=period)
+        result = st.session_state.api_client.get_sales_report(period=period, start_date=start_date, end_date=end_date)
         
         data = None
         records = None
@@ -461,7 +468,7 @@ def fetch_dashboard_data(period: str = "year"):
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             
             # Cache the data for this period
-            cache_key = f"api_data_{period}"
+            cache_key = f"api_data_{start_date}_{end_date}" if start_date and end_date else f"api_data_{period}"
             st.session_state[cache_key] = df
             return df
         else:

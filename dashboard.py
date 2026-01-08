@@ -22,20 +22,13 @@ if not st.session_state.authenticated:
     login_form()
     st.stop()
 
-# Load data from API with period selection
-def load_data_by_period(period):
-    """Load data for the selected time period"""
-    df = fetch_dashboard_data(period=period)
-    if df is not None:
-        df.columns = df.columns.str.strip()
-    return df
-
 # Sidebar with logout and refresh options
 with st.sidebar:
     st.title("Dashboard Controls")
     logout_button()
     st.markdown("---")
     if st.button(" Refresh Data", use_container_width=True):
+        # Clear all cached API data for date ranges
         for key in list(st.session_state.keys()):
             if key.startswith("api_data_"):
                 del st.session_state[key]
@@ -47,26 +40,37 @@ with st.sidebar:
     st.markdown("---")
     st.caption("Data loaded from API")
 
-# Time period selector (moved to sidebar for better UX)
-selected_period = st.sidebar.selectbox(
-    "📅 Select Time Period",
-    ["Today", "This Week", "This Month", "This Year"],
-    index=2,  # Default to "This Month"
-    key="time_period_select"
-)
+# Date range selector with calendar picker
+st.sidebar.markdown("### 📅 Select Date Range")
 
-# Map display names to period codes
-period_map = {
-    "Today": "today",
-    "This Week": "week",
-    "This Month": "month",
-    "This Year": "year"
-}
+from datetime import datetime, timedelta
 
-period_code = period_map[selected_period]
+# Get current month start and today
+today = datetime.now()
+month_start = today.replace(day=1)
 
-# Load data for selected period
-df = load_data_by_period(period_code)
+# Create columns for date inputs
+col1, col2 = st.sidebar.columns(2)
+with col1:
+    start_date = st.date_input(
+        "Start Date",
+        value=month_start,
+        key="start_date_picker"
+    )
+
+with col2:
+    end_date = st.date_input(
+        "End Date",
+        value=today,
+        key="end_date_picker"
+    )
+
+# Convert dates to DD-MM-YYYY format for API
+start_date_str = start_date.strftime("%d-%m-%Y")
+end_date_str = end_date.strftime("%d-%m-%Y")
+
+# Load data for selected date range
+df = fetch_dashboard_data(start_date=start_date_str, end_date=end_date_str)
 
 # Handle case when data couldn't be loaded
 if df is None:
@@ -204,6 +208,7 @@ if df.empty:
 st.subheader("📊 Key Metrics")
 
 # Get period label for display
+# Display date range information
 period_labels = {
     "today": "Today",
     "week": "This Week",
@@ -211,7 +216,7 @@ period_labels = {
     "year": "This Year"
 }
 
-current_period_label = period_labels.get(period_code, "Selected Period")
+current_period_label = f"{start_date_str} to {end_date_str}"
 
 # Since we're fetching filtered data from API, use all data for metrics
 current_period_data = df
@@ -362,8 +367,6 @@ with tab1:
                         st.plotly_chart(fig_dealer, use_container_width=True, key="pie_dealer")
                     else:
                         st.info("No dealer revenue data available")
-                else:
-                    st.info("Dealer Name column not found")
             
             with pie_col2:
                 if 'State' in df.columns:
@@ -379,8 +382,6 @@ with tab1:
                         st.plotly_chart(fig_state, use_container_width=True, key="pie_state")
                     else:
                         st.info("No state revenue data available")
-                else:
-                    st.info("State column not found")
             
             with pie_col3:
                 exec_col = 'Sales Executive' if 'Sales Executive' in df.columns else 'Executive' if 'Executive' in df.columns else None
@@ -397,8 +398,6 @@ with tab1:
                         st.plotly_chart(fig_exec, use_container_width=True, key="pie_exec")
                     else:
                         st.info("No executive revenue data available")
-                else:
-                    st.info("Sales Executive column not found")
             
             # TREND GRAPHS
             st.markdown("#### Trend Analysis")
@@ -416,8 +415,6 @@ with tab1:
                     st.plotly_chart(fig_trend, use_container_width=True, key="trend_monthly")
                 else:
                     st.info("No monthly trend data available")
-            else:
-                st.info("Month column not found for trend analysis")
             
             # Category Analysis
             trend_col1, trend_col2 = st.columns(2)
@@ -435,8 +432,6 @@ with tab1:
                         st.plotly_chart(fig_cat, use_container_width=True, key="cat_rev_bar")
                     else:
                         st.info("No category revenue data available")
-                else:
-                    st.info("Category column not found")
             
             with trend_col2:
                 if 'Category' in df.columns and selected_qty_col and selected_qty_col in df.columns:
@@ -480,8 +475,6 @@ with tab1:
                         st.info("Please select at least one sub-category")
                 else:
                     st.info("No sub-categories available")
-            else:
-                st.info("Sub Category column not found")
     
     # 1.2 Customer Segmentation (Onion Method)
     with sales_sub2:
@@ -564,10 +557,6 @@ with tab1:
                                         st.plotly_chart(fig_cust, use_container_width=True, key="seg_cust_bar")
                                         
                                         st.dataframe(cust_summary[['Customer', 'Formatted']], use_container_width=True)
-                            elif 'Dealer Name' not in df.columns:
-                                st.info("Dealer Name column not found")
-                elif 'City' not in df.columns:
-                    st.info("City column not found for drill-down")
             
             st.markdown("---")
             st.markdown("#### Executive Performance")
@@ -590,8 +579,6 @@ with tab1:
                     fig_exec.update_traces(textposition='outside', hovertemplate='%{x}<br>%{customdata[0]}<extra></extra>')
                     fig_exec.update_yaxes(tickformat=',.0f')
                     st.plotly_chart(fig_exec, use_container_width=True, key="seg_exec_bar")
-            else:
-                st.info("Sales Executive column not found")
     
     # 1.3 Non-Moving & Slow-Moving Items
     with sales_sub3:
@@ -688,9 +675,7 @@ with tab1:
                 
                 # CATEGORY-WISE VIEW
                 elif nonmov_analysis_view == "Category-wise":
-                    if 'Category' not in df.columns:
-                        st.warning("Category column not found for category-wise analysis")
-                    else:
+                    if 'Category' in df.columns:
                         all_categories = df['Category'].dropna().unique().tolist()
                         all_categories = sorted(all_categories)
                         
@@ -764,14 +749,10 @@ with tab1:
                                                        color_continuous_scale='Oranges')
                                     fig_subcat.update_layout(xaxis_tickangle=-45)
                                     st.plotly_chart(fig_subcat, use_container_width=True, key="nonmov_subcat_bar")
-                            else:
-                                st.info("Sub Category column not found")
                 
                 # STATE-WISE VIEW
                 elif nonmov_analysis_view == "State-wise":
-                    if 'State' not in df.columns:
-                        st.warning("State column not found for state-wise analysis")
-                    else:
+                    if 'State' in df.columns:
                         all_states = df['State'].dropna().unique().tolist()
                         all_states = sorted(all_states)
                         
@@ -851,13 +832,7 @@ with tab1:
     with sales_sub4:
         st.subheader("Cross-Selling Analytics")
         
-        if 'Dealer Name' not in df.columns:
-            st.warning("Dealer Name column not found for cross-selling analysis")
-        elif 'Category' not in df.columns:
-            st.warning("Category column not found for cross-selling analysis")
-        elif not VALUE_COL:
-            st.warning("No value columns found in the dataset")
-        else:
+        if 'Dealer Name' in df.columns and 'Category' in df.columns and VALUE_COL:
             # For API data, use single Value column; for Excel, allow year selection
             if len(VALUE_COLS) > 1:
                 cross_value_col = st.selectbox("Select Year", VALUE_COLS, key="cross_year")
@@ -1427,11 +1402,7 @@ with tab1:
     with sales_sub7:
         st.subheader("State-wise Revenue Analysis")
         
-        if not VALUE_COL:
-            st.warning("No value columns found in the dataset")
-        elif 'State' not in df.columns:
-            st.warning("State column not found for state-wise analysis")
-        else:
+        if VALUE_COL and 'State' in df.columns:
             # For API data, use single Value column; for Excel, allow year selection
             if len(VALUE_COLS) > 1:
                 state_rev_col = st.selectbox("Select Year", VALUE_COLS, key="state_year_select")
@@ -1644,11 +1615,7 @@ with tab1:
     with sales_sub8:
         st.subheader("Dealer & State Comparative Analysis")
         
-        if not VALUE_COL:
-            st.warning("No value columns found in the dataset")
-        elif 'State' not in df.columns or 'Dealer Name' not in df.columns:
-            st.warning("State or Dealer Name column not found for comparative analysis")
-        else:
+        if VALUE_COL and 'State' in df.columns and 'Dealer Name' in df.columns:
             # For API data, use single Value column; for Excel, allow year selection
             if len(VALUE_COLS) > 1:
                 comp_value_col = st.selectbox("Select Year", VALUE_COLS, key="comp_year_select")
@@ -1832,9 +1799,7 @@ with tab1:
                 with tab_subcat_comp:
                     st.markdown(f"#### Sub-Category Mix in {selected_comp_state}")
                     
-                    if 'Sub Category' not in state_data_comp.columns:
-                        st.warning("Sub Category column not found")
-                    else:
+                    if 'Sub Category' in state_data_comp.columns:
                         # Get categories for filtering
                         state_categories = state_data_comp['Category'].dropna().unique().tolist()
                         state_categories = sorted(state_categories)
