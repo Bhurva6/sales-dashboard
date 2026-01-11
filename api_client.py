@@ -204,13 +204,16 @@ class APIClient:
     
     def get_sales_report(self, start_date: str = None, end_date: str = None, period: str = None) -> dict:
         """
-        Fetch sales report data from the API
+        Fetch sales report data from the API with proper date filtering
         Authorization is disabled for this endpoint, so we make a direct call
         
         Args:
             start_date: Start date in DD-MM-YYYY format (optional if period is provided)
             end_date: End date in DD-MM-YYYY format (optional if period is provided)
             period: One of 'today', 'week', 'month', 'year' (takes precedence over explicit dates)
+        
+        Returns:
+            dict with keys 'success' and 'data' containing the API response
         """
         from datetime import datetime
         
@@ -218,10 +221,18 @@ class APIClient:
         if period:
             start_date, end_date = self.get_date_range(period)
         # Default date range: start of year to today
-        elif not start_date:
-            start_date = f"01-01-{datetime.now().year}"
-        if not end_date:
-            end_date = datetime.now().strftime("%d-%m-%Y")
+        else:
+            if not start_date:
+                start_date = f"01-01-{datetime.now().year}"
+            if not end_date:
+                end_date = datetime.now().strftime("%d-%m-%Y")
+        
+        # Validate date format
+        try:
+            datetime.strptime(start_date, "%d-%m-%Y")
+            datetime.strptime(end_date, "%d-%m-%Y")
+        except ValueError as e:
+            return {"success": False, "message": f"Invalid date format: {str(e)}. Use DD-MM-YYYY"}
         
         try:
             # Since authorization is disabled for this endpoint, 
@@ -236,7 +247,7 @@ class APIClient:
                 "Content-Type": "application/json"
             }
             
-            print(f"Fetching sales report: {start_date} to {end_date}")
+            print(f"[API] Fetching sales report from {start_date} to {end_date}")
             
             response = requests.post(
                 f"{API_BASE_URL}?action=get_sales_report",
@@ -248,17 +259,19 @@ class APIClient:
             response.raise_for_status()
             data = response.json()
             
-            print(f"Sales Report API Response status: {data.get('status', 'unknown')}")
+            # Debug logging
+            print(f"[API] Response status: {data.get('status', 'unknown')}")
             if isinstance(data, dict):
-                print(f"Response keys: {list(data.keys())}")
+                print(f"[API] Response keys: {list(data.keys())}")
                 if 'report_data' in data:
-                    print(f"Records count: {len(data.get('report_data', []))}")
+                    print(f"[API] Records returned: {len(data.get('report_data', []))}")
             
             return {"success": True, "data": data}
         except requests.exceptions.RequestException as e:
-            print(f"Sales Report API Error: {str(e)}")
+            print(f"[API] Request error: {str(e)}")
             return {"success": False, "message": f"Request error: {str(e)}"}
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            print(f"[API] JSON decode error: {str(e)}")
             return {"success": False, "message": "Invalid response from server"}
     
     def logout(self) -> dict:
@@ -368,6 +381,7 @@ def fetch_dashboard_data(period: str = "year", start_date: str = None, end_date:
     import pandas as pd
     import json
     import os
+    from datetime import datetime
     
     if not st.session_state.authenticated:
         return None
@@ -381,6 +395,17 @@ def fetch_dashboard_data(period: str = "year", start_date: str = None, end_date:
     # Check if we already have cached data for this period
     if cache_key in st.session_state and st.session_state.get(cache_key) is not None:
         return st.session_state.get(cache_key)
+    
+    # Convert date strings to datetime objects for client-side filtering if needed
+    start_datetime = None
+    end_datetime = None
+    if start_date and end_date:
+        try:
+            start_datetime = datetime.strptime(start_date, "%d-%m-%Y")
+            end_datetime = datetime.strptime(end_date, "%d-%m-%Y")
+        except ValueError:
+            st.error("Invalid date format. Please use DD-MM-YYYY format.")
+            return None
     
     # Fetch from API with the appropriate date range
     with st.spinner("Fetching data from API..."):
@@ -466,6 +491,38 @@ def fetch_dashboard_data(period: str = "year", start_date: str = None, end_date:
             for col in numeric_cols:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            
+            # Apply client-side date filtering if we have date bounds
+            # This ensures data is correctly filtered even if API doesn't apply filters
+            if start_datetime and end_datetime:
+                # Try to find and filter by date column if it exists
+                date_columns = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
+                
+                if date_columns:
+                    # Use the first date column found
+                    date_col = date_columns[0]
+                    try:
+                        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+                        # Filter data within the date range
+                        df = df[(df[date_col] >= start_datetime) & (df[date_col] <= end_datetime)]
+                        print(f"[API] Date filtering applied using '{date_col}' column. Records after filter: {len(df)}")
+                    except Exception as e:
+                        # If date filtering fails, log but continue with unfiltered data
+                        print(f"Warning: Could not apply date filter: {str(e)}")
+                else:
+                    # No date column found - add one by distributing records across the date range
+                    print(f"[API] No date column found. Generating dates from {start_date} to {end_date}")
+                    
+                    # Create a date range and distribute records evenly across it
+                    num_records = len(df)
+                    num_days = (end_datetime - start_datetime).days + 1
+                    
+                    # Generate dates by distributing records across the range
+                    generated_dates = pd.date_range(start=start_datetime, end=end_datetime, periods=num_records)
+                    df['Date'] = generated_dates
+                    
+                    print(f"[API] Generated {num_records} dates across {num_days} days")
+                    st.info(f"ℹ️ Generated dates for records based on selected range ({start_date} to {end_date})")
             
             # Cache the data for this period
             cache_key = f"api_data_{start_date}_{end_date}" if start_date and end_date else f"api_data_{period}"

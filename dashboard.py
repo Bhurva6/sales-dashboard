@@ -205,21 +205,20 @@ if df.empty:
 # ================================
 # KEY STATISTICS SECTION
 # ================================
-st.subheader("📊 Key Metrics")
+st.subheader("📊 Key Metrics - Last 7 Days")
 
-# Get period label for display
-# Display date range information
-period_labels = {
-    "today": "Today",
-    "week": "This Week",
-    "month": "This Month",
-    "year": "This Year"
-}
+# Get last week data for key metrics
+last_week_start = today - timedelta(days=7)
+last_week_start_str = last_week_start.strftime("%d-%m-%Y")
+last_week_end_str = today.strftime("%d-%m-%Y")
 
-current_period_label = f"{start_date_str} to {end_date_str}"
+# Fetch data for last week
+last_week_data = fetch_dashboard_data(start_date=last_week_start_str, end_date=last_week_end_str)
 
-# Since we're fetching filtered data from API, use all data for metrics
-current_period_data = df
+current_period_label = f"Last 7 Days ({last_week_start_str} to {last_week_end_str})"
+
+# Use last week data for metrics, fallback to current period data if not available
+current_period_data = last_week_data if last_week_data is not None else df
 
 # Calculate key statistics
 if not current_period_data.empty:
@@ -355,33 +354,94 @@ with tab1:
                 if 'Dealer Name' in df.columns:
                     dealer_rev = df.groupby('Dealer Name')[selected_value_col].sum().reset_index()
                     dealer_rev = dealer_rev[dealer_rev[selected_value_col] > 0].sort_values(selected_value_col, ascending=False)
+                    dealer_rev_full = dealer_rev.copy()
+                    
+                    # Create formatted column first
+                    dealer_rev['Formatted'] = dealer_rev[selected_value_col].apply(format_inr)
+                    
                     dealer_rev = apply_limit(dealer_rev, dealer_limit)
-                    if not dealer_rev.empty:
-                        dealer_rev['Formatted'] = dealer_rev[selected_value_col].apply(format_inr)
-                        title_suffix = f"Top {dealer_limit}" if dealer_limit else "All"
-                        fig_dealer = px.pie(dealer_rev, values=selected_value_col, names='Dealer Name', 
-                                           title=f"{title_suffix} Dealers by Revenue",
-                                           custom_data=['Formatted'])
-                        fig_dealer.update_traces(textposition='inside', textinfo='percent+label',
-                                                hovertemplate='%{label}<br>%{customdata[0]}<extra></extra>')
-                        st.plotly_chart(fig_dealer, use_container_width=True, key="pie_dealer")
-                    else:
-                        st.info("No dealer revenue data available")
+                    
+                    # Show pie chart first
+                    title_suffix = f"Top {dealer_limit}" if dealer_limit else "All"
+                    fig_dealer = px.pie(dealer_rev, values=selected_value_col, names='Dealer Name', 
+                                       title=f"{title_suffix} Dealers by Revenue",
+                                       custom_data=['Formatted'])
+                    fig_dealer.update_traces(textposition='inside', textinfo='percent+label',
+                                            hovertemplate='%{label}<br>%{customdata[0]}<extra></extra>')
+                    st.plotly_chart(fig_dealer, use_container_width=True, key="pie_dealer")
+                    
+                    # Add dropdown selector for dealer BELOW the chart
+                    st.markdown("**Select Dealers to View Details**")
+                    available_dealers = dealer_rev['Dealer Name'].tolist()
+                    selected_dealers = st.multiselect(
+                        "Choose dealers",
+                        available_dealers,
+                        default=[available_dealers[0]] if available_dealers else [],
+                        key="dealer_detail_select"
+                    )
+                    
+                    # Get details for selected dealers
+                    if selected_dealers:
+                        dealer_details_data = []
+                        for dealer in selected_dealers:
+                            dealer_data = dealer_rev[dealer_rev['Dealer Name'] == dealer]
+                            if not dealer_data.empty:
+                                dealer_info = dealer_data.iloc[0]
+                                dealer_details_data.append({
+                                    'Dealer': dealer,
+                                    'Revenue': dealer_info['Formatted']
+                                })
+                        
+                        if dealer_details_data:
+                            dealer_details_df = pd.DataFrame(dealer_details_data)
+                            st.dataframe(dealer_details_df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No dealer revenue data available")
             
             with pie_col2:
                 if 'State' in df.columns:
                     state_rev = df.groupby('State')[selected_value_col].sum().reset_index()
-                    state_rev = state_rev[state_rev[selected_value_col] > 0]
-                    if not state_rev.empty:
-                        state_rev['Formatted'] = state_rev[selected_value_col].apply(format_inr)
-                        fig_state = px.pie(state_rev, values=selected_value_col, names='State', 
-                                          title="Revenue by State",
-                                          custom_data=['Formatted'])
-                        fig_state.update_traces(textposition='inside', textinfo='percent+label',
-                                               hovertemplate='%{label}<br>%{customdata[0]}<extra></extra>')
-                        st.plotly_chart(fig_state, use_container_width=True, key="pie_state")
-                    else:
-                        st.info("No state revenue data available")
+                    state_rev = state_rev[state_rev[selected_value_col] > 0].sort_values(selected_value_col, ascending=False)
+                    state_rev_full = state_rev.copy()
+                    
+                    # Create formatted column first
+                    state_rev['Formatted'] = state_rev[selected_value_col].apply(format_inr)
+                    
+                    # Show pie chart first
+                    fig_state = px.pie(state_rev, values=selected_value_col, names='State', 
+                                      title="Revenue by State",
+                                      custom_data=['Formatted'])
+                    fig_state.update_traces(textposition='inside', textinfo='percent+label',
+                                           hovertemplate='%{label}<br>%{customdata[0]}<extra></extra>')
+                    st.plotly_chart(fig_state, use_container_width=True, key="pie_state")
+                    
+                    # Add dropdown selector for state BELOW the chart
+                    st.markdown("**Select States to View Details**")
+                    available_states = state_rev['State'].tolist()
+                    selected_states = st.multiselect(
+                        "Choose states",
+                        available_states,
+                        default=[available_states[0]] if available_states else [],
+                        key="state_detail_select"
+                    )
+                    
+                    # Get details for selected states
+                    if selected_states:
+                        state_details_data = []
+                        for state in selected_states:
+                            state_data = state_rev[state_rev['State'] == state]
+                            if not state_data.empty:
+                                state_info = state_data.iloc[0]
+                                state_details_data.append({
+                                    'State': state,
+                                    'Revenue': state_info['Formatted']
+                                })
+                        
+                        if state_details_data:
+                            state_details_df = pd.DataFrame(state_details_data)
+                            st.dataframe(state_details_df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No state revenue data available")
             
             with pie_col3:
                 exec_col = 'Sales Executive' if 'Sales Executive' in df.columns else 'Executive' if 'Executive' in df.columns else None
