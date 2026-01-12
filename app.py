@@ -13,7 +13,6 @@ from api_client import APIClient
 from datetime import datetime, timedelta
 import json
 import os
-
 # Initialize Dash app with Bootstrap theme
 app = dash.Dash(
     __name__,
