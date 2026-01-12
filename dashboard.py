@@ -69,8 +69,83 @@ with col2:
 start_date_str = start_date.strftime("%d-%m-%Y")
 end_date_str = end_date.strftime("%d-%m-%Y")
 
-# Load data for selected date range
-df = fetch_dashboard_data(start_date=start_date_str, end_date=end_date_str)
+# Force date change detection and cache invalidation
+force_refresh = False
+
+# Check if dates have changed, and if so, clear the cache
+if 'last_start_date' not in st.session_state:
+    st.session_state.last_start_date = start_date_str
+if 'last_end_date' not in st.session_state:
+    st.session_state.last_end_date = end_date_str
+
+current_date_key = f"{start_date_str}_{end_date_str}"
+last_date_key = f"{st.session_state.last_start_date}_{st.session_state.last_end_date}"
+
+if current_date_key != last_date_key:
+    # Date changed, clear ALL cache IMMEDIATELY before updating session state
+    print(f"📅 DATE CHANGE DETECTED: {last_date_key} → {current_date_key}")
+    force_refresh = True
+    
+    # Clear all cached data - including Streamlit's internal cache
+    for key in list(st.session_state.keys()):
+        if key.startswith("api_data_"):
+            del st.session_state[key]
+            print(f"   Cleared cache: {key}")
+    
+    # Also delete the specific cache key for the new date range (in case it exists)
+    new_cache_key = f"api_data_{start_date_str}_{end_date_str}"
+    if new_cache_key in st.session_state:
+        del st.session_state[new_cache_key]
+        print(f"   Cleared new cache key: {new_cache_key}")
+    
+    # Update session state BEFORE rerun
+    st.session_state.last_start_date = start_date_str
+    st.session_state.last_end_date = end_date_str
+    st.session_state.force_data_refresh = True
+    st.session_state.skip_all_caches = True  # NEW: Additional flag
+    
+    # Force Streamlit to re-run the entire script
+    st.rerun()
+
+# Check if we need to force refresh (set during date change above)
+force_refresh = st.session_state.get('force_data_refresh', False)
+skip_all_caches = st.session_state.get('skip_all_caches', False)
+
+if force_refresh or skip_all_caches:
+    # Create cache key and delete it to force fresh fetch
+    cache_key = f"api_data_{start_date_str}_{end_date_str}"
+    if cache_key in st.session_state:
+        del st.session_state[cache_key]
+        print(f"   Tier 2 cleanup: Deleted cache key {cache_key}")
+    
+    # Also clear any metrics cache if it exists
+    metrics_cache_key = f"metrics_{start_date_str}_{end_date_str}"
+    if metrics_cache_key in st.session_state:
+        del st.session_state[metrics_cache_key]
+        print(f"   Tier 2 cleanup: Deleted metrics cache key {metrics_cache_key}")
+    
+    # Reset the flags
+    st.session_state.force_data_refresh = False
+    st.session_state.skip_all_caches = False
+    print(f"✅ Force refresh enabled - will fetch fresh data from API")
+
+print(f"📊 Fetching data for date range: {start_date_str} to {end_date_str}")
+df = fetch_dashboard_data(start_date=start_date_str, end_date=end_date_str, force_refresh=force_refresh)
+
+# Debug: Print info about fetched data
+if df is not None:
+    print(f"✅ Data fetched successfully")
+    print(f"   - Rows: {len(df)}")
+    print(f"   - Columns: {len(df.columns)}")
+    print(f"   - Object ID: {id(df)}")
+    if 'Value' in df.columns:
+        print(f"   - Total Revenue: Rs. {df['Value'].sum():,.2f}")
+    if 'Qty' in df.columns:
+        print(f"   - Total Qty: {df['Qty'].sum():,.0f}")
+    if 'Dealer Name' in df.columns:
+        print(f"   - Unique Dealers: {df['Dealer Name'].nunique()}")
+else:
+    print(f"❌ Failed to fetch data")
 
 # Handle case when data couldn't be loaded
 if df is None:
@@ -205,28 +280,40 @@ if df.empty:
 # ================================
 # KEY STATISTICS SECTION
 # ================================
-st.subheader("📊 Key Metrics - Last 7 Days")
 
-# Get last week data for key metrics
-last_week_start = today - timedelta(days=7)
-last_week_start_str = last_week_start.strftime("%d-%m-%Y")
-last_week_end_str = today.strftime("%d-%m-%Y")
+# Create a unique render key based on dates to force Streamlit to re-render metrics
+metrics_render_key = f"{start_date_str}_{end_date_str}"
+print(f"📊 METRICS RENDER KEY: {metrics_render_key}")
 
-# Fetch data for last week
-last_week_data = fetch_dashboard_data(start_date=last_week_start_str, end_date=last_week_end_str)
+st.subheader("📊 Key Metrics - Selected Date Range")
 
-current_period_label = f"Last 7 Days ({last_week_start_str} to {last_week_end_str})"
+# CRITICAL: Force Streamlit to clear any cached metrics
+# This ensures metrics recalculate with fresh data
+if force_refresh or skip_all_caches:
+    st.cache_data.clear()
+    print(f"🧹 Streamlit cache cleared due to date change")
 
-# Use last week data for metrics, fallback to current period data if not available
-current_period_data = last_week_data if last_week_data is not None else df
+# Use the selected date range for metrics (same as main dashboard)
+current_period_label = f"Selected Range ({start_date_str} to {end_date_str})"
+
+# IMPORTANT: Use a fresh reference to the dataframe to avoid any caching issues
+# Create a copy to ensure we're working with fresh data
+current_period_data = df.copy()
+
+print(f"📈 KEY METRICS CALCULATION")
+print(f"   Data shape: {current_period_data.shape}")
+print(f"   Object ID (current_period_data): {id(current_period_data)}")
+print(f"   Render Key: {metrics_render_key}")
 
 # Calculate key statistics
 if not current_period_data.empty:
     # 1. Revenue this period
     revenue_this_period = current_period_data[VALUE_COL].sum() if VALUE_COL else 0
+    print(f"   - Revenue calculated: Rs. {revenue_this_period:,.2f}")
     
     # 2. Quantity this period
     quantity_this_period = current_period_data[QTY_COL].sum() if QTY_COL else 0
+    print(f"   - Quantity calculated: {quantity_this_period:,.0f}")
     
     # 3. Most sold item (by quantity)
     if QTY_COL and QTY_COL in current_period_data.columns:
@@ -262,47 +349,91 @@ if not current_period_data.empty:
         most_orders_dealer = "N/A"
         dealer_orders_count = 0
     
+    # Store metrics in session state with date-based keys to force updates on date change
+    # This ensures metrics refresh when dates change
+    metrics_state_key = f"metrics_data_{metrics_render_key}"
+    if metrics_state_key not in st.session_state:
+        st.session_state[metrics_state_key] = {
+            'revenue': revenue_this_period,
+            'quantity': quantity_this_period,
+            'most_sold': most_sold,
+            'total_orders': len(current_period_data),
+            'top_state': most_orders_state,
+            'state_count': state_orders_count,
+            'top_area': most_orders_area,
+            'area_count': area_orders_count,
+            'top_dealer': most_orders_dealer,
+            'dealer_count': dealer_orders_count
+        }
+    
     # Create metric boxes in a grid layout
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("💰 Revenue", format_inr(revenue_this_period))
+        st.metric(
+            "💰 Revenue", 
+            format_inr(st.session_state[metrics_state_key]['revenue'])
+        )
         st.caption(current_period_label)
     
     with col2:
-        st.metric("📦 Total Quantity", format_qty(quantity_this_period))
+        st.metric(
+            "📦 Total Quantity", 
+            format_qty(st.session_state[metrics_state_key]['quantity'])
+        )
         st.caption(current_period_label)
     
     with col3:
-        st.metric("🏆 Most Sold Item", most_sold)
+        st.metric(
+            "🏆 Most Sold Item", 
+            st.session_state[metrics_state_key]['most_sold']
+        )
         st.caption("By Quantity")
     
     with col4:
-        st.metric("📊 Total Orders", len(current_period_data))
+        st.metric(
+            "📊 Total Orders", 
+            st.session_state[metrics_state_key]['total_orders']
+        )
         st.caption(current_period_label)
     
     # Second row of statistics
     col5, col6, col7, col8 = st.columns(4)
     
     with col5:
-        st.metric("🗺️ Top State", most_orders_state)
-        st.caption(f"{state_orders_count} orders")
+        st.metric(
+            "🗺️ Top State", 
+            st.session_state[metrics_state_key]['top_state']
+        )
+        st.caption(f"{st.session_state[metrics_state_key]['state_count']} orders")
     
     with col6:
-        st.metric("🏙️ Top Area", most_orders_area)
-        st.caption(f"{area_orders_count} orders")
+        st.metric(
+            "🏙️ Top Area", 
+            st.session_state[metrics_state_key]['top_area']
+        )
+        st.caption(f"{st.session_state[metrics_state_key]['area_count']} orders")
     
     with col7:
-        st.metric("🤝 Top Dealer", most_orders_dealer)
-        st.caption(f"{dealer_orders_count} orders")
+        st.metric(
+            "🤝 Top Dealer", 
+            st.session_state[metrics_state_key]['top_dealer']
+        )
+        st.caption(f"{st.session_state[metrics_state_key]['dealer_count']} orders")
     
     with col8:
         # Category count
         if 'Category' in current_period_data.columns:
             category_count = current_period_data['Category'].nunique()
-            st.metric("📂 Categories", category_count)
+            st.metric(
+                "📂 Categories", 
+                category_count
+            )
         else:
-            st.metric("📂 Categories", "N/A")
+            st.metric(
+                "📂 Categories", 
+                "N/A"
+            )
         st.caption("Unique")
     
     st.markdown("---")
