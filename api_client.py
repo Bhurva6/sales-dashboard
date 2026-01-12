@@ -25,11 +25,9 @@ class APIClient:
     
     BASE_URL = "https://avantemedicals.com/API/api.php"
     
-    # API Credentials (stored as constants for now, should be environment variables in production)
-    USERNAME = "u2vp8kb"
-    PASSWORD = "asdftuy#$%78@!"
-    
-    def __init__(self):
+    def __init__(self, username: str = None, password: str = None):
+        self.username = username or "u2vp8kb"  # Default fallback
+        self.password = password or "asdftuy#$%78@!"
         self.token = None
         self.refresh_token = None
         self.token_expiry = None
@@ -37,6 +35,10 @@ class APIClient:
         self.session.headers.update({
             'Content-Type': 'application/json'
         })
+        # Disable SSL verification for development (not recommended for production)
+        self.session.verify = False
+        # Suppress SSL warnings
+        requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
         
     def login(self) -> bool:
         """Authenticate with ERP API and get access token"""
@@ -49,10 +51,10 @@ class APIClient:
             logger.info(f"URL: {url}")
             
             payload = {
-                "username": self.USERNAME,
-                "password": self.PASSWORD
+                "username": self.username,
+                "password": self.password
             }
-            logger.debug(f"Username: {self.USERNAME}")
+            logger.debug(f"Username: {self.username}")
             logger.debug(f"Request Payload: {json.dumps(payload, indent=2)}")
             
             response = self.session.post(url, json=payload)
