@@ -1,0 +1,40 @@
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.Python
+env/
+venv/
+*.egg
+.env
+.env.local
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test and documentation
+tests/
+docs/
+*.md
+.git
+.gitignore
+
+# Data files (optional - comment out if needed for production)
+*.xlsx
+*.csv
+*.json
+*.log
+
+# Cache
+.pytest_cache
+.streamlit
+streamlit.log
+streamlit_debug.log

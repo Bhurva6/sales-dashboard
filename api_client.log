@@ -5918,3 +5918,186 @@
   "SV": "6607.31"
 }
 2026-01-12 12:44:41,163 - [INFO] - api_client - ================================================================================
+2026-01-12 12:45:04,099 - [INFO] - api_client - ================================================================================
+2026-01-12 12:45:04,099 - [INFO] - api_client - GET SALES REPORT REQUEST INITIATED
+2026-01-12 12:45:04,099 - [INFO] - api_client - ================================================================================
+2026-01-12 12:45:04,099 - [INFO] - api_client - Date Range - Start: 01-11-2025, End: 10-12-2025
+2026-01-12 12:45:04,099 - [DEBUG] - api_client - ✅ Date format validation passed
+2026-01-12 12:45:04,099 - [INFO] - api_client - API URL: https://avantemedicals.com/API/api.php?action=get_sales_report
+2026-01-12 12:45:04,100 - [DEBUG] - api_client - Request Payload: {
+  "action": "get_sales_report",
+  "startdate": "01-11-2025",
+  "enddate": "10-12-2025"
+}
+2026-01-12 12:45:04,100 - [DEBUG] - api_client - Request Headers: {
+  "Content-Type": "application/json"
+}
+2026-01-12 12:45:04,102 - [DEBUG] - urllib3.connectionpool - Starting new HTTPS connection (1): avantemedicals.com:443
+2026-01-12 12:45:05,161 - [DEBUG] - urllib3.connectionpool - https://avantemedicals.com:443 "POST /API/api.php?action=get_sales_report HTTP/1.1" 200 None
+2026-01-12 12:45:05,166 - [INFO] - api_client - Response Status Code: 200
+2026-01-12 12:45:05,167 - [DEBUG] - api_client - Response Headers: {'Date': 'Mon, 12 Jan 2026 07:15:04 GMT', 'Server': 'Apache', 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0', 'Access-Control-Allow-Headers': 'Content-Type, Origin, Authorization', 'Pragma': 'no-cache', 'Content-Encoding': 'gzip', 'Vary': 'Accept-Encoding', 'Keep-Alive': 'timeout=5, max=100', 'Connection': 'Keep-Alive', 'Transfer-Encoding': 'chunked', 'Content-Type': 'application/json'}
+2026-01-12 12:45:05,254 - [INFO] - api_client - Response Status: success
+2026-01-12 12:45:05,254 - [DEBUG] - api_client - Response Keys: ['status', 'report_data']
+2026-01-12 12:45:05,254 - [INFO] - api_client - ✅ Records returned: 1106
+2026-01-12 12:45:05,254 - [DEBUG] - api_client - Sample record (first): {
+  "cust_id": "38",
+  "id": "187",
+  "comp_nm": "ALTIVATE MEDICARE",
+  "city": "VADODARA ",
+  "state": "GUJARAT",
+  "parent_category": "Bone Plate",
+  "category_name": "AS. Olecranon Plate, ",
+  "meta_keyword": "AAS.332-A",
+  "SQ": "1",
+  "SV": "1385.67"
+}
+2026-01-12 12:45:05,254 - [INFO] - api_client - ================================================================================
+2026-01-12 12:45:05,607 - [INFO] - api_client - ================================================================================
+2026-01-12 12:45:05,608 - [INFO] - api_client - GET SALES REPORT REQUEST INITIATED
+2026-01-12 12:45:05,608 - [INFO] - api_client - ================================================================================
+2026-01-12 12:45:05,608 - [INFO] - api_client - Date Range - Start: 01-11-2025, End: 11-11-2025
+2026-01-12 12:45:05,608 - [DEBUG] - api_client - ✅ Date format validation passed
+2026-01-12 12:45:05,608 - [INFO] - api_client - API URL: https://avantemedicals.com/API/api.php?action=get_sales_report
+2026-01-12 12:45:05,608 - [DEBUG] - api_client - Request Payload: {
+  "action": "get_sales_report",
+  "startdate": "01-11-2025",
+  "enddate": "11-11-2025"
+}
+2026-01-12 12:45:05,608 - [DEBUG] - api_client - Request Headers: {
+  "Content-Type": "application/json"
+}
+2026-01-12 12:45:05,609 - [DEBUG] - urllib3.connectionpool - Starting new HTTPS connection (1): avantemedicals.com:443
+2026-01-12 12:45:06,096 - [DEBUG] - urllib3.connectionpool - https://avantemedicals.com:443 "POST /API/api.php?action=get_sales_report HTTP/1.1" 200 None
+2026-01-12 12:45:06,097 - [INFO] - api_client - Response Status Code: 200
+2026-01-12 12:45:06,097 - [DEBUG] - api_client - Response Headers: {'Date': 'Mon, 12 Jan 2026 07:15:05 GMT', 'Server': 'Apache', 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0', 'Access-Control-Allow-Headers': 'Content-Type, Origin, Authorization', 'Pragma': 'no-cache', 'Content-Encoding': 'gzip', 'Vary': 'Accept-Encoding', 'Keep-Alive': 'timeout=5, max=99', 'Connection': 'Keep-Alive', 'Transfer-Encoding': 'chunked', 'Content-Type': 'application/json'}
+2026-01-12 12:45:06,098 - [INFO] - api_client - Response Status: success
+2026-01-12 12:45:06,098 - [DEBUG] - api_client - Response Keys: ['status', 'report_data']
+2026-01-12 12:45:06,098 - [INFO] - api_client - ✅ Records returned: 301
+2026-01-12 12:45:06,098 - [DEBUG] - api_client - Sample record (first): {
+  "cust_id": "49",
+  "id": "41",
+  "comp_nm": "S S ORTHO TOOLS ",
+  "city": "BANGALORE ",
+  "state": "KARNATAKA",
+  "parent_category": "Bone Screw",
+  "category_name": "6.4mm Cannulated Locking Bolt for Affn/PFN",
+  "meta_keyword": "ALB.298",
+  "SQ": "8",
+  "SV": "1022.86"
+}
+2026-01-12 12:45:06,098 - [INFO] - api_client - ================================================================================
+2026-01-12 12:45:39,226 - [ERROR] - api_client - ❌ Request error: HTTPSConnectionPool(host='avantemedicals.com', port=443): Max retries exceeded with url: /API/api.php?action=get_sales_report (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x116987610>, 'Connection to avantemedicals.com timed out. (connect timeout=60)'))
+Traceback (most recent call last):
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/urllib3/connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+        (self._dns_host, self.port),
+    ...<2 lines>...
+        socket_options=self.socket_options,
+    )
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+    ~~~~~~~~~~~~^^^^
+TimeoutError: timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 488, in _make_request
+    raise new_e
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 464, in _make_request
+    self._validate_conn(conn)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 1093, in _validate_conn
+    conn.connect()
+    ~~~~~~~~~~~~^^
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/urllib3/connection.py", line 753, in connect
+    self.sock = sock = self._new_conn()
+                       ~~~~~~~~~~~~~~^^
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/urllib3/connection.py", line 207, in _new_conn
+    raise ConnectTimeoutError(
+    ...<2 lines>...
+    ) from e
+urllib3.exceptions.ConnectTimeoutError: (<urllib3.connection.HTTPSConnection object at 0x116987610>, 'Connection to avantemedicals.com timed out. (connect timeout=60)')
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/requests/adapters.py", line 644, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/urllib3/util/retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='avantemedicals.com', port=443): Max retries exceeded with url: /API/api.php?action=get_sales_report (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x116987610>, 'Connection to avantemedicals.com timed out. (connect timeout=60)'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/bhurvasharma/dashboard/api_client.py", line 344, in get_sales_report
+    response = requests.post(
+        url,
+    ...<3 lines>...
+        verify=False
+    )
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/requests/api.py", line 115, in post
+    return request("post", url, data=data, json=json, **kwargs)
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/requests/adapters.py", line 665, in send
+    raise ConnectTimeout(e, request=request)
+requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='avantemedicals.com', port=443): Max retries exceeded with url: /API/api.php?action=get_sales_report (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x116987610>, 'Connection to avantemedicals.com timed out. (connect timeout=60)'))
+2026-01-12 12:45:39,238 - [INFO] - api_client - ================================================================================
+2026-01-12 12:52:12,348 - [INFO] - api_client - ================================================================================
+2026-01-12 12:52:12,348 - [INFO] - api_client - GET SALES REPORT REQUEST INITIATED
+2026-01-12 12:52:12,349 - [INFO] - api_client - ================================================================================
+2026-01-12 12:52:12,349 - [INFO] - api_client - Date Range - Start: 01-11-2025, End: 11-11-2025
+2026-01-12 12:52:12,349 - [DEBUG] - api_client - ✅ Date format validation passed
+2026-01-12 12:52:12,349 - [INFO] - api_client - API URL: https://avantemedicals.com/API/api.php?action=get_sales_report
+2026-01-12 12:52:12,349 - [DEBUG] - api_client - Request Payload: {
+  "action": "get_sales_report",
+  "startdate": "01-11-2025",
+  "enddate": "11-11-2025"
+}
+2026-01-12 12:52:12,349 - [DEBUG] - api_client - Request Headers: {
+  "Content-Type": "application/json"
+}
+2026-01-12 12:52:12,352 - [DEBUG] - urllib3.connectionpool - Starting new HTTPS connection (1): avantemedicals.com:443
+2026-01-12 12:52:12,920 - [DEBUG] - urllib3.connectionpool - https://avantemedicals.com:443 "POST /API/api.php?action=get_sales_report HTTP/1.1" 200 None
+2026-01-12 12:52:12,921 - [INFO] - api_client - Response Status Code: 200
+2026-01-12 12:52:12,921 - [DEBUG] - api_client - Response Headers: {'Date': 'Mon, 12 Jan 2026 07:22:12 GMT', 'Server': 'Apache', 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0', 'Access-Control-Allow-Headers': 'Content-Type, Origin, Authorization', 'Pragma': 'no-cache', 'Content-Encoding': 'gzip', 'Vary': 'Accept-Encoding', 'Keep-Alive': 'timeout=5, max=100', 'Connection': 'Keep-Alive', 'Transfer-Encoding': 'chunked', 'Content-Type': 'application/json'}
+2026-01-12 12:52:12,921 - [INFO] - api_client - Response Status: success
+2026-01-12 12:52:12,921 - [DEBUG] - api_client - Response Keys: ['status', 'report_data']
+2026-01-12 12:52:12,922 - [INFO] - api_client - ✅ Records returned: 301
+2026-01-12 12:52:12,922 - [DEBUG] - api_client - Sample record (first): {
+  "cust_id": "49",
+  "id": "41",
+  "comp_nm": "S S ORTHO TOOLS ",
+  "city": "BANGALORE ",
+  "state": "KARNATAKA",
+  "parent_category": "Bone Screw",
+  "category_name": "6.4mm Cannulated Locking Bolt for Affn/PFN",
+  "meta_keyword": "ALB.298",
+  "SQ": "8",
+  "SV": "1022.86"
+}
+2026-01-12 12:52:12,922 - [INFO] - api_client - ================================================================================

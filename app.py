@@ -480,4 +480,7 @@ if __name__ == '__main__':
     print("   URL: http://localhost:8050")
     print("   Press Ctrl+C to stop")
     print("="*60 + "\n")
-    app.run(debug=True, port=8050)
+    app.run_server(debug=True, port=8050)
+
+# Export server for production (Vercel)
+server = app.server

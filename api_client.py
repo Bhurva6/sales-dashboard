@@ -3,7 +3,6 @@ API Client for Avante Medicals ERP
 Handles authentication and data fetching from the ERP API
 """
 import requests
-import streamlit as st
 from datetime import datetime, timedelta
 import json
 import logging

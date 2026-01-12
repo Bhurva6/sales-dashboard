@@ -8,3 +8,4 @@ xgboost
 requests
 dash
 dash-bootstrap-components
+gunicorn
