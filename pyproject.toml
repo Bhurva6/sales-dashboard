@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orthopedic-implant-dashboard"
+version = "1.0.0"
+description = "Orthopedic Implant Analytics Dashboard with Dash"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas",
+    "plotly",
+    "openpyxl",
+    "scikit-learn",
+    "numpy",
+    "statsmodels",
+    "xgboost",
+    "requests",
+    "dash",
+    "dash-bootstrap-components",
+    "gunicorn"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "flake8"
+]
