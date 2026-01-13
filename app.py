@@ -1,10 +1,9 @@
 """
 Dash-based Orthopedic Implant Analytics Dashboard
-Replaces Streamlit with Dash for better state management and reactive updates
 """
 
 import dash
-from dash import dcc, html, Input, Output, State, callback, ctx
+from dash import dcc, html, Input, Output, State, callback, ctx, no_update, ALL
 import dash_bootstrap_components as dbc
 import pandas as pd
 import plotly.express as px
@@ -64,6 +63,10 @@ def format_qty(value):
     else:
         return f"{value:,.0f}"
 
+def get_week_start():
+    today = datetime.now()
+    return today - timedelta(days=today.weekday())
+
 # App layout
 app.layout = dbc.Container([
     dcc.Location(id='url', refresh=False),
@@ -85,7 +88,7 @@ app.layout = dbc.Container([
         dbc.Col([
             dbc.Card([
                 dbc.CardBody([
-                    html.H5("🔐 API Login", className="card-title"),
+                    html.H5("🔐 Login", className="card-title"),
                     
                     dbc.Input(
                         id='username-input',
@@ -104,6 +107,20 @@ app.layout = dbc.Container([
                     ),
                     
                     html.Hr(),
+                    
+                    # Quick Date Selection Section
+                    html.P("⚡ Quick Select:", className='small fw-bold mb-2'),
+                    dbc.Stack([
+                        dbc.ButtonGroup([
+                            dbc.Button("Today", id='quick-today', color='primary', outline=True, size='sm', className='w-100 mb-1'),
+                            dbc.Button("Yesterday", id='quick-yesterday', color='primary', outline=True, size='sm', className='w-100 mb-1'),
+                        ], className='d-grid gap-1 mb-1'),
+                        dbc.ButtonGroup([
+                            dbc.Button("This Week", id='quick-week', color='primary', outline=True, size='sm', className='w-100 mb-1'),
+                            dbc.Button("This Month", id='quick-month', color='primary', outline=True, size='sm', className='w-100 mb-1'),
+                            dbc.Button("Last 3 Months", id='quick-3months', color='primary', outline=True, size='sm', className='w-100 mb-1'),
+                        ], className='d-grid gap-1 mb-1'),
+                    ], gap=1, className='mb-3'),
                     
                     html.H5("📅 Date Range", className="card-title"),
                     
@@ -472,6 +489,67 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                     ])
                 ], width=4),
             ], className="g-2 mb-4"),
+            
+            # Custom Chart Builder Section
+            html.Hr(),
+            dbc.Button("➕ Create Custom Chart", id="toggle-custom-builder", color="secondary", className="mb-3"),
+            dbc.Collapse(
+                dbc.Card([
+                    dbc.CardHeader("🎨 Custom Chart Builder"),
+                    dbc.CardBody([
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("X-axis"),
+                                dcc.Dropdown(
+                                    id='custom-x-axis',
+                                    options=[{'label': col, 'value': col} for col in ['Dealer Name', 'State', 'City', 'Category', 'Sub Category', 'Product Name']],
+                                    placeholder="Select X-axis"
+                                )
+                            ], width=6),
+                            dbc.Col([
+                                dbc.Label("Y-axis"),
+                                dcc.Dropdown(
+                                    id='custom-y-axis',
+                                    options=[{'label': opt, 'value': opt} for opt in ['Sum of Revenue', 'Sum of Quantity', 'Count of Orders', 'Average Revenue', 'Average Quantity']],
+                                    placeholder="Select Y-axis"
+                                )
+                            ], width=6),
+                        ], className="mb-3"),
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("Chart Type"),
+                                dcc.Dropdown(
+                                    id='custom-chart-type',
+                                    options=[{'label': opt, 'value': opt} for opt in ['Bar Chart', 'Horizontal Bar', 'Pie Chart', 'Line Chart', 'Scatter Plot', 'Sunburst']],
+                                    placeholder="Select Chart Type"
+                                )
+                            ], width=6),
+                            dbc.Col([
+                                dbc.Label("Aggregation"),
+                                dcc.Dropdown(
+                                    id='custom-agg-type',
+                                    options=[{'label': opt, 'value': opt} for opt in ['Sum', 'Average', 'Count', 'Min', 'Max']],
+                                    value='Sum',
+                                    placeholder="Select Aggregation"
+                                )
+                            ], width=6),
+                        ], className="mb-3"),
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Label("Top N Items"),
+                                dbc.Input(type='number', id='custom-top-n', min=5, max=50, value=10, step=5)
+                            ], width=6),
+                            dbc.Col([
+                                dbc.Checkbox(id='custom-sort-desc', label="Sort Descending", value=True),
+                                dbc.Button("Generate Chart", id='generate-custom-chart-btn', color='primary', className="mt-2")
+                            ], width=6),
+                        ], className="mb-3"),
+                        html.Div(id='custom-chart-output')
+                    ])
+                ]),
+                id="custom-builder-collapse",
+                is_open=False,
+            ),
         ])
         
         # Status text
@@ -485,6 +563,209 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
         traceback.print_exc()
         status_text = f"❌ Error | {datetime.now().strftime('%H:%M:%S')}"
         return dbc.Alert(f"Error: {str(e)}", color="danger"), status_text
+
+# Toggle Custom Chart Builder Callback
+@app.callback(
+    Output("custom-builder-collapse", "is_open"),
+    Input("toggle-custom-builder", "n_clicks"),
+    State("custom-builder-collapse", "is_open"),
+)
+def toggle_custom_builder(n, is_open):
+    if n:
+        return not is_open
+    return is_open
+
+# Custom Chart Builder Callback
+@app.callback(
+    Output('custom-chart-output', 'children'),
+    Input('generate-custom-chart-btn', 'n_clicks'),
+    State('custom-x-axis', 'value'),
+    State('custom-y-axis', 'value'),
+    State('custom-chart-type', 'value'),
+    State('custom-agg-type', 'value'),
+    State('custom-top-n', 'value'),
+    State('custom-sort-desc', 'value'),
+    State('date-range-picker', 'start_date'),
+    State('date-range-picker', 'end_date'),
+    State('hide-innovative-check', 'value'),
+    State('username-input', 'value'),
+    State('password-input', 'value'),
+    prevent_initial_call=True
+)
+def generate_custom_chart(n_clicks, x_axis, y_axis, chart_type, agg_type, top_n, sort_desc, start_date, end_date, hide_innovative, username, password):
+    if not n_clicks or not x_axis or not y_axis or not chart_type:
+        return dbc.Alert("Please select X-axis, Y-axis, and Chart Type", color="warning")
+    
+    try:
+        # Convert dates
+        start_date_obj = pd.to_datetime(start_date)
+        end_date_obj = pd.to_datetime(end_date)
+        start_date_str = start_date_obj.strftime("%d-%m-%Y")
+        end_date_str = end_date_obj.strftime("%d-%m-%Y")
+        
+        # Fetch data
+        api_client = APIClient(username=username, password=password)
+        response = api_client.get_sales_report(start_date=start_date_str, end_date=end_date_str)
+        if not response.get('success'):
+            return dbc.Alert(f"API Error: {response.get('message')}", color="danger")
+        
+        api_response = response.get('data', {})
+        report_data = api_response.get('report_data', [])
+        if not report_data:
+            return dbc.Alert("No data available for this date range", color="warning")
+        
+        df = pd.DataFrame(report_data)
+        
+        # Map columns
+        column_mapping = {
+            'SV': 'Value', 'SQ': 'Qty', 'comp_nm': 'Dealer Name', 'category_name': 'Category',
+            'state': 'State', 'city': 'City', 'meta_keyword': 'Product Name', 'parent_category': 'Sub Category'
+        }
+        df = df.rename(columns={old: new for old, new in column_mapping.items() if old in df.columns})
+        
+        # Convert numeric
+        if 'Value' in df.columns:
+            df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+        if 'Qty' in df.columns:
+            df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
+        
+        # Apply filter
+        if hide_innovative and 'Dealer Name' in df.columns:
+            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Detect columns
+        VALUE_COLS = [c for c in df.columns if c.startswith('Value') and c != 'Value']
+        QTY_COLS = [c for c in df.columns if c.startswith('Qty') and c != 'Qty']
+        VALUE_COL = VALUE_COLS[0] if VALUE_COLS else ('Value' if 'Value' in df.columns else None)
+        QTY_COL = QTY_COLS[0] if QTY_COLS else ('Qty' if 'Qty' in df.columns else None)
+        
+        # Determine aggregation column and function
+        if y_axis == 'Sum of Revenue':
+            agg_col = VALUE_COL
+            agg_func = 'sum'
+        elif y_axis == 'Sum of Quantity':
+            agg_col = QTY_COL
+            agg_func = 'sum'
+        elif y_axis == 'Count of Orders':
+            agg_col = None
+            agg_func = 'count'
+        elif y_axis == 'Average Revenue':
+            agg_col = VALUE_COL
+            agg_func = 'mean'
+        elif y_axis == 'Average Quantity':
+            agg_col = QTY_COL
+            agg_func = 'mean'
+        else:
+            return dbc.Alert("Invalid Y-axis selection", color="danger")
+        
+        if agg_func == 'count':
+            grouped = df.groupby(x_axis).size().reset_index(name='Count')
+            sort_col = 'Count'
+        else:
+            grouped = df.groupby(x_axis)[agg_col].agg(agg_func).reset_index(name='Value')
+            sort_col = 'Value'
+        
+        # Sort
+        grouped = grouped.sort_values(sort_col, ascending=not sort_desc).head(top_n)
+        
+        # Generate chart
+        title = f"{y_axis} by {x_axis} - Top {top_n} ({chart_type})"
+        
+        if chart_type == 'Bar Chart':
+            fig = px.bar(grouped, x=x_axis, y=sort_col, title=title, color=sort_col, color_continuous_scale='Blues')
+        elif chart_type == 'Horizontal Bar':
+            fig = px.bar(grouped, x=sort_col, y=x_axis, orientation='h', title=title, color=sort_col, color_continuous_scale='Blues')
+        elif chart_type == 'Pie Chart':
+            fig = px.pie(grouped, values=sort_col, names=x_axis, title=title)
+        elif chart_type == 'Line Chart':
+            fig = px.line(grouped, x=x_axis, y=sort_col, title=title, markers=True)
+        elif chart_type == 'Scatter Plot':
+            fig = px.scatter(grouped, x=x_axis, y=sort_col, title=title, size=sort_col)
+        elif chart_type == 'Sunburst':
+            # For sunburst, if x_axis has hierarchy, but since single column, use simple
+            fig = px.sunburst(grouped, path=[x_axis], values=sort_col, title=title)
+        else:
+            return dbc.Alert("Invalid chart type", color="danger")
+        
+        # Format axes
+        if 'Value' in sort_col.lower() or 'revenue' in y_axis.lower():
+            fig.update_yaxes(tickformat=".2f", tickprefix="Rs. ", ticksuffix="", 
+                           tickvals=[1e5, 1e6, 1e7, 1e8, 1e9], ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"])
+        
+        fig.update_layout(height=500, font=dict(size=12, family="Arial, sans-serif"),
+                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        
+        return dbc.Card([
+            dbc.CardHeader(title),
+            dbc.CardBody([dcc.Graph(figure=fig, config={'displayModeBar': True})])
+        ])
+    
+    except Exception as e:
+        return dbc.Alert(f"Error generating chart: {str(e)}", color="danger")
+
+# Quick Date Selection Callback
+@app.callback(
+    Output('date-range-picker', 'start_date'),
+    Output('date-range-picker', 'end_date'),
+    Input('quick-today', 'n_clicks'),
+    Input('quick-yesterday', 'n_clicks'),
+    Input('quick-week', 'n_clicks'),
+    Input('quick-month', 'n_clicks'),
+    Input('quick-3months', 'n_clicks'),
+    prevent_initial_call=True
+)
+def quick_date_select(today_click, yest_click, week_click, month_click, three_month_click):
+    triggered = ctx.triggered_id
+    now = datetime.now()
+    if triggered == 'quick-today':
+        start = end = now
+    elif triggered == 'quick-yesterday':
+        start = end = now - timedelta(days=1)
+    elif triggered == 'quick-week':
+        start = get_week_start()
+        end = now
+    elif triggered == 'quick-month':
+        start = now.replace(day=1)
+        end = now
+    elif triggered == 'quick-3months':
+        start = now - timedelta(days=90)
+        end = now
+    else:
+        return no_update, no_update
+    # Format as yyyy-mm-dd for DatePickerRange
+    return start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')
+
+# Clientside callback for button feedback
+app.clientside_callback(
+    """
+    function(t, y, w, m, threem) {
+        const ids = ['quick-today', 'quick-yesterday', 'quick-week', 'quick-month', 'quick-3months'];
+        const btns = ids.map(id => document.getElementById(id));
+        let idx = -1;
+        if (t) idx = 0;
+        else if (y) idx = 1;
+        else if (w) idx = 2;
+        else if (m) idx = 3;
+        else if (threem) idx = 4;
+        if (idx >= 0 && btns[idx]) {
+            btns[idx].classList.remove('btn-outline-primary');
+            btns[idx].classList.add('btn-primary');
+            setTimeout(() => {
+                btns[idx].classList.add('btn-outline-primary');
+                btns[idx].classList.remove('btn-primary');
+            }, 500);
+        }
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('quick-today', 'n_clicks'),
+    Input('quick-today', 'n_clicks'),
+    Input('quick-yesterday', 'n_clicks'),
+    Input('quick-week', 'n_clicks'),
+    Input('quick-month', 'n_clicks'),
+    Input('quick-3months', 'n_clicks'),
+    prevent_initial_call=True
+)
 
 # Chart creation functions
 def _create_dealer_pie(df, value_col, limit=10):
