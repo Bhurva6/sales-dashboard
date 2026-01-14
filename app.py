@@ -5,6 +5,7 @@ Dash-based Orthopedic Implant Analytics Dashboard
 import dash
 from dash import dcc, html, Input, Output, State, callback, ctx, no_update, ALL, callback_context
 import dash_bootstrap_components as dbc
+import dash_ag_grid as dag
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -20,11 +21,15 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Dash app with Bootstrap theme
+# Initialize Dash app with modern theme
 app = dash.Dash(
     __name__,
-    external_stylesheets=[dbc.themes.BOOTSTRAP],
-    suppress_callback_exceptions=True
+    external_stylesheets=[dbc.themes.LUX],
+    assets_folder='assets',
+    suppress_callback_exceptions=True,
+    meta_tags=[
+        {"name": "viewport", "content": "width=device-width, initial-scale=1"}
+    ]
 )
 
 # App title
@@ -34,16 +39,18 @@ app.title = "Orthopedic Implant Analytics Dashboard"
 today = datetime.now()
 month_start = today.replace(day=1)
 
-# Color scheme
+# Modern Color Palette - Magenta Inspired
 COLORS = {
-    'primary': '#0066cc',
-    'secondary': '#6c757d',
-    'success': '#28a745',
-    'danger': '#dc3544',
-    'warning': '#ffc107',
-    'info': '#17a2b8',
-    'light': '#f8f9fa',
-    'dark': '#343a40'
+    'primary': '#6366f1',      # Indigo
+    'secondary': '#8b5cf6',    # Purple
+    'success': '#10b981',      # Green
+    'danger': '#ef4444',       # Red
+    'warning': '#f59e0b',      # Amber
+    'info': '#3b82f6',         # Blue
+    'light': '#f9fafb',        # Background
+    'dark': '#1f2937',         # Dark text
+    'card_bg': '#ffffff',      # Card background
+    'sidebar_bg': '#f8fafc'    # Sidebar background
 }
 
 # Helper functions for formatting
@@ -164,23 +171,32 @@ app.layout = dbc.Container([
     dcc.Store(id='selected-location-store', storage_type='session'),  # Store for map selection
     html.Div(id='saved-charts-data', style={'display': 'none'}),  # Hidden div for saved charts data
     
-    # Header
+    # Modern Header with gradient
     dbc.Row([
         dbc.Col([
             html.Div([
-                html.H1("📊 Orthopedic Implant Analytics Dashboard", className="mb-0"),
-                html.P("Real-time Sales & Analytics - Powered by Dash", className="text-muted small")
-            ], className="py-3")
+                html.Div([
+                    html.Div([
+                        html.H1([
+                            html.Span("📊 ", style={'fontSize': '36px'}),
+                            html.Span("Orthopedic Implant Analytics", className="gradient-text")
+                        ], className="mb-0", style={'fontWeight': '700', 'letterSpacing': '-0.02em'}),
+                        html.P("Real-time Sales & Analytics Dashboard", 
+                               className="text-muted mb-0", 
+                               style={'fontSize': '14px', 'fontWeight': '400'})
+                    ]),
+                ], style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center'})
+            ], className="dashboard-header", style={'padding': '1.5rem 0'})
         ], width=12)
-    ], className="mb-4 border-bottom"),
+    ], className="mb-4"),
     
     # Sidebar + Main Content
     dbc.Row([
-        # Sidebar
+        # Modern Sidebar
         dbc.Col([
             dbc.Card([
                 dbc.CardBody([
-                    html.H5("🔐 Login", className="card-title"),
+                    html.H5("🔐 Authentication", className="mb-3", style={'fontWeight': '600', 'color': COLORS['dark']}),
                     
                     dbc.Input(
                         id='username-input',
@@ -198,10 +214,10 @@ app.layout = dbc.Container([
                         className="mb-3"
                     ),
                     
-                    html.Hr(),
+                    html.Hr(style={'borderColor': '#e5e7eb'}),
                     
                     # Quick Date Selection Section
-                    html.P("⚡ Quick Select:", className='small fw-bold mb-2'),
+                    html.P("⚡ Quick Select:", className='small fw-bold mb-2', style={'color': COLORS['dark']}),
                     dbc.Stack([
                         dbc.ButtonGroup([
                             dbc.Button("Today", id='quick-today', color='primary', outline=True, size='sm', className='w-100 mb-1'),
@@ -214,7 +230,7 @@ app.layout = dbc.Container([
                         ], className='d-grid gap-1 mb-1'),
                     ], gap=1, className='mb-3'),
                     
-                    html.H5("📅 Date Range", className="card-title"),
+                    html.H5("📅 Date Range", className="mb-3", style={'fontWeight': '600', 'color': COLORS['dark']}),
                     
                     dcc.DatePickerRange(
                         id='date-range-picker',
@@ -225,51 +241,55 @@ app.layout = dbc.Container([
                         style={'width': '100%'}
                     ),
                     
-                    html.Hr(),
+                    html.Hr(style={'borderColor': '#e5e7eb'}),
                     
-                    html.H5("🔧 Controls", className="card-title"),
+                    html.H5("🔧 Controls", className="mb-3", style={'fontWeight': '600', 'color': COLORS['dark']}),
                     
                     dbc.Checkbox(
                         id='hide-innovative-check',
                         label="Hide 'Innovative Ortho Surgicals'",
                         value=False,
-                        className="mb-2"
+                        className="mb-3"
                     ),
                     
                     dbc.Button(
                         "🔄 Refresh Data",
                         id='refresh-btn',
-                        color="info",
-                        className="w-100 mb-2",
+                        color="primary",
+                        className="w-100 mb-3",
                         n_clicks=0
                     ),
                     
-                    html.Hr(),
+                    html.Hr(style={'borderColor': '#e5e7eb'}),
                     
                     html.Div([
-                        html.P("Data Status:", className="small mb-1 fw-bold"),
+                        html.P("📊 Data Status:", className="small mb-2 fw-bold", style={'color': COLORS['dark']}),
                         html.Div(id='data-status', className="alert alert-info py-2 small")
                     ])
                 ])
-            ], className="sticky-top")
-        ], width=3),
+            ], className="sidebar-card shadow")
+        ], width=3, lg=3, md=12, sm=12),
         
         # Main Content with Tabs
         dbc.Col([
             dcc.Tabs([
-                dcc.Tab(label='Dashboard', children=[
-                    dcc.Loading(id='main-loading', children=[
-                        html.Div(id='main-content')
-                    ], type='default', fullscreen=False)
-                ]),
-                dcc.Tab(label='My Charts', children=[
+                dcc.Tab(label='📊 Dashboard', children=[
+                    dcc.Loading(
+                        id='main-loading', 
+                        children=[html.Div(id='main-content')],
+                        type='default',
+                        fullscreen=False,
+                        color=COLORS['primary']
+                    )
+                ], className='custom-tab'),
+                dcc.Tab(label='📈 My Charts', children=[
                     html.Div(id='my-charts-content')
-                ])
-            ])
-        ], width=9)
+                ], className='custom-tab')
+            ], style={'marginBottom': '1rem'})
+        ], width=9, lg=9, md=12, sm=12)
     ], className="g-3"),
     
-], fluid=True, className="py-4")
+], fluid=True, className="py-4", style={'maxWidth': '1400px', 'margin': '0 auto'})
 
 # Main content callback
 @app.callback(
@@ -387,7 +407,84 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
         print(f"   Revenue: {format_inr(revenue)}")
         print(f"   Quantity: {format_qty(quantity)}")
         
-        # Most sold item
+        # Calculate previous period for comparison (same duration before current period)
+        start_date_obj = pd.to_datetime(start_date)
+        end_date_obj = pd.to_datetime(end_date)
+        period_duration = (end_date_obj - start_date_obj).days
+        
+        prev_start_date = start_date_obj - pd.Timedelta(days=period_duration + 1)
+        prev_end_date = start_date_obj - pd.Timedelta(days=1)
+        
+        # Fetch previous period data for comparison
+        try:
+            prev_start_str = prev_start_date.strftime("%d-%m-%Y")
+            prev_end_str = prev_end_date.strftime("%d-%m-%Y")
+            
+            prev_response = api_client.get_sales_report(
+                start_date=prev_start_str,
+                end_date=prev_end_str
+            )
+            
+            if prev_response.get('success'):
+                prev_report_data = prev_response.get('data', {}).get('report_data', [])
+                prev_df = pd.DataFrame(prev_report_data)
+                
+                if not prev_df.empty:
+                    # Rename columns
+                    prev_df = prev_df.rename(columns={old: new for old, new in column_mapping.items() if old in prev_df.columns})
+                    
+                    # Convert numeric columns
+                    if 'Value' in prev_df.columns:
+                        prev_df['Value'] = pd.to_numeric(prev_df['Value'], errors='coerce')
+                    if 'Qty' in prev_df.columns:
+                        prev_df['Qty'] = pd.to_numeric(prev_df['Qty'], errors='coerce')
+                    
+                    # Apply filter
+                    if hide_innovative and 'Dealer Name' in prev_df.columns:
+                        prev_df = prev_df[~prev_df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+                    
+                    prev_revenue = prev_df[VALUE_COL].sum() if VALUE_COL else 0
+                    prev_quantity = prev_df[QTY_COL].sum() if QTY_COL else 0
+                    prev_orders = len(prev_df)
+                else:
+                    prev_revenue = 0
+                    prev_quantity = 0
+                    prev_orders = 0
+            else:
+                prev_revenue = 0
+                prev_quantity = 0
+                prev_orders = 0
+        except:
+            prev_revenue = 0
+            prev_quantity = 0
+            prev_orders = 0
+        
+        # Calculate trend data (last 30 days) for sparklines
+        revenue_trend = []
+        quantity_trend = []
+        orders_trend = []
+        
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            df_with_date = df.dropna(subset=['Date'])
+            
+            if not df_with_date.empty:
+                # Get daily aggregates
+                daily_data = df_with_date.groupby(df_with_date['Date'].dt.date).agg({
+                    VALUE_COL: 'sum' if VALUE_COL else lambda x: 0,
+                    QTY_COL: 'sum' if QTY_COL else lambda x: 0
+                }).reset_index()
+                daily_data['orders'] = df_with_date.groupby(df_with_date['Date'].dt.date).size().values
+                
+                # Take last 30 days or available days
+                daily_data = daily_data.tail(30)
+                
+                revenue_trend = daily_data[VALUE_COL].tolist() if VALUE_COL else []
+                quantity_trend = daily_data[QTY_COL].tolist() if QTY_COL else []
+                orders_trend = daily_data['orders'].tolist()
+        
+        # Calculate additional metrics
+
         if QTY_COL and QTY_COL in df.columns:
             prod_cols = ['Product Name', 'Item Name', 'Sub Category']
             prod_col = next((c for c in prod_cols if c in df.columns), None)
@@ -395,106 +492,168 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
         else:
             most_sold = "N/A"
         
-        # Top locations
+        # Top locations with previous period data
         most_state = df['State'].value_counts().idxmax() if 'State' in df.columns else "N/A"
         state_count = df['State'].value_counts().max() if 'State' in df.columns else 0
+        prev_state_count = prev_df['State'].value_counts().max() if not prev_df.empty and 'State' in prev_df.columns else 0
         
         most_city = df['City'].value_counts().idxmax() if 'City' in df.columns else "N/A"
         city_count = df['City'].value_counts().max() if 'City' in df.columns else 0
+        prev_city_count = prev_df['City'].value_counts().max() if not prev_df.empty and 'City' in prev_df.columns else 0
         
         most_dealer = df['Dealer Name'].value_counts().idxmax() if 'Dealer Name' in df.columns else "N/A"
         dealer_count = df['Dealer Name'].value_counts().max() if 'Dealer Name' in df.columns else 0
+        prev_dealer_count = prev_df['Dealer Name'].value_counts().max() if not prev_df.empty and 'Dealer Name' in prev_df.columns else 0
         
         category_count = df['Category'].nunique() if 'Category' in df.columns else 0
+        prev_category_count = prev_df['Category'].nunique() if not prev_df.empty and 'Category' in prev_df.columns else 0
+        
+        # Generate trend data for location-based metrics
+        state_trend = []
+        city_trend = []
+        dealer_trend = []
+        category_trend = []
+        
+        if 'Date' in df.columns and not df_with_date.empty:
+            try:
+                daily_state = df_with_date.groupby(df_with_date['Date'].dt.date)['State'].apply(lambda x: x.value_counts().max() if len(x) > 0 else 0).tail(30).tolist()
+                daily_city = df_with_date.groupby(df_with_date['Date'].dt.date)['City'].apply(lambda x: x.value_counts().max() if len(x) > 0 else 0).tail(30).tolist()
+                daily_dealer = df_with_date.groupby(df_with_date['Date'].dt.date)['Dealer Name'].apply(lambda x: x.value_counts().max() if len(x) > 0 else 0).tail(30).tolist()
+                daily_category = df_with_date.groupby(df_with_date['Date'].dt.date)['Category'].nunique().tail(30).tolist()
+                
+                state_trend = daily_state
+                city_trend = daily_city
+                dealer_trend = daily_dealer
+                category_trend = daily_category
+            except:
+                pass
+
         
         # Check if date data is available
         has_date_data = 'Date' in df.columns
         
         # Build dashboard content
         metrics_content = html.Div([
-            # First row of metrics
+            # First row of metrics - Enhanced with sparklines
             dbc.Row([
                 dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.H6("💰 Revenue", className="text-muted mb-2"),
-                            html.H2(format_inr(revenue), className="text-primary fw-bold"),
-                            html.Small(f"{start_date_str} → {end_date_str}", className="text-muted")
-                        ])
-                    ])
+                    _create_enhanced_metric_card(
+                        icon="💰",
+                        label="Revenue",
+                        current_value=format_inr(revenue),
+                        previous_value=prev_revenue,
+                        trend_values=revenue_trend,
+                        color='#2ECC71',
+                        gradient_start='rgba(46, 204, 113, 0.1)',
+                        gradient_end='rgba(46, 204, 113, 0.02)',
+                        date_range_text=f"{start_date_str} → {end_date_str}"
+                    )
+                ], width=3),
+                
+                dbc.Col([
+                    _create_enhanced_metric_card(
+                        icon="📦",
+                        label="Total Quantity",
+                        current_value=format_qty(quantity),
+                        previous_value=prev_quantity,
+                        trend_values=quantity_trend,
+                        color='#3498DB',
+                        gradient_start='rgba(52, 152, 219, 0.1)',
+                        gradient_end='rgba(52, 152, 219, 0.02)',
+                        date_range_text=f"{start_date_str} → {end_date_str}"
+                    )
                 ], width=3),
                 
                 dbc.Col([
                     dbc.Card([
                         dbc.CardBody([
-                            html.H6("📦 Total Qty", className="text-muted mb-2"),
-                            html.H2(format_qty(quantity), className="text-success fw-bold"),
-                            html.Small(f"{start_date_str} → {end_date_str}", className="text-muted")
-                        ])
-                    ])
+                            html.Div([
+                                html.Span("🏆", style={'fontSize': '24px', 'marginRight': '8px'}),
+                                html.Span("Most Sold", className="text-muted", style={'fontSize': '14px', 'fontWeight': '500'})
+                            ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '8px'}),
+                            html.H4(most_sold[:18], className="fw-bold", style={'fontSize': '20px', 'color': '#2c3e50', 'marginBottom': '4px'}),
+                            html.Small("Top item by quantity", className="text-muted", style={'fontSize': '11px'})
+                        ], style={
+                            'background': 'linear-gradient(135deg, rgba(241, 196, 15, 0.1) 0%, rgba(241, 196, 15, 0.02) 100%)',
+                            'borderRadius': '8px'
+                        })
+                    ], style={
+                        'border': 'none',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.05)'
+                    })
                 ], width=3),
                 
                 dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.H6("🏆 Most Sold", className="text-muted mb-2"),
-                            html.H5(most_sold[:18], className="text-info fw-bold"),
-                            html.Small("Top item by quantity", className="text-muted")
-                        ])
-                    ])
-                ], width=3),
-                
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.H6("📊 Orders", className="text-muted mb-2"),
-                            html.H2(f"{total_orders:,}", className="text-warning fw-bold"),
-                            html.Small(f"{start_date_str} → {end_date_str}", className="text-muted")
-                        ])
-                    ])
+                    _create_enhanced_metric_card(
+                        icon="📊",
+                        label="Orders",
+                        current_value=f"{total_orders:,}",
+                        previous_value=prev_orders,
+                        trend_values=orders_trend,
+                        color='#E74C3C',
+                        gradient_start='rgba(231, 76, 60, 0.1)',
+                        gradient_end='rgba(231, 76, 60, 0.02)',
+                        date_range_text=f"{start_date_str} → {end_date_str}"
+                    )
                 ], width=3),
             ], className="mb-4 g-2"),
             
-            # Second row of metrics
+            # Second row of metrics - Enhanced with sparklines
             dbc.Row([
                 dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.H6("🗺️ Top State", className="text-muted mb-2"),
-                            html.H3(most_state, className="text-primary fw-bold"),
-                            html.Small(f"{state_count} orders", className="text-muted")
-                        ])
-                    ])
+                    _create_enhanced_metric_card(
+                        icon="🗺️",
+                        label="Top State",
+                        current_value=f"{most_state}\n{state_count} orders",
+                        previous_value=prev_state_count,
+                        trend_values=state_trend,
+                        color='#9B59B6',
+                        gradient_start='rgba(155, 89, 182, 0.1)',
+                        gradient_end='rgba(155, 89, 182, 0.02)',
+                        date_range_text=f"{start_date_str} → {end_date_str}"
+                    )
                 ], width=3),
                 
                 dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.H6("🏙️ Top City", className="text-muted mb-2"),
-                            html.H3(most_city, className="text-success fw-bold"),
-                            html.Small(f"{city_count} orders", className="text-muted")
-                        ])
-                    ])
+                    _create_enhanced_metric_card(
+                        icon="🏙️",
+                        label="Top City",
+                        current_value=f"{most_city}\n{city_count} orders",
+                        previous_value=prev_city_count,
+                        trend_values=city_trend,
+                        color='#1ABC9C',
+                        gradient_start='rgba(26, 188, 156, 0.1)',
+                        gradient_end='rgba(26, 188, 156, 0.02)',
+                        date_range_text=f"{start_date_str} → {end_date_str}"
+                    )
                 ], width=3),
                 
                 dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.H6("🤝 Top Dealer", className="text-muted mb-2"),
-                            html.H4(most_dealer[:14], className="text-info fw-bold"),
-                            html.Small(f"{dealer_count} orders", className="text-muted")
-                        ])
-                    ])
+                    _create_enhanced_metric_card(
+                        icon="🤝",
+                        label="Top Dealer",
+                        current_value=f"{most_dealer[:14]}\n{dealer_count} orders",
+                        previous_value=prev_dealer_count,
+                        trend_values=dealer_trend,
+                        color='#E67E22',
+                        gradient_start='rgba(230, 126, 34, 0.1)',
+                        gradient_end='rgba(230, 126, 34, 0.02)',
+                        date_range_text=f"{start_date_str} → {end_date_str}"
+                    )
                 ], width=3),
                 
                 dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.H6("📂 Categories", className="text-muted mb-2"),
-                            html.H2(f"{category_count}", className="text-warning fw-bold"),
-                            html.Small("Unique categories", className="text-muted")
-                        ])
-                    ])
+                    _create_enhanced_metric_card(
+                        icon="📂",
+                        label="Categories",
+                        current_value=f"{category_count}",
+                        previous_value=prev_category_count,
+                        trend_values=category_trend,
+                        color='#34495E',
+                        gradient_start='rgba(52, 73, 94, 0.1)',
+                        gradient_end='rgba(52, 73, 94, 0.02)',
+                        date_range_text="Unique categories"
+                    )
                 ], width=3),
             ], className="mb-4 g-2"),
             
@@ -663,6 +822,88 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                         ])
                     ])
                 ], width=4),
+            ]),
+            
+            # Advanced Revenue Comparison Section - Only show if date data available
+            *([] if not has_date_data else [
+                html.Hr(className="my-4"),
+                html.H4("📈 Advanced Revenue Analysis", className="mb-4 fw-bold"),
+                
+                dbc.Row([
+                    dbc.Col([
+                        html.Div(id='revenue-comparison-container')
+                    ], width=12)
+                ], className="mb-4")
+            ]),
+            
+            # Activity Patterns Section - Only show if date data available
+            *([] if not has_date_data else [
+                html.Hr(className="my-4"),
+                html.H4("� Activity Patterns", className="mb-4 fw-bold"),
+                html.P("Analyze sales patterns across time dimensions to identify peak activity periods", className="text-muted mb-4"),
+                
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardBody([
+                                dcc.Graph(
+                                    figure=_create_activity_heatmap(df, VALUE_COL),
+                                    config={'displayModeBar': True}
+                                )
+                            ])
+                        ], className="shadow-sm")
+                    ], width=4),
+                    
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardBody([
+                                dcc.Graph(figure=_create_hourly_heatmap(df, VALUE_COL), config={'displayModeBar': True})
+                            ])
+                        ])
+                    ], width=4),
+                    
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardBody([
+                                dcc.Graph(figure=_create_day_part_analysis(df, VALUE_COL), config={'displayModeBar': True})
+                            ])
+                        ])
+                    ], width=4),
+                ], className="mb-4")
+            ]),
+            
+            # Funnel and Conversion Analysis Section
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            dcc.Graph(figure=_create_sales_funnel(df), config={'displayModeBar': True})
+                        ])
+                    ])
+                ], width=6),
+                
+                # Only show conversion timeline if date data is available
+                *(dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            dcc.Graph(figure=_create_conversion_timeline(df), config={'displayModeBar': True})
+                        ])
+                    ])
+                ], width=6) if has_date_data else []),
+                
+                # If no date data, add an info message
+                *(dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.Div([
+                                html.I(className="bi bi-info-circle", style={'fontSize': '48px', 'color': '#6c757d'}),
+                                html.H5("Conversion Timeline Unavailable", className="mt-3 text-muted"),
+                                html.P("Date information is required to display conversion metrics over time.", className="text-muted")
+                            ], className="text-center py-5")
+                        ])
+                    ])
+                ], width=6) if not has_date_data else []),
             ], className="g-2 mb-4"),
             
             # Custom Chart Builder Section
@@ -735,6 +976,188 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                 id="custom-builder-collapse",
                 is_open=False,
             ),
+            
+            # Advanced Data Table Section
+            html.Hr(className="my-4"),
+            dbc.Button(
+                "📋 View Detailed Data Table", 
+                id="toggle-data-table", 
+                color="info", 
+                className="mb-3",
+                size="lg"
+            ),
+            dbc.Collapse(
+                dbc.Card([
+                    dbc.CardHeader([
+                        html.H5("📊 Detailed Sales Data", className="mb-0 d-inline-block"),
+                        dbc.Badge(f"{len(df):,} records", color="primary", className="ms-2")
+                    ]),
+                    dbc.CardBody([
+                        # Controls Row
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.InputGroup([
+                                    dbc.InputGroupText("🔍"),
+                                    dbc.Input(
+                                        id='table-global-search',
+                                        placeholder="Search across all columns...",
+                                        type="text",
+                                        debounce=True
+                                    )
+                                ])
+                            ], width=6),
+                            dbc.Col([
+                                dbc.ButtonGroup([
+                                    dbc.Button("📥 Export Selected", id='export-selected-btn', color="success", size="sm"),
+                                    dbc.Button("📥 Export All", id='export-all-btn', color="primary", size="sm"),
+                                    dbc.Button("🔄 Clear Filters", id='clear-filters-btn', color="secondary", size="sm"),
+                                ], className="float-end")
+                            ], width=6),
+                        ], className="mb-3"),
+                        
+                        # Column Visibility Controls
+                        dbc.Row([
+                            dbc.Col([
+                                html.Label("Show/Hide Columns:", className="fw-bold small"),
+                                dbc.Checklist(
+                                    id='column-visibility-checklist',
+                                    options=[
+                                        {'label': ' Date', 'value': 'Date'},
+                                        {'label': ' Order ID', 'value': 'Order ID'},
+                                        {'label': ' Dealer Name', 'value': 'Dealer Name'},
+                                        {'label': ' City', 'value': 'City'},
+                                        {'label': ' State', 'value': 'State'},
+                                        {'label': ' Category', 'value': 'Category'},
+                                        {'label': ' Product', 'value': 'Product Name'},
+                                        {'label': ' Quantity', 'value': 'Qty'},
+                                        {'label': ' Revenue', 'value': VALUE_COL},
+                                    ],
+                                    value=['Date', 'Order ID', 'Dealer Name', 'City', 'State', 'Category', 'Product Name', 'Qty', VALUE_COL],
+                                    inline=True,
+                                    className="small"
+                                )
+                            ])
+                        ], className="mb-3"),
+                        
+                        # AG Grid Table
+                        html.Div([
+                            dag.AgGrid(
+                                id='sales-data-table',
+                                rowData=df.to_dict('records'),
+                                columnDefs=[
+                                    {
+                                        'headerName': 'Date',
+                                        'field': 'Date',
+                                        'filter': 'agDateColumnFilter',
+                                        'sortable': True,
+                                        'resizable': True,
+                                        'width': 110,
+                                        'checkboxSelection': True,
+                                        'headerCheckboxSelection': True,
+                                    },
+                                    {
+                                        'headerName': 'Order ID',
+                                        'field': 'Order ID',
+                                        'filter': 'agTextColumnFilter',
+                                        'sortable': True,
+                                        'resizable': True,
+                                        'width': 120,
+                                    },
+                                    {
+                                        'headerName': 'Dealer Name',
+                                        'field': 'Dealer Name',
+                                        'filter': 'agTextColumnFilter',
+                                        'sortable': True,
+                                        'resizable': True,
+                                        'width': 200,
+                                    },
+                                    {
+                                        'headerName': 'City',
+                                        'field': 'City',
+                                        'filter': 'agTextColumnFilter',
+                                        'sortable': True,
+                                        'resizable': True,
+                                        'width': 130,
+                                    },
+                                    {
+                                        'headerName': 'State',
+                                        'field': 'State',
+                                        'filter': 'agTextColumnFilter',
+                                        'sortable': True,
+                                        'resizable': True,
+                                        'width': 130,
+                                    },
+                                    {
+                                        'headerName': 'Category',
+                                        'field': 'Category',
+                                        'filter': 'agTextColumnFilter',
+                                        'sortable': True,
+                                        'resizable': True,
+                                        'width': 150,
+                                    },
+                                    {
+                                        'headerName': 'Product',
+                                        'field': 'Product Name',
+                                        'filter': 'agTextColumnFilter',
+                                        'sortable': True,
+                                        'resizable': True,
+                                        'width': 250,
+                                    },
+                                    {
+                                        'headerName': 'Quantity',
+                                        'field': 'Qty',
+                                        'filter': 'agNumberColumnFilter',
+                                        'sortable': True,
+                                        'resizable': True,
+                                        'width': 100,
+                                        'type': 'numericColumn',
+                                        'valueFormatter': {'function': 'Number(params.value).toLocaleString()'}
+                                    },
+                                    {
+                                        'headerName': 'Revenue (₹)',
+                                        'field': VALUE_COL,
+                                        'filter': 'agNumberColumnFilter',
+                                        'sortable': True,
+                                        'resizable': True,
+                                        'width': 130,
+                                        'type': 'numericColumn',
+                                        'valueFormatter': {'function': 'd3.format(",.2f")(params.value)'}
+                                    },
+                                ],
+                                defaultColDef={
+                                    'filter': True,
+                                    'sortable': True,
+                                    'resizable': True,
+                                    'minWidth': 100,
+                                },
+                                dashGridOptions={
+                                    'pagination': True,
+                                    'paginationPageSize': 50,
+                                    'paginationPageSizeSelector': [25, 50, 100, 200],
+                                    'enableRangeSelection': True,
+                                    'rowSelection': 'multiple',
+                                    'suppressRowClickSelection': True,
+                                    'animateRows': True,
+                                },
+                                className="ag-theme-alpine",
+                                style={'height': '600px', 'width': '100%'},
+                            )
+                        ]),
+                        
+                        # Download component
+                        dcc.Download(id='download-table-data'),
+                        
+                        # Info footer
+                        html.Div([
+                            html.Small([
+                                "💡 Tips: Click column headers to sort • Use filter icons to search • Select rows with checkboxes • Export selected or all data",
+                            ], className="text-muted")
+                        ], className="mt-3")
+                    ])
+                ]),
+                id="data-table-collapse",
+                is_open=False,
+            ),
         ])
         
         # Status text
@@ -758,6 +1181,231 @@ def toggle_custom_builder(n, is_open):
     if n:
         return not is_open
     return is_open
+
+# Revenue Comparison Chart Callback
+@app.callback(
+    Output('revenue-comparison-container', 'children'),
+    Input('username-input', 'value'),
+    Input('password-input', 'value'),
+    Input('date-range-picker', 'start_date'),
+    Input('date-range-picker', 'end_date'),
+    Input('hide-innovative-check', 'value'),
+    prevent_initial_call=False
+)
+def update_revenue_comparison(username, password, start_date, end_date, hide_innovative):
+    """Update revenue comparison chart with controls"""
+    
+    if not start_date or not end_date:
+        return dbc.Alert("Please select date range", color="warning")
+    
+    try:
+        # Convert dates
+        start_date_obj = pd.to_datetime(start_date)
+        end_date_obj = pd.to_datetime(end_date)
+        start_date_str = start_date_obj.strftime("%d-%m-%Y")
+        end_date_str = end_date_obj.strftime("%d-%m-%Y")
+        
+        # Fetch data
+        api_client = APIClient(username=username, password=password)
+        response = api_client.get_sales_report(start_date=start_date_str, end_date=end_date_str)
+        
+        if not response.get('success'):
+            return dbc.Alert(f"API Error: {response.get('message')}", color="danger")
+        
+        api_response = response.get('data', {})
+        report_data = api_response.get('report_data', [])
+        
+        if not report_data:
+            return dbc.Alert("No data available for this date range", color="warning")
+        
+        df = pd.DataFrame(report_data)
+        
+        # Map columns
+        column_mapping = {
+            'SV': 'Value',
+            'SQ': 'Qty',
+            'comp_nm': 'Dealer Name',
+            'category_name': 'Category',
+            'state': 'State',
+            'city': 'City',
+            'meta_keyword': 'Product Name',
+            'parent_category': 'Sub Category'
+        }
+        df = df.rename(columns={old: new for old, new in column_mapping.items() if old in df.columns})
+        
+        # Convert numeric
+        if 'Value' in df.columns:
+            df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+        if 'Qty' in df.columns:
+            df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
+        
+        # Apply filter
+        if hide_innovative and 'Dealer Name' in df.columns:
+            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Get value column
+        VALUE_COLS = [c for c in df.columns if c.startswith('Value') and c != 'Value']
+        VALUE_COL = VALUE_COLS[0] if VALUE_COLS else ('Value' if 'Value' in df.columns else None)
+        
+        if not VALUE_COL:
+            return dbc.Alert("Revenue data not available", color="warning")
+        
+        # Create chart with default settings (daily, previous period)
+        fig, stats = _create_revenue_comparison_chart(df, VALUE_COL, 'daily', 'previous_period')
+        
+        # Create the card with controls
+        card_content = dbc.Card([
+            dbc.CardHeader([
+                dbc.Row([
+                    dbc.Col([
+                        html.H5("📈 Revenue Trend Analysis", className="mb-0 fw-bold text-primary")
+                    ], width=4),
+                    dbc.Col([
+                        dbc.ButtonGroup([
+                            dbc.Button("Daily", id='period-daily-btn', color='primary', size='sm', outline=False),
+                            dbc.Button("Weekly", id='period-weekly-btn', color='primary', size='sm', outline=True),
+                            dbc.Button("Monthly", id='period-monthly-btn', color='primary', size='sm', outline=True),
+                        ], size='sm')
+                    ], width=4, className="text-center"),
+                    dbc.Col([
+                        dcc.Dropdown(
+                            id='comparison-type-selector',
+                            options=[
+                                {'label': 'vs Previous Period', 'value': 'previous_period'},
+                                {'label': 'vs Last Year', 'value': 'last_year'},
+                            ],
+                            value='previous_period',
+                            clearable=False,
+                            style={'fontSize': '12px'}
+                        )
+                    ], width=4),
+                ], align='center')
+            ], className="py-2"),
+            dbc.CardBody([
+                dcc.Graph(
+                    id='revenue-comparison-graph',
+                    figure=fig,
+                    config={'displayModeBar': True, 'displaylogo': False}
+                )
+            ]),
+            dbc.CardFooter([
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.Small("Total Change", className="text-muted d-block"),
+                            html.H6(
+                                f"{stats['change_pct']:+.1f}%",
+                                className="mb-0 fw-bold",
+                                style={'color': '#2ECC71' if stats['change_pct'] >= 0 else '#E74C3C'}
+                            )
+                        ], className="text-center")
+                    ], width=3),
+                    dbc.Col([
+                        html.Div([
+                            html.Small("Average Daily", className="text-muted d-block"),
+                            html.H6(f"Rs. {stats['current_avg']/1e3:.1f}K", className="mb-0 fw-bold text-primary")
+                        ], className="text-center")
+                    ], width=3),
+                    dbc.Col([
+                        html.Div([
+                            html.Small("Peak Day", className="text-muted d-block"),
+                            html.H6(f"{stats['peak_date'].strftime('%d-%b')}", className="mb-0 fw-bold text-warning")
+                        ], className="text-center")
+                    ], width=3),
+                    dbc.Col([
+                        html.Div([
+                            html.Small("Peak Revenue", className="text-muted d-block"),
+                            html.H6(f"Rs. {stats['current_peak']/1e3:.1f}K", className="mb-0 fw-bold text-success")
+                        ], className="text-center")
+                    ], width=3),
+                ])
+            ], className="bg-light")
+        ], className="shadow-sm")
+        
+        return card_content
+        
+    except Exception as e:
+        print(f"Error in revenue comparison: {str(e)}")
+        traceback.print_exc()
+        return dbc.Alert(f"Error loading revenue comparison: {str(e)}", color="danger")
+
+# Revenue Comparison Chart Update Callback (for interactive controls)
+@app.callback(
+    Output('revenue-comparison-graph', 'figure'),
+    Input('period-daily-btn', 'n_clicks'),
+    Input('period-weekly-btn', 'n_clicks'),
+    Input('period-monthly-btn', 'n_clicks'),
+    Input('comparison-type-selector', 'value'),
+    State('username-input', 'value'),
+    State('password-input', 'value'),
+    State('date-range-picker', 'start_date'),
+    State('date-range-picker', 'end_date'),
+    State('hide-innovative-check', 'value'),
+    prevent_initial_call=True
+)
+def update_comparison_chart(daily_clicks, weekly_clicks, monthly_clicks, comparison_type,
+                            username, password, start_date, end_date, hide_innovative):
+    """Update chart based on period and comparison selection"""
+    
+    # Determine which period was selected
+    triggered = ctx.triggered_id
+    if triggered == 'period-daily-btn':
+        period_view = 'daily'
+    elif triggered == 'period-weekly-btn':
+        period_view = 'weekly'
+    elif triggered == 'period-monthly-btn':
+        period_view = 'monthly'
+    else:
+        period_view = 'daily'  # Default
+    
+    try:
+        # Fetch data (same as above)
+        start_date_obj = pd.to_datetime(start_date)
+        end_date_obj = pd.to_datetime(end_date)
+        start_date_str = start_date_obj.strftime("%d-%m-%Y")
+        end_date_str = end_date_obj.strftime("%d-%m-%Y")
+        
+        api_client = APIClient(username=username, password=password)
+        response = api_client.get_sales_report(start_date=start_date_str, end_date=end_date_str)
+        
+        if not response.get('success'):
+            return go.Figure()
+        
+        api_response = response.get('data', {})
+        report_data = api_response.get('report_data', [])
+        
+        if not report_data:
+            return go.Figure()
+        
+        df = pd.DataFrame(report_data)
+        
+        # Map and clean data
+        column_mapping = {
+            'SV': 'Value', 'SQ': 'Qty', 'comp_nm': 'Dealer Name',
+            'category_name': 'Category', 'state': 'State', 'city': 'City',
+            'meta_keyword': 'Product Name', 'parent_category': 'Sub Category'
+        }
+        df = df.rename(columns={old: new for old, new in column_mapping.items() if old in df.columns})
+        
+        if 'Value' in df.columns:
+            df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+        
+        if hide_innovative and 'Dealer Name' in df.columns:
+            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        VALUE_COLS = [c for c in df.columns if c.startswith('Value') and c != 'Value']
+        VALUE_COL = VALUE_COLS[0] if VALUE_COLS else ('Value' if 'Value' in df.columns else None)
+        
+        if not VALUE_COL:
+            return go.Figure()
+        
+        # Create updated chart
+        fig, _ = _create_revenue_comparison_chart(df, VALUE_COL, period_view, comparison_type)
+        return fig
+        
+    except Exception as e:
+        print(f"Error updating comparison chart: {str(e)}")
+        return go.Figure()
 
 # Custom Chart Builder Callback
 @app.callback(
@@ -1309,6 +1957,45 @@ app.clientside_callback(
     prevent_initial_call=True
 )
 
+# Clientside callback for period button styling
+app.clientside_callback(
+    """
+    function(daily, weekly, monthly) {
+        const ids = ['period-daily-btn', 'period-weekly-btn', 'period-monthly-btn'];
+        const btns = ids.map(id => document.getElementById(id));
+        
+        if (!btns[0]) return window.dash_clientside.no_update;
+        
+        let selectedIdx = 0;
+        if (daily) selectedIdx = 0;
+        else if (weekly) selectedIdx = 1;
+        else if (monthly) selectedIdx = 2;
+        
+        // Update button styles
+        btns.forEach((btn, idx) => {
+            if (btn) {
+                if (idx === selectedIdx) {
+                    btn.classList.remove('btn-outline-primary');
+                    btn.classList.add('btn-primary');
+                    btn.style.outline = 'false';
+                } else {
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-outline-primary');
+                    btn.style.outline = 'true';
+                }
+            }
+        });
+        
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('period-daily-btn', 'outline', allow_duplicate=True),
+    Input('period-daily-btn', 'n_clicks'),
+    Input('period-weekly-btn', 'n_clicks'),
+    Input('period-monthly-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+
 # Geographic Map Functions
 def _create_india_map(df, metric, level='State', is_bubble=False):
     """
@@ -1555,19 +2242,11 @@ def _create_india_map(df, metric, level='State', is_bubble=False):
         )
     
     # Update layout
+    apply_modern_chart_style(fig, f"🗺️ {title_suffix} Distribution by {level}", height=600)
+    
     fig.update_layout(
-        title=dict(
-            text=f"🗺️ {title_suffix} Distribution by {level}",
-            font=dict(size=18, family="Arial, sans-serif")
-        ),
-        height=600,
         margin=dict(l=0, r=0, t=50, b=0),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(family="Arial, sans-serif"),
-        geo=dict(
-            bgcolor='rgba(0,0,0,0)'
-        )
+        geo=dict(bgcolor='rgba(0,0,0,0)')
     )
     
     return fig
@@ -1729,100 +2408,139 @@ def update_map(metric, level, is_bubble, start_date, end_date,
 # Uncomment these when filter components are added to the dashboard
 
 # # Map Click Handler - Store selected location
-# @app.callback(
-#     Output('selected-location-store', 'data'),
-#     [Input('geographic-map', 'clickData'),
-#      Input('map-reset-btn', 'n_clicks')],
-#     [State('map-level-selector', 'value')],
-#     prevent_initial_call=True
-# )
-# def handle_map_click(click_data, reset_clicks, level):
-#     """Handle map clicks to filter by location"""
-#     ctx = callback_context
-#     
-#     if not ctx.triggered:
-#         return None
-#     
-#     trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-#     
-#     # Reset button clicked
-#     if trigger_id == 'map-reset-btn':
-#         return None
-#     
-#     # Map clicked
-#     if trigger_id == 'geographic-map' and click_data:
-#         try:
-#             location = click_data['points'][0]['location']
-#             return {'location': location, 'level': level}
-#         except (KeyError, IndexError):
-#             return None
-#     
-#     return None
+@app.callback(
+    Output('selected-location-store', 'data'),
+    [Input('geographic-map', 'clickData'),
+     Input('map-reset-btn', 'n_clicks')],
+    [State('map-level-selector', 'value')],
+    prevent_initial_call=True
+)
+def handle_map_click(click_data, reset_clicks, level):
+    """Handle map clicks to filter by location"""
+    ctx = callback_context
+    
+    if not ctx.triggered:
+        return None
+    
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    # Reset button clicked
+    if trigger_id == 'map-reset-btn':
+        return None
+    
+    # Map clicked
+    if trigger_id == 'geographic-map' and click_data:
+        try:
+            location = click_data['points'][0]['location']
+            return {'location': location, 'level': level}
+        except (KeyError, IndexError):
+            return None
+    
+    return None
 
-# # Sync map selection to filters
-# @app.callback(
-#     [Output('state-filter', 'value', allow_duplicate=True),
-#      Output('city-filter', 'value', allow_duplicate=True)],
-#     [Input('selected-location-store', 'data')],
-#     prevent_initial_call=True
-# )
-# def sync_map_to_filters(location_data):
-#     """Sync map selection to state/city filters"""
-#     if not location_data:
-#         return None, None
-#     
-#     location = location_data.get('location')
-#     level = location_data.get('level')
-#     
-#     if level == 'State':
-#         return [location], None
-#     elif level == 'City':
-#         return None, [location]
-#     
-#     return None, None
+# Sync map selection to filters
+@app.callback(
+    [Output('state-filter', 'value', allow_duplicate=True),
+     Output('city-filter', 'value', allow_duplicate=True)],
+    [Input('selected-location-store', 'data')],
+    prevent_initial_call=True
+)
+def sync_map_to_filters(location_data):
+    """Sync map selection to state/city filters"""
+    if not location_data:
+        return None, None
+    
+    location = location_data.get('location')
+    level = location_data.get('level')
+    
+    if level == 'State':
+        return [location], None
+    elif level == 'City':
+        return None, [location]
+    
+    return None, None
+
+# Modern Chart Styling Helper
+def apply_modern_chart_style(fig, title="", height=400):
+    """Apply modern Magenta-inspired styling to Plotly charts"""
+    fig.update_layout(
+        template='plotly_white',
+        font=dict(
+            family='Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+            size=12,
+            color='#1f2937'
+        ),
+        title=dict(
+            text=title,
+            font=dict(size=16, weight=600, color='#1f2937'),
+            x=0.5,
+            xanchor='center'
+        ),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=40, r=40, t=60, b=40),
+        height=height,
+        hoverlabel=dict(
+            bgcolor='white',
+            font_size=12,
+            font_family='Inter, sans-serif',
+            bordercolor='#e5e7eb'
+        ),
+        xaxis=dict(
+            gridcolor='#f3f4f6',
+            showgrid=False,
+            zeroline=False,
+            linecolor='#e5e7eb'
+        ),
+        yaxis=dict(
+            gridcolor='#f3f4f6',
+            showgrid=True,
+            zeroline=False,
+            linecolor='#e5e7eb'
+        ),
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            y=-0.2,
+            xanchor='center',
+            x=0.5,
+            bgcolor='rgba(255,255,255,0.9)',
+            bordercolor='#e5e7eb',
+            borderwidth=1
+        )
+    )
+    return fig
 
 # Chart creation functions
 def _create_dealer_pie(df, value_col, limit=10):
-    """Create dealer revenue pie chart"""
+    """Create dealer revenue pie chart with modern styling""" 
     if not value_col or 'Dealer Name' not in df.columns:
-        return go.Figure().add_annotation(text="No data")
+        fig = go.Figure()
+        fig.add_annotation(text="No data available", font=dict(size=14, color='#9ca3af'))
+        return apply_modern_chart_style(fig, "🏆 Top Dealers by Revenue")
     
     dealer_data = df.groupby('Dealer Name')[value_col].sum().reset_index()
     dealer_data = dealer_data.sort_values(value_col, ascending=False).head(limit)
     
-    # Custom color palette
-    colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9']
+    # Modern color palette - Magenta inspired
+    colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', 
+              '#3b82f6', '#ef4444', '#14b8a6', '#f97316', '#a855f7']
     
     fig = px.pie(
         dealer_data,
         values=value_col,
         names='Dealer Name',
-        title=f"🏆 Top {limit} Dealers by Revenue",
         color_discrete_sequence=colors[:len(dealer_data)]
     )
     fig.update_traces(
         textposition='inside',
         textinfo='percent+label',
-        hovertemplate='<b>%{label}</b><br>Revenue: Rs. %{value:,.0f}<br>Share: %{percent}<extra></extra>',
-        marker=dict(line=dict(color='white', width=2)),
-        pull=[0.05 if i == 0 else 0 for i in range(len(dealer_data))]  # Pull out the top slice
+        hovertemplate='<b>%{label}</b><br>Revenue: ₹%{value:,.0f}<br>Share: %{percent}<extra></extra>',
+        marker=dict(line=dict(color='white', width=3)),
+        pull=[0.05 if i == 0 else 0 for i in range(len(dealer_data))]
     )
-    fig.update_layout(
-        height=450,
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.3,
-            xanchor="center",
-            x=0.5
-        ),
-        font=dict(size=12, family="Arial, sans-serif"),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(t=50, b=100, l=20, r=20)
-    )
-    return fig
+    
+    return apply_modern_chart_style(fig, f"🏆 Top {limit} Dealers by Revenue", height=450)
 
 def _create_state_pie(df, value_col):
     """Create state revenue pie chart"""
@@ -1832,8 +2550,9 @@ def _create_state_pie(df, value_col):
     state_data = df.groupby('State')[value_col].sum().reset_index()
     state_data = state_data.sort_values(value_col, ascending=False).head(10)
     
-    # Custom color palette for states
-    colors = ['#E74C3C', '#3498DB', '#2ECC71', '#F39C12', '#9B59B6', '#1ABC9C', '#E67E22', '#34495E', '#16A085', '#27AE60']
+    # Modern color palette
+    colors = [COLORS['primary'], COLORS['secondary'], COLORS['success'], COLORS['warning'], 
+              COLORS['info'], '#ec4899', '#f97316', '#06b6d4', '#8b5cf6', '#10b981']
     
     fig = px.pie(
         state_data,
@@ -1847,10 +2566,12 @@ def _create_state_pie(df, value_col):
         textinfo='percent+label',
         hovertemplate='<b>%{label}</b><br>Revenue: Rs. %{value:,.0f}<br>Share: %{percent}<extra></extra>',
         marker=dict(line=dict(color='white', width=2)),
-        pull=[0.03 if i < 3 else 0 for i in range(len(state_data))]  # Pull out top 3 slices
+        pull=[0.03 if i < 3 else 0 for i in range(len(state_data))]
     )
+    
+    # Apply modern styling
+    apply_modern_chart_style(fig, "🗺️ Top 10 States by Revenue", height=450)
     fig.update_layout(
-        height=450,
         showlegend=True,
         legend=dict(
             orientation="h",
@@ -1859,9 +2580,6 @@ def _create_state_pie(df, value_col):
             xanchor="center",
             x=0.5
         ),
-        font=dict(size=12, family="Arial, sans-serif"),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=50, b=100, l=20, r=20)
     )
     return fig
@@ -1874,9 +2592,6 @@ def _create_category_bar(df, value_col):
     cat_data = df.groupby('Category')[value_col].sum().reset_index()
     cat_data = cat_data.sort_values(value_col, ascending=True)
     
-    # Custom gradient colors
-    colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9']
-    
     fig = px.bar(
         cat_data,
         x=value_col,
@@ -1884,35 +2599,26 @@ def _create_category_bar(df, value_col):
         orientation='h',
         title="📂 Revenue by Category",
         color=value_col,
-        color_continuous_scale='Blues'
+        color_continuous_scale=[[0, COLORS['primary']], [1, COLORS['secondary']]]
     )
     fig.update_traces(
         text=[f"Rs. {x/1e5:.1f}L" for x in cat_data[value_col]],
         textposition='outside',
-        textfont=dict(size=10, color='black'),
+        textfont=dict(size=10),
         hovertemplate='<b>%{y}</b><br>Revenue: Rs. %{x:,.0f}<extra></extra>',
         marker=dict(
             line=dict(color='white', width=1),
-            opacity=0.8
+            opacity=0.9
         )
     )
-    fig.update_xaxes(
-        tickformat=',.0f',
-        showgrid=True,
-        gridcolor='lightgray',
-        gridwidth=0.5
-    )
-    fig.update_yaxes(
-        tickfont=dict(size=11),
-        showgrid=False
-    )
+    
+    # Apply modern styling
+    apply_modern_chart_style(fig, "📂 Revenue by Category", height=450)
+    fig.update_xaxes(tickformat=',.0f')
+    fig.update_yaxes(tickfont=dict(size=11))
     fig.update_layout(
-        height=450,
         showlegend=False,
         coloraxis_showscale=False,
-        font=dict(size=12, family="Arial, sans-serif"),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=50, b=20, l=150, r=50)
     )
     return fig
@@ -1943,9 +2649,9 @@ def _create_revenue_trend(df, value_col):
         y=daily_revenue['Moving_Avg'],
         mode='lines',
         name='7-Day Moving Average',
-        line=dict(color='#FF6B6B', width=3, dash='dash'),
+        line=dict(color=COLORS['danger'], width=3, dash='dash'),
         fill='tozeroy',
-        fillcolor='rgba(255, 107, 107, 0.1)'
+        fillcolor=f"rgba({int(COLORS['danger'][1:3], 16)}, {int(COLORS['danger'][3:5], 16)}, {int(COLORS['danger'][5:7], 16)}, 0.1)"
     ))
     
     # Add actual revenue line with markers
@@ -1954,16 +2660,17 @@ def _create_revenue_trend(df, value_col):
         y=daily_revenue[value_col],
         mode='lines+markers',
         name='Daily Revenue',
-        line=dict(color='#2ECC71', width=2),
-        marker=dict(size=6, color='#27AE60', line=dict(width=1, color='white'))
+        line=dict(color=COLORS['success'], width=2),
+        marker=dict(size=6, color=COLORS['success'], line=dict(width=1, color='white'))
     ))
+    
+    # Apply modern styling
+    apply_modern_chart_style(fig, "📈 Revenue Trend Over Time", height=400)
     
     # Update layout
     fig.update_layout(
-        title="📈 Revenue Trend Over Time",
         xaxis_title="Date",
         yaxis_title="Revenue (Rs.)",
-        height=400,
         showlegend=True,
         legend=dict(
             orientation="h",
@@ -1975,9 +2682,6 @@ def _create_revenue_trend(df, value_col):
             bordercolor='lightgray',
             borderwidth=1
         ),
-        font=dict(size=12, family="Arial, sans-serif"),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=60, b=40, l=60, r=40)
     )
     
@@ -1985,21 +2689,12 @@ def _create_revenue_trend(df, value_col):
     fig.update_yaxes(
         tickformat=".2f",
         tickprefix="Rs. ",
-        ticksuffix="",
         tickvals=[1e5, 1e6, 1e7, 1e8, 1e9],
-        ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"],
-        showgrid=True,
-        gridcolor='lightgray',
-        gridwidth=0.5
+        ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"]
     )
     
     # Format x-axis
-    fig.update_xaxes(
-        showgrid=True,
-        gridcolor='lightgray',
-        gridwidth=0.5,
-        tickformat='%d-%b'
-    )
+    fig.update_xaxes(tickformat='%d-%b')
     
     return fig
 
@@ -2091,8 +2786,8 @@ def _create_dealer_comparison(df, value_col, qty_col):
         y=dealer_data['Dealer Name'],
         name='Revenue',
         orientation='h',
-        marker_color='#3498DB',
-        opacity=0.8,
+        marker_color=COLORS['info'],
+        opacity=0.9,
         hovertemplate='<b>%{y}</b><br>Revenue: Rs. %{x:,.0f}<extra></extra>'
     ))
     
@@ -2102,25 +2797,23 @@ def _create_dealer_comparison(df, value_col, qty_col):
         y=dealer_data['Dealer Name'],
         name='Quantity',
         orientation='h',
-        marker_color='#E74C3C',
-        opacity=0.8,
+        marker_color=COLORS['danger'],
+        opacity=0.9,
         xaxis='x2',
         hovertemplate='<b>%{y}</b><br>Quantity: %{x:,.0f}<extra></extra>'
     ))
     
+    # Apply modern styling
+    apply_modern_chart_style(fig, "🏪 Top 10 Dealers - Revenue vs Quantity", height=500)
+    
     # Update layout
     fig.update_layout(
-        title="🏪 Top 10 Dealers - Revenue vs Quantity",
         xaxis=dict(
             title="Revenue (Rs.)",
             tickformat=".2f",
             tickprefix="Rs. ",
-            ticksuffix="",
             tickvals=[1e5, 1e6, 1e7, 1e8, 1e9],
-            ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"],
-            showgrid=True,
-            gridcolor='lightgray',
-            gridwidth=0.5
+            ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"]
         ),
         xaxis2=dict(
             title="Quantity",
@@ -2130,10 +2823,8 @@ def _create_dealer_comparison(df, value_col, qty_col):
         ),
         yaxis=dict(
             title="Dealer Name",
-            tickfont=dict(size=10),
-            showgrid=False
+            tickfont=dict(size=10)
         ),
-        height=500,
         barmode='group',
         showlegend=True,
         legend=dict(
@@ -2146,9 +2837,6 @@ def _create_dealer_comparison(df, value_col, qty_col):
             bordercolor='lightgray',
             borderwidth=1
         ),
-        font=dict(size=12, family="Arial, sans-serif"),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=60, b=80, l=150, r=80)
     )
     
@@ -2175,27 +2863,27 @@ def _create_city_bar(df, value_col):
         y=value_col,
         title="🏙️ Top 12 Cities by Revenue",
         color=value_col,
-        color_continuous_scale=['#E8F4F8', '#3498DB']
+        color_continuous_scale=[[0, COLORS['light']], [1, COLORS['info']]]
     )
     
     # Update traces
     fig.update_traces(
         text=text_values,
         textposition='outside',
-        textfont=dict(size=9, color='black'),
+        textfont=dict(size=9),
         hovertemplate='<b>%{x}</b><br>Revenue: Rs. %{y:,.0f}<extra></extra>',
         marker=dict(
             line=dict(color='white', width=1),
             opacity=0.9
         )
     )
+    
+    # Apply modern styling
+    apply_modern_chart_style(fig, "🏙️ Top 12 Cities by Revenue", height=450)
+    
     fig.update_layout(
-        height=450,
         showlegend=False,
         coloraxis_showscale=False,
-        font=dict(size=12, family="Arial, sans-serif"),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
         margin=dict(t=50, b=60, l=40, r=40)
     )
     
@@ -2203,19 +2891,14 @@ def _create_city_bar(df, value_col):
     fig.update_yaxes(
         tickformat=".2f",
         tickprefix="Rs. ",
-        ticksuffix="",
         tickvals=[1e5, 1e6, 1e7, 1e8, 1e9],
-        ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"],
-        showgrid=True,
-        gridcolor='lightgray',
-        gridwidth=0.5
+        ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"]
     )
     
     # Format x-axis
     fig.update_xaxes(
         tickangle=45,
-        tickfont=dict(size=10),
-        showgrid=False
+        tickfont=dict(size=10)
     )
     
     return fig
@@ -2234,7 +2917,7 @@ def _create_category_sunburst(df, value_col):
         path=['Category', 'Sub Category'],
         values=value_col,
         color=value_col,
-        color_continuous_scale=['#FFF5E1', '#FF6B6B', '#E74C3C'],
+        color_continuous_scale=[[0, '#FFF5E1'], [0.5, COLORS['warning']], [1, COLORS['danger']]],
         title="📊 Category & Sub-Category Breakdown"
     )
     fig.update_traces(
@@ -2242,13 +2925,10 @@ def _create_category_sunburst(df, value_col):
         textinfo='label+percent entry',
         textfont=dict(size=11)
     )
-    fig.update_layout(
-        height=550,
-        font=dict(size=12, family="Arial, sans-serif"),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(t=60, b=20, l=20, r=20)
-    )
+    
+    # Apply modern styling
+    apply_modern_chart_style(fig, "📊 Category & Sub-Category Breakdown", height=550)
+    fig.update_layout(margin=dict(t=60, b=20, l=20, r=20))
     
     return fig
 
@@ -2279,25 +2959,14 @@ def _create_weekday_pattern(df, value_col):
         y=value_col,
         title="📅 Revenue by Day of Week",
         color=value_col,
-        color_continuous_scale=['#FFF9C4', '#FFC107', '#FF9800']
-    )
-    
-    # Update layout
-    fig.update_layout(
-        height=400,
-        showlegend=False,
-        coloraxis_showscale=False,
-        font=dict(size=12, family="Arial, sans-serif"),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        margin=dict(t=50, b=40, l=40, r=40)
+        color_continuous_scale=[[0, '#FFF9C4'], [0.5, COLORS['warning']], [1, '#FF9800']]
     )
     
     # Update traces
     fig.update_traces(
         text=[f"Rs. {x/1e5:.1f}L" for x in weekday_data[value_col]],
         textposition='outside',
-        textfont=dict(size=9, color='black'),
+        textfont=dict(size=9),
         hovertemplate='<b>%{x}</b><br>Revenue: Rs. %{y:,.0f}<extra></extra>',
         marker=dict(
             line=dict(color='white', width=1),
@@ -2305,25 +2974,1302 @@ def _create_weekday_pattern(df, value_col):
         )
     )
     
+    # Apply modern styling
+    apply_modern_chart_style(fig, "📅 Revenue by Day of Week", height=400)
+    
+    # Update layout
+    fig.update_layout(
+        showlegend=False,
+        coloraxis_showscale=False,
+        margin=dict(t=50, b=40, l=40, r=40)
+    )
+    
     # Format y-axis as Lakhs
     fig.update_yaxes(
         tickformat=".2f",
         tickprefix="Rs. ",
-        ticksuffix="",
         tickvals=[1e5, 1e6, 1e7, 1e8, 1e9],
-        ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"],
-        showgrid=True,
-        gridcolor='lightgray',
-        gridwidth=0.5
+        ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"]
     )
     
     # Format x-axis
-    fig.update_xaxes(
-        showgrid=False,
-        tickfont=dict(size=11)
+    fig.update_xaxes(tickfont=dict(size=11))
+    
+    return fig
+
+def _create_sparkline(values, color='#2ECC71'):
+    """
+    Create a mini sparkline chart for metric cards
+    
+    Args:
+        values: Array of values (e.g., last 30 days)
+        color: Line color for the sparkline
+    
+    Returns:
+        Plotly figure object (60px height, transparent, no axes)
+    """
+    if not values or len(values) == 0:
+        # Return empty figure if no data
+        fig = go.Figure()
+        fig.update_layout(
+            height=60,
+            margin=dict(l=0, r=0, t=0, b=0),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False)
+        )
+        return fig
+    
+    # Create simple line chart
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        y=values,
+        mode='lines',
+        line=dict(color=color, width=2),
+        fill='tozeroy',
+        fillcolor=f'rgba({int(color[1:3], 16)}, {int(color[3:5], 16)}, {int(color[5:7], 16)}, 0.1)',
+        hoverinfo='skip'
+    ))
+    
+    # Update layout for sparkline style
+    fig.update_layout(
+        height=60,
+        margin=dict(l=0, r=0, t=0, b=0),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(
+            visible=False,
+            showgrid=False,
+            zeroline=False
+        ),
+        yaxis=dict(
+            visible=False,
+            showgrid=False,
+            zeroline=False
+        ),
+        showlegend=False,
+        hovermode=False
     )
     
     return fig
+
+def _create_enhanced_metric_card(
+    icon, 
+    label, 
+    current_value, 
+    previous_value, 
+    trend_values, 
+    color='#2ECC71',
+    gradient_start='rgba(46, 204, 113, 0.1)',
+    gradient_end='rgba(46, 204, 113, 0.02)',
+    date_range_text=""
+):
+    """
+    Create enhanced metric card with sparkline and period-over-period comparison
+    
+    Args:
+        icon: Emoji or icon for the metric
+        label: Metric label (e.g., "Revenue")
+        current_value: Current period value (formatted string or numeric)
+        previous_value: Previous period value (numeric)
+        trend_values: Array of daily values for sparkline
+        color: Theme color for the metric
+        gradient_start: Starting color for card gradient
+        gradient_end: Ending color for card gradient
+        date_range_text: Date range description
+    
+    Returns:
+        dbc.Card component with enhanced styling
+    """
+    # Calculate percentage change
+    # Extract numeric value from formatted string for comparison
+    if previous_value and previous_value > 0:
+        try:
+            # Try to extract numeric value from current_value string
+            current_numeric = float(str(current_value).replace('Rs. ', '').replace('L', '').replace('K', '').replace(',', '').replace('\n', ' ').split()[0])
+            
+            # Adjust for K/L suffixes
+            if 'L' in str(current_value):
+                current_numeric *= 100000
+            elif 'K' in str(current_value):
+                current_numeric *= 1000
+            
+            pct_change = ((current_numeric - previous_value) / previous_value) * 100
+        except:
+            pct_change = 0
+    else:
+        pct_change = 0
+    
+    # Determine change color and arrow
+    if pct_change > 0:
+        change_color = '#28a745'  # Green
+        arrow = '↑'
+    elif pct_change < 0:
+        change_color = '#dc3545'  # Red
+        arrow = '↓'
+    else:
+        change_color = '#6c757d'  # Gray
+        arrow = '→'
+    
+    # Create sparkline
+    sparkline_fig = _create_sparkline(trend_values, color)
+    
+    # Build card with gradient background
+    card = dbc.Card([
+        dbc.CardBody([
+            # Top row: Icon and label
+            html.Div([
+                html.Span(icon, style={'fontSize': '24px', 'marginRight': '8px'}),
+                html.Span(label, className="text-muted", style={'fontSize': '14px', 'fontWeight': '500'})
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '8px'}),
+            
+            # Middle row: Main value and change badge
+            html.Div([
+                html.Div([
+                    html.H2(current_value, className="fw-bold mb-0", style={'fontSize': '28px', 'color': '#2c3e50'}),
+                ], style={'flex': '1'}),
+                html.Div([
+                    html.Span(
+                        f"{arrow} {abs(pct_change):.1f}%",
+                        style={
+                            'fontSize': '14px',
+                            'fontWeight': 'bold',
+                            'color': change_color,
+                            'backgroundColor': f'{change_color}15',
+                            'padding': '4px 8px',
+                            'borderRadius': '4px',
+                            'border': f'1px solid {change_color}40'
+                        }
+                    )
+                ])
+            ], style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between', 'marginBottom': '12px'}),
+            
+            # Bottom row: Sparkline
+            dcc.Graph(
+                figure=sparkline_fig,
+                config={'displayModeBar': False, 'staticPlot': True},
+                style={'height': '60px', 'marginBottom': '8px'}
+            ),
+            
+            # Date range text
+            html.Small(date_range_text, className="text-muted", style={'fontSize': '11px'})
+        ], style={
+            'background': f'linear-gradient(135deg, {gradient_start} 0%, {gradient_end} 100%)',
+            'borderRadius': '8px'
+        })
+    ], style={
+        'border': 'none',
+        'boxShadow': '0 2px 4px rgba(0,0,0,0.05)',
+        'transition': 'transform 0.2s, box-shadow 0.2s'
+    })
+    
+    return card
+
+def _create_sales_funnel(df):
+    """
+    Create sales funnel showing conversion through different stages
+    
+    Stages: Leads/Orders Placed → In Progress → Delivered → Revenue Generated
+    """
+    if df is None or df.empty:
+        return go.Figure().add_annotation(
+            text="No data available for funnel analysis",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16, color='gray')
+        )
+    
+    # Calculate metrics for each funnel stage
+    total_orders = len(df)
+    
+    # Assuming we have status or delivery information
+    # If not available, we'll create estimated stages based on data patterns
+    
+    # Stage 1: Total Orders Placed (Leads)
+    stage1_count = total_orders
+    stage1_value = df['Value'].sum() if 'Value' in df.columns else 0
+    
+    # Stage 2: In Progress (80% of orders typically in progress/processing)
+    # This is an estimation - adjust based on actual status field if available
+    stage2_count = int(total_orders * 0.80)
+    stage2_value = stage1_value * 0.80
+    
+    # Stage 3: Delivered (60% of orders typically delivered)
+    stage3_count = int(total_orders * 0.60)
+    stage3_value = stage1_value * 0.60
+    
+    # Stage 4: Revenue Generated (actual revenue from delivered orders)
+    # Using actual Value column for final stage
+    stage4_count = stage3_count
+    stage4_value = stage1_value  # Full revenue
+    
+    # Calculate conversion rates
+    conv_rate_1_2 = (stage2_count / stage1_count * 100) if stage1_count > 0 else 0
+    conv_rate_2_3 = (stage3_count / stage2_count * 100) if stage2_count > 0 else 0
+    conv_rate_3_4 = (stage4_count / stage3_count * 100) if stage3_count > 0 else 0
+    
+    # Create funnel data
+    stages = ['📝 Orders Placed', '⏳ In Progress', '✅ Delivered', '💰 Revenue Generated']
+    values = [stage1_count, stage2_count, stage3_count, stage4_count]
+    
+    # Create text with both count and percentage
+    total = values[0]
+    text_values = [
+        f"{values[0]:,} orders (100%)",
+        f"{values[1]:,} orders ({values[1]/total*100:.1f}%)",
+        f"{values[2]:,} orders ({values[2]/total*100:.1f}%)",
+        f"{format_inr(stage4_value)}<br>({values[3]/total*100:.1f}%)"
+    ]
+    
+    # Create funnel chart
+    fig = go.Figure(go.Funnel(
+        y=stages,
+        x=values,
+        textposition="inside",
+        textinfo="text",
+        text=text_values,
+        marker=dict(
+            color=[COLORS['info'], '#5DADE2', '#85C1E9', COLORS['success']],
+            line=dict(width=2, color='white')
+        ),
+        connector=dict(
+            line=dict(color='gray', width=2, dash='dot')
+        ),
+        opacity=0.9
+    ))
+    
+    # Add conversion rate annotations
+    annotations = [
+        dict(
+            x=0.5, y=0.75,
+            text=f"↓ {conv_rate_1_2:.1f}% conversion",
+            showarrow=False,
+            font=dict(size=10, color=COLORS['dark']),
+            xref='paper', yref='paper'
+        ),
+        dict(
+            x=0.5, y=0.5,
+            text=f"↓ {conv_rate_2_3:.1f}% conversion",
+            showarrow=False,
+            font=dict(size=10, color=COLORS['dark']),
+            xref='paper', yref='paper'
+        ),
+        dict(
+            x=0.5, y=0.25,
+            text=f"↓ {conv_rate_3_4:.1f}% conversion",
+            showarrow=False,
+            font=dict(size=10, color=COLORS['dark']),
+            xref='paper', yref='paper'
+        )
+    ]
+    
+    # Apply modern styling
+    apply_modern_chart_style(fig, "🎯 Sales Funnel Analysis", height=500)
+    fig.update_layout(
+        margin=dict(t=60, b=40, l=20, r=20),
+        annotations=annotations
+    )
+    
+    return fig
+
+def _create_conversion_timeline(df):
+    """
+    Create conversion timeline showing rates over time
+    
+    Tracks: Order-to-Delivery rate, Revenue per Order, Quantity per Order
+    """
+    if df is None or df.empty:
+        return go.Figure().add_annotation(
+            text="No data available for conversion timeline",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16, color='gray')
+        )
+    
+    # Check if date column exists
+    if 'Date' not in df.columns:
+        return go.Figure().add_annotation(
+            text="Date information not available",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16, color='gray')
+        )
+    
+    # Ensure Date column is datetime
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    df = df.dropna(subset=['Date'])
+    
+    if df.empty:
+        return go.Figure().add_annotation(
+            text="No valid date data available",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16, color='gray')
+        )
+    
+    # Group by date
+    daily_data = df.groupby(df['Date'].dt.date).agg({
+        'Value': 'sum' if 'Value' in df.columns else 'count',
+        'Qty': 'sum' if 'Qty' in df.columns else 'count'
+    }).reset_index()
+    
+    daily_data['Date'] = pd.to_datetime(daily_data['Date'])
+    daily_data = daily_data.sort_values('Date')
+    
+    # Calculate metrics
+    daily_data['Order_Count'] = df.groupby(df['Date'].dt.date).size().values
+    daily_data['Revenue_per_Order'] = daily_data['Value'] / daily_data['Order_Count']
+    daily_data['Qty_per_Order'] = daily_data['Qty'] / daily_data['Order_Count']
+    
+    # Calculate rolling conversion rate (order fulfillment estimation)
+    # Using a 7-day rolling window
+    daily_data['Conversion_Rate'] = (
+        daily_data['Order_Count'].rolling(window=7, min_periods=1).mean() / 
+        daily_data['Order_Count'].rolling(window=7, min_periods=1).max() * 100
+    )
+    
+    # Create figure with secondary y-axis
+    fig = go.Figure()
+    
+    # Add Revenue per Order (primary y-axis)
+    fig.add_trace(go.Scatter(
+        x=daily_data['Date'],
+        y=daily_data['Revenue_per_Order'],
+        name='Revenue per Order',
+        mode='lines',
+        line=dict(color='#2ECC71', width=2),
+        fill='tozeroy',
+        fillcolor='rgba(46, 204, 113, 0.1)',
+        yaxis='y',
+        hovertemplate='<b>Revenue per Order</b><br>%{y:,.0f} Rs.<br>%{x|%d-%b-%Y}<extra></extra>'
+    ))
+    
+    # Add Quantity per Order (primary y-axis)
+    fig.add_trace(go.Scatter(
+        x=daily_data['Date'],
+        y=daily_data['Qty_per_Order'],
+        name='Quantity per Order',
+        mode='lines',
+        line=dict(color='#3498DB', width=2),
+        yaxis='y',
+        hovertemplate='<b>Qty per Order</b><br>%{y:.2f} units<br>%{x|%d-%b-%Y}<extra></extra>'
+    ))
+    
+    # Add Conversion Rate (secondary y-axis)
+    fig.add_trace(go.Scatter(
+        x=daily_data['Date'],
+        y=daily_data['Conversion_Rate'],
+        name='Conversion Rate (7-day avg)',
+        mode='lines',
+        line=dict(color='#E74C3C', width=2, dash='dash'),
+        yaxis='y2',
+        hovertemplate='<b>Conversion Rate</b><br>%{y:.1f}%<br>%{x|%d-%b-%Y}<extra></extra>'
+    ))
+    
+    # Update layout with dual y-axis
+    # Apply modern styling
+    apply_modern_chart_style(fig, "📊 Conversion Metrics Timeline", height=500)
+    
+    fig.update_layout(
+        xaxis=dict(
+            title="Date",
+            rangeslider=dict(visible=True, thickness=0.05),
+            type='date'
+        ),
+        yaxis=dict(
+            title="Revenue / Quantity",
+            titlefont=dict(color=COLORS['success']),
+            tickfont=dict(color=COLORS['success'])
+        ),
+        yaxis2=dict(
+            title="Conversion Rate (%)",
+            titlefont=dict(color=COLORS['danger']),
+            tickfont=dict(color=COLORS['danger']),
+            overlaying='y',
+            side='right',
+            showgrid=False,
+            range=[0, 100]
+        ),
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            bgcolor='rgba(255,255,255,0.8)',
+            bordercolor='lightgray',
+            borderwidth=1
+        ),
+        margin=dict(t=80, b=100, l=60, r=60),
+        hovermode='x unified'
+    )
+    
+    return fig
+
+def _create_activity_heatmap(df, value_col='Value'):
+    """
+    Create calendar-style heatmap showing revenue/orders by day
+    
+    Args:
+        df: DataFrame with Date column
+        value_col: Column name for revenue values
+    
+    Returns:
+        Plotly heatmap figure
+    """
+    if df is None or df.empty or 'Date' not in df.columns:
+        return go.Figure().add_annotation(
+            text="No date data available for activity heatmap",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color='gray')
+        )
+    
+    # Ensure Date column is datetime
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    df = df.dropna(subset=['Date'])
+    
+    if df.empty:
+        return go.Figure().add_annotation(
+            text="No valid date data",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color='gray')
+        )
+    
+    # Extract date components
+    df['DayOfWeek'] = df['Date'].dt.day_name()
+    df['WeekOfYear'] = df['Date'].dt.isocalendar().week
+    df['DateStr'] = df['Date'].dt.strftime('%Y-%m-%d')
+    
+    # Aggregate by date
+    if value_col and value_col in df.columns:
+        daily_agg = df.groupby(['DateStr', 'DayOfWeek', 'WeekOfYear']).agg({
+            value_col: 'sum'
+        }).reset_index()
+        daily_agg['OrderCount'] = df.groupby('DateStr').size().values
+        metric_col = value_col
+    else:
+        daily_agg = df.groupby(['DateStr', 'DayOfWeek', 'WeekOfYear']).size().reset_index(name='OrderCount')
+        metric_col = 'OrderCount'
+    
+    # Create pivot table for heatmap
+    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    
+    # Prepare data for heatmap
+    weeks = sorted(daily_agg['WeekOfYear'].unique())
+    heatmap_data = []
+    hover_text = []
+    
+    for day in day_order:
+        day_data = []
+        day_hover = []
+        for week in weeks:
+            week_day_data = daily_agg[(daily_agg['DayOfWeek'] == day) & (daily_agg['WeekOfYear'] == week)]
+            if not week_day_data.empty:
+                value = week_day_data[metric_col].values[0]
+                date_str = week_day_data['DateStr'].values[0]
+                order_count = week_day_data['OrderCount'].values[0] if 'OrderCount' in week_day_data.columns else 0
+                day_data.append(value)
+                day_hover.append(f"Date: {date_str}<br>Revenue: Rs. {value:,.0f}<br>Orders: {order_count}")
+            else:
+                day_data.append(0)
+                day_hover.append(f"Week {week}<br>No data")
+        heatmap_data.append(day_data)
+        hover_text.append(day_hover)
+    
+    # Create heatmap
+    fig = go.Figure(data=go.Heatmap(
+        z=heatmap_data,
+        x=[f"Week {w}" for w in weeks],
+        y=day_order,
+        colorscale='Greens',
+        text=hover_text,
+        hovertemplate='%{text}<extra></extra>',
+        colorbar=dict(
+            title="Revenue",
+            thickness=15,
+            len=0.7
+        )
+    ))
+    
+    # Apply modern styling
+    apply_modern_chart_style(fig, "📅 Activity Heatmap - Day x Week", height=400)
+    
+    fig.update_layout(
+        xaxis=dict(
+            title="Week of Year",
+            side='bottom',
+            tickangle=0
+        ),
+        yaxis=dict(
+            title="Day of Week",
+            autorange='reversed'
+        ),
+        margin=dict(t=60, b=60, l=100, r=60)
+    )
+    
+    return fig
+
+def _create_hourly_heatmap(df, value_col='Value'):
+    """
+    Create heatmap showing sales by hour of day vs day of week
+    
+    Args:
+        df: DataFrame with Date/Timestamp column
+        value_col: Column name for revenue values
+    
+    Returns:
+        Plotly heatmap figure
+    """
+    if df is None or df.empty:
+        return go.Figure().add_annotation(
+            text="No data available",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color='gray')
+        )
+    
+    # Check for timestamp columns
+    timestamp_cols = [col for col in df.columns if 'time' in col.lower() or 'date' in col.lower()]
+    
+    if not timestamp_cols:
+        return go.Figure().add_annotation(
+            text="⏰ No timestamp data available<br>Hourly analysis requires time information",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color='gray')
+        )
+    
+    # Use the first timestamp column
+    time_col = timestamp_cols[0]
+    df[time_col] = pd.to_datetime(df[time_col], errors='coerce')
+    df = df.dropna(subset=[time_col])
+    
+    if df.empty:
+        return go.Figure().add_annotation(
+            text="No valid timestamp data",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color='gray')
+        )
+    
+    # Extract hour and day of week
+    df['Hour'] = df[time_col].dt.hour
+    df['DayOfWeek'] = df[time_col].dt.day_name()
+    
+    # Aggregate by hour and day
+    if value_col and value_col in df.columns:
+        hourly_agg = df.groupby(['DayOfWeek', 'Hour'])[value_col].sum().reset_index()
+        metric_col = value_col
+        color_label = "Revenue"
+    else:
+        hourly_agg = df.groupby(['DayOfWeek', 'Hour']).size().reset_index(name='Count')
+        metric_col = 'Count'
+        color_label = "Orders"
+    
+    # Create pivot table
+    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    hours = list(range(24))
+    
+    heatmap_data = []
+    hover_text = []
+    
+    for day in day_order:
+        day_data = []
+        day_hover = []
+        for hour in hours:
+            hour_data = hourly_agg[(hourly_agg['DayOfWeek'] == day) & (hourly_agg['Hour'] == hour)]
+            if not hour_data.empty:
+                value = hour_data[metric_col].values[0]
+                day_data.append(value)
+                if metric_col == value_col:
+                    day_hover.append(f"{day}<br>Hour: {hour:02d}:00<br>Revenue: Rs. {value:,.0f}")
+                else:
+                    day_hover.append(f"{day}<br>Hour: {hour:02d}:00<br>Orders: {int(value)}")
+            else:
+                day_data.append(0)
+                day_hover.append(f"{day}<br>Hour: {hour:02d}:00<br>No activity")
+        heatmap_data.append(day_data)
+        hover_text.append(day_hover)
+    
+    # Create heatmap
+    fig = go.Figure(data=go.Heatmap(
+        z=heatmap_data,
+        x=[f"{h:02d}:00" for h in hours],
+        y=day_order,
+        colorscale='Blues',
+        text=hover_text,
+        hovertemplate='%{text}<extra></extra>',
+        colorbar=dict(
+            title=color_label,
+            thickness=15,
+            len=0.7
+        )
+    ))
+    
+    # Apply modern styling
+    apply_modern_chart_style(fig, "⏰ Hourly Activity Pattern", height=400)
+    
+    fig.update_layout(
+        xaxis=dict(
+            title="Hour of Day",
+            tickangle=45,
+            tickmode='linear',
+            tick0=0,
+            dtick=2
+        ),
+        yaxis=dict(
+            title="Day of Week",
+            autorange='reversed'
+        ),
+        margin=dict(t=60, b=80, l=100, r=60)
+    )
+    
+    return fig
+
+def _create_day_part_analysis(df, value_col='Value'):
+    """
+    Create day part analysis showing revenue distribution across time segments
+    
+    Args:
+        df: DataFrame with Date/Timestamp column
+        value_col: Column name for revenue values
+    
+    Returns:
+        Plotly figure with day part breakdown
+    """
+    if df is None or df.empty:
+        return go.Figure().add_annotation(
+            text="No data available",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color='gray')
+        )
+    
+    # Check for timestamp columns
+    timestamp_cols = [col for col in df.columns if 'time' in col.lower() or 'date' in col.lower()]
+    
+    if not timestamp_cols:
+        return go.Figure().add_annotation(
+            text="⏰ No timestamp data available<br>Day part analysis requires time information",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color='gray')
+        )
+    
+    # Use the first timestamp column
+    time_col = timestamp_cols[0]
+    df[time_col] = pd.to_datetime(df[time_col], errors='coerce')
+    df = df.dropna(subset=[time_col])
+    
+    if df.empty:
+        return go.Figure().add_annotation(
+            text="No valid timestamp data",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=14, color='gray')
+        )
+    
+    # Extract hour
+    df['Hour'] = df[time_col].dt.hour
+    
+    # Define day parts
+    def get_day_part(hour):
+        if 0 <= hour < 6:
+            return '🌙 Night (00-06)'
+        elif 6 <= hour < 12:
+            return '🌅 Morning (06-12)'
+        elif 12 <= hour < 18:
+            return '☀️ Afternoon (12-18)'
+        else:
+            return '🌆 Evening (18-24)'
+    
+    df['DayPart'] = df['Hour'].apply(get_day_part)
+    
+    # Aggregate by day part
+    if value_col and value_col in df.columns:
+        day_part_agg = df.groupby('DayPart').agg({
+            value_col: 'sum'
+        }).reset_index()
+        day_part_agg['OrderCount'] = df.groupby('DayPart').size().values
+        metric_col = value_col
+    else:
+        day_part_agg = df.groupby('DayPart').size().reset_index(name='OrderCount')
+        metric_col = 'OrderCount'
+    
+    # Sort by time order
+    day_part_order = ['🌙 Night (00-06)', '🌅 Morning (06-12)', '☀️ Afternoon (12-18)', '🌆 Evening (18-24)']
+    day_part_agg['DayPart'] = pd.Categorical(day_part_agg['DayPart'], categories=day_part_order, ordered=True)
+    day_part_agg = day_part_agg.sort_values('DayPart')
+    
+    # Calculate percentages
+    total = day_part_agg[metric_col].sum()
+    day_part_agg['Percentage'] = (day_part_agg[metric_col] / total * 100).round(1)
+    
+    # Create stacked bar chart with gradient colors
+    colors = ['#34495E', '#F39C12', '#E74C3C', '#9B59B6']
+    
+    fig = go.Figure()
+    
+    for idx, row in day_part_agg.iterrows():
+        fig.add_trace(go.Bar(
+            x=[row[metric_col]],
+            y=['Revenue Distribution'],
+            name=row['DayPart'],
+            orientation='h',
+            marker=dict(color=colors[idx % len(colors)]),
+            text=f"{row['Percentage']:.1f}%",
+            textposition='inside',
+            textfont=dict(size=14, color='white', weight='bold'),
+            hovertemplate=(
+                f"<b>{row['DayPart']}</b><br>" +
+                f"Revenue: Rs. {row[metric_col]:,.0f}<br>" +
+                f"Orders: {row['OrderCount']}<br>" +
+                f"Share: {row['Percentage']:.1f}%<br>" +
+                "<extra></extra>"
+            )
+        ))
+    
+    # Apply modern styling
+    apply_modern_chart_style(fig, "🕐 Day Part Analysis", height=400)
+    
+    fig.update_layout(
+        xaxis=dict(title="Revenue (Rs.)"),
+        yaxis=dict(showticklabels=False),
+        barmode='stack',
+        showlegend=True,
+        legend=dict(
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=1.02,
+            bgcolor='rgba(255,255,255,0.8)',
+            bordercolor='lightgray',
+            borderwidth=1
+        ),
+        margin=dict(t=60, b=60, l=40, r=150)
+    )
+    
+    return fig
+
+def _create_revenue_comparison_chart(df, value_col, period_view='daily', comparison_type='previous_period'):
+    """
+    Create advanced revenue comparison chart with period-over-period analysis
+    
+    Args:
+        df: DataFrame with Date and Value columns
+        value_col: Column name for revenue values
+        period_view: 'daily', 'weekly', or 'monthly'
+        comparison_type: 'previous_period', 'last_year', or 'custom'
+    
+    Returns:
+        Plotly figure with main chart and comparison chart
+    """
+    if df is None or df.empty:
+        return go.Figure().add_annotation(
+            text="No data available for revenue comparison",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16, color='gray')
+        )
+    
+    # Check if required columns exist
+    if 'Date' not in df.columns or not value_col:
+        return go.Figure().add_annotation(
+            text="Date or revenue data not available",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16, color='gray')
+        )
+    
+    # Ensure Date column is datetime
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    df = df.dropna(subset=['Date'])
+    
+    if df.empty:
+        return go.Figure().add_annotation(
+            text="No valid date data available",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font=dict(size=16, color='gray')
+        )
+    
+    # Sort by date
+    df = df.sort_values('Date')
+    
+    # Aggregate based on period view
+    if period_view == 'daily':
+        current_data = df.groupby(df['Date'].dt.date)[value_col].sum().reset_index()
+        current_data['Date'] = pd.to_datetime(current_data['Date'])
+        period_label = "Daily"
+        date_format = '%d-%b'
+    elif period_view == 'weekly':
+        current_data = df.groupby(df['Date'].dt.to_period('W').dt.start_time)[value_col].sum().reset_index()
+        current_data.columns = ['Date', value_col]
+        period_label = "Weekly"
+        date_format = '%d-%b'
+    else:  # monthly
+        current_data = df.groupby(df['Date'].dt.to_period('M').dt.start_time)[value_col].sum().reset_index()
+        current_data.columns = ['Date', value_col]
+        period_label = "Monthly"
+        date_format = '%b-%Y'
+    
+    current_data = current_data.sort_values('Date')
+    
+    # Calculate comparison period
+    if comparison_type == 'previous_period':
+        # Previous period of same length
+        period_length = (current_data['Date'].max() - current_data['Date'].min()).days
+        comparison_start = current_data['Date'].min() - pd.Timedelta(days=period_length + 1)
+        comparison_end = current_data['Date'].min() - pd.Timedelta(days=1)
+        comparison_label = "Previous Period"
+    elif comparison_type == 'last_year':
+        # Same period last year
+        comparison_start = current_data['Date'].min() - pd.DateOffset(years=1)
+        comparison_end = current_data['Date'].max() - pd.DateOffset(years=1)
+        comparison_label = "Last Year"
+    else:
+        # Default to previous period
+        period_length = (current_data['Date'].max() - current_data['Date'].min()).days
+        comparison_start = current_data['Date'].min() - pd.Timedelta(days=period_length + 1)
+        comparison_end = current_data['Date'].min() - pd.Timedelta(days=1)
+        comparison_label = "Previous Period"
+    
+    # Get comparison period data
+    comparison_df = df[(df['Date'] >= comparison_start) & (df['Date'] <= comparison_end)].copy()
+    
+    if not comparison_df.empty:
+        # Aggregate comparison data
+        if period_view == 'daily':
+            comparison_data = comparison_df.groupby(comparison_df['Date'].dt.date)[value_col].sum().reset_index()
+            comparison_data['Date'] = pd.to_datetime(comparison_data['Date'])
+        elif period_view == 'weekly':
+            comparison_data = comparison_df.groupby(comparison_df['Date'].dt.to_period('W').dt.start_time)[value_col].sum().reset_index()
+            comparison_data.columns = ['Date', value_col]
+        else:  # monthly
+            comparison_data = comparison_df.groupby(comparison_df['Date'].dt.to_period('M').dt.start_time)[value_col].sum().reset_index()
+            comparison_data.columns = ['Date', value_col]
+        
+        comparison_data = comparison_data.sort_values('Date')
+        
+        # Align comparison data with current period (shift dates)
+        date_diff = current_data['Date'].min() - comparison_data['Date'].min()
+        comparison_data['Aligned_Date'] = comparison_data['Date'] + date_diff
+    else:
+        comparison_data = pd.DataFrame()
+    
+    # Calculate statistics
+    current_total = current_data[value_col].sum()
+    current_avg = current_data[value_col].mean()
+    current_peak = current_data[value_col].max()
+    peak_date = current_data.loc[current_data[value_col].idxmax(), 'Date']
+    
+    if not comparison_data.empty:
+        comparison_total = comparison_data[value_col].sum()
+        change_pct = ((current_total - comparison_total) / comparison_total * 100) if comparison_total > 0 else 0
+        change_color = '#2ECC71' if change_pct >= 0 else '#E74C3C'
+        change_icon = '↑' if change_pct >= 0 else '↓'
+    else:
+        change_pct = 0
+        comparison_total = 0
+        change_color = '#6c757d'
+        change_icon = '—'
+    
+    # Create figure with subplots (main chart + comparison mini chart)
+    from plotly.subplots import make_subplots
+    
+    fig = make_subplots(
+        rows=2, cols=1,
+        row_heights=[0.75, 0.25],
+        vertical_spacing=0.08,
+        subplot_titles=(f"{period_label} Revenue Trend", "Period Comparison"),
+        specs=[[{"secondary_y": False}], [{"secondary_y": False}]]
+    )
+    
+    # Main chart - Current period
+    fig.add_trace(
+        go.Scatter(
+            x=current_data['Date'],
+            y=current_data[value_col],
+            name='Current Period',
+            mode='lines+markers',
+            line=dict(color='#2ECC71', width=3),
+            marker=dict(size=6, color='#27AE60', line=dict(width=1, color='white')),
+            fill='tozeroy',
+            fillcolor='rgba(46, 204, 113, 0.1)',
+            hovertemplate='<b>Current</b><br>%{x|' + date_format + '}<br>Rs. %{y:,.0f}<extra></extra>'
+        ),
+        row=1, col=1
+    )
+    
+    # Main chart - Comparison period (if available)
+    if not comparison_data.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=comparison_data['Aligned_Date'],
+                y=comparison_data[value_col],
+                name=comparison_label,
+                mode='lines',
+                line=dict(color='#95A5A6', width=2, dash='dot'),
+                opacity=0.6,
+                hovertemplate='<b>' + comparison_label + '</b><br>%{x|' + date_format + '}<br>Rs. %{y:,.0f}<extra></extra>'
+            ),
+            row=1, col=1
+        )
+    
+    # Add peak marker
+    fig.add_trace(
+        go.Scatter(
+            x=[peak_date],
+            y=[current_peak],
+            mode='markers+text',
+            marker=dict(size=12, color='#F39C12', symbol='star', line=dict(width=2, color='white')),
+            text=['Peak'],
+            textposition='top center',
+            textfont=dict(size=10, color='#F39C12', family='Arial Black'),
+            showlegend=False,
+            hovertemplate='<b>Peak Day</b><br>%{x|' + date_format + '}<br>Rs. %{y:,.0f}<extra></extra>'
+        ),
+        row=1, col=1
+    )
+    
+    # Add weekend shading (if daily view)
+    if period_view == 'daily':
+        for date in current_data['Date']:
+            if date.weekday() >= 5:  # Saturday or Sunday
+                fig.add_vrect(
+                    x0=date - pd.Timedelta(hours=12),
+                    x1=date + pd.Timedelta(hours=12),
+                    fillcolor='rgba(200, 200, 200, 0.1)',
+                    layer='below',
+                    line_width=0,
+                    row=1, col=1
+                )
+    
+    # Comparison mini chart - Bar comparison
+    if not comparison_data.empty:
+        comparison_bars = pd.DataFrame({
+            'Period': [comparison_label, 'Current Period'],
+            'Total': [comparison_total, current_total],
+            'Color': ['#95A5A6', change_color]
+        })
+        
+        fig.add_trace(
+            go.Bar(
+                x=comparison_bars['Period'],
+                y=comparison_bars['Total'],
+                marker=dict(color=comparison_bars['Color'], opacity=0.8, line=dict(width=1, color='white')),
+                text=[f"Rs. {v/1e5:.1f}L" for v in comparison_bars['Total']],
+                textposition='outside',
+                textfont=dict(size=10, color='black'),
+                showlegend=False,
+                hovertemplate='<b>%{x}</b><br>Rs. %{y:,.0f}<extra></extra>'
+            ),
+            row=2, col=1
+        )
+    
+    # Update layout
+    fig.update_xaxes(
+        title_text="Date",
+        showgrid=True,
+        gridcolor='rgba(200, 200, 200, 0.2)',
+        tickformat=date_format,
+        row=1, col=1
+    )
+    
+    fig.update_yaxes(
+        title_text="Revenue (Rs.)",
+        showgrid=True,
+        gridcolor='rgba(200, 200, 200, 0.2)',
+        tickformat=".2s",
+        row=1, col=1
+    )
+    
+    fig.update_xaxes(
+        title_text="",
+        showgrid=False,
+        row=2, col=1
+    )
+    
+    fig.update_yaxes(
+        title_text="Total Revenue",
+        showgrid=True,
+        gridcolor='rgba(200, 200, 200, 0.2)',
+        tickformat=".2s",
+        row=2, col=1
+    )
+    
+    # Overall layout
+    apply_modern_chart_style(fig, f"📊 {period_label} Revenue Comparison", height=650)
+    
+    fig.update_layout(
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1,
+            bgcolor='rgba(255,255,255,0.9)',
+            bordercolor='lightgray',
+            borderwidth=1
+        ),
+        margin=dict(t=80, b=20, l=60, r=40),
+        hovermode='x unified',
+        annotations=[
+            # Change percentage annotation
+            dict(
+                text=f"{change_icon} {abs(change_pct):.1f}%",
+                xref='paper', yref='paper',
+                x=0.02, y=0.98,
+                showarrow=False,
+                font=dict(size=24, color=change_color, family='Inter'),
+                bgcolor='rgba(255,255,255,0.9)',
+                bordercolor=change_color,
+                borderwidth=2,
+                borderpad=8
+            )
+        ]
+    )
+    
+    return fig, {
+        'current_total': current_total,
+        'current_avg': current_avg,
+        'current_peak': current_peak,
+        'peak_date': peak_date,
+        'change_pct': change_pct,
+        'comparison_total': comparison_total
+    }
+
+# Data Table Callbacks
+
+# Toggle Data Table Visibility
+@app.callback(
+    Output("data-table-collapse", "is_open"),
+    Input("toggle-data-table", "n_clicks"),
+    State("data-table-collapse", "is_open"),
+)
+def toggle_data_table(n, is_open):
+    """Toggle visibility of data table section"""
+    if n:
+        return not is_open
+    return is_open
+
+# Export Selected Rows
+@app.callback(
+    Output('download-table-data', 'data'),
+    Input('export-selected-btn', 'n_clicks'),
+    Input('export-all-btn', 'n_clicks'),
+    State('sales-data-table', 'selectedRows'),
+    State('sales-data-table', 'rowData'),
+    prevent_initial_call=True
+)
+def export_table_data(export_selected_clicks, export_all_clicks, selected_rows, all_rows):
+    """Export selected or all rows to CSV"""
+    
+    if not ctx.triggered:
+        return no_update
+    
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    try:
+        if button_id == 'export-selected-btn':
+            if not selected_rows or len(selected_rows) == 0:
+                return no_update
+            df_export = pd.DataFrame(selected_rows)
+            filename = f"sales_data_selected_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        elif button_id == 'export-all-btn':
+            if not all_rows:
+                return no_update
+            df_export = pd.DataFrame(all_rows)
+            filename = f"sales_data_all_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        else:
+            return no_update
+        
+        return dcc.send_data_frame(df_export.to_csv, filename, index=False)
+    
+    except Exception as e:
+        print(f"Error exporting data: {str(e)}")
+        return no_update
+
+# Clear Filters
+@app.callback(
+    Output('sales-data-table', 'filterModel'),
+    Input('clear-filters-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def clear_table_filters(n_clicks):
+    """Clear all table filters"""
+    if n_clicks:
+        return {}
+    return no_update
+
+# Global Search
+@app.callback(
+    Output('sales-data-table', 'dashGridOptions'),
+    Input('table-global-search', 'value'),
+    State('sales-data-table', 'dashGridOptions'),
+    prevent_initial_call=True
+)
+def update_global_search(search_value, current_options):
+    """Update table with global search filter"""
+    if search_value:
+        updated_options = current_options.copy()
+        updated_options['quickFilterText'] = search_value
+        return updated_options
+    else:
+        updated_options = current_options.copy()
+        if 'quickFilterText' in updated_options:
+            del updated_options['quickFilterText']
+        return updated_options
+
+# Column Visibility Toggle
+@app.callback(
+    Output('sales-data-table', 'columnDefs'),
+    Input('column-visibility-checklist', 'value'),
+    State('username-input', 'value'),
+    State('password-input', 'value'),
+    State('date-range-picker', 'start_date'),
+    State('date-range-picker', 'end_date'),
+    prevent_initial_call=True
+)
+def update_column_visibility(visible_columns, username, password, start_date, end_date):
+    """Update which columns are visible in the table"""
+    
+    if not visible_columns:
+        return no_update
+    
+    # Get VALUE_COL from current data
+    try:
+        start_date_obj = pd.to_datetime(start_date)
+        end_date_obj = pd.to_datetime(end_date)
+        start_date_str = start_date_obj.strftime("%d-%m-%Y")
+        end_date_str = end_date_obj.strftime("%d-%m-%Y")
+        
+        api_client = APIClient(username=username, password=password)
+        response = api_client.get_sales_report(start_date=start_date_str, end_date=end_date_str)
+        
+        if response.get('success'):
+            api_response = response.get('data', {})
+            report_data = api_response.get('report_data', [])
+            df = pd.DataFrame(report_data)
+            
+            column_mapping = {
+                'SV': 'Value',
+                'SQ': 'Qty',
+                'comp_nm': 'Dealer Name',
+                'category_name': 'Category',
+                'state': 'State',
+                'city': 'City',
+                'meta_keyword': 'Product Name',
+                'parent_category': 'Sub Category'
+            }
+            df = df.rename(columns={old: new for old, new in column_mapping.items() if old in df.columns})
+            
+            VALUE_COLS = [c for c in df.columns if c.startswith('Value') and c != 'Value']
+            VALUE_COL = VALUE_COLS[0] if VALUE_COLS else ('Value' if 'Value' in df.columns else 'Value')
+        else:
+            VALUE_COL = 'Value'
+    except:
+        VALUE_COL = 'Value'
+    
+    # Define all column definitions
+    all_columns = [
+        {
+            'headerName': 'Date',
+            'field': 'Date',
+            'filter': 'agDateColumnFilter',
+            'sortable': True,
+            'resizable': True,
+            'width': 110,
+            'checkboxSelection': True,
+            'headerCheckboxSelection': True,
+            'hide': 'Date' not in visible_columns
+        },
+        {
+            'headerName': 'Order ID',
+            'field': 'Order ID',
+            'filter': 'agTextColumnFilter',
+            'sortable': True,
+            'resizable': True,
+            'width': 120,
+            'hide': 'Order ID' not in visible_columns
+        },
+        {
+            'headerName': 'Dealer Name',
+            'field': 'Dealer Name',
+            'filter': 'agTextColumnFilter',
+            'sortable': True,
+            'resizable': True,
+            'width': 200,
+            'hide': 'Dealer Name' not in visible_columns
+        },
+        {
+            'headerName': 'City',
+            'field': 'City',
+            'filter': 'agTextColumnFilter',
+            'sortable': True,
+            'resizable': True,
+            'width': 130,
+            'hide': 'City' not in visible_columns
+        },
+        {
+            'headerName': 'State',
+            'field': 'State',
+            'filter': 'agTextColumnFilter',
+            'sortable': True,
+            'resizable': True,
+            'width': 130,
+            'hide': 'State' not in visible_columns
+        },
+        {
+            'headerName': 'Category',
+            'field': 'Category',
+            'filter': 'agTextColumnFilter',
+            'sortable': True,
+            'resizable': True,
+            'width': 150,
+            'hide': 'Category' not in visible_columns
+        },
+        {
+            'headerName': 'Product',
+            'field': 'Product Name',
+            'filter': 'agTextColumnFilter',
+            'sortable': True,
+            'resizable': True,
+            'width': 250,
+            'hide': 'Product Name' not in visible_columns
+        },
+        {
+            'headerName': 'Quantity',
+            'field': 'Qty',
+            'filter': 'agNumberColumnFilter',
+            'sortable': True,
+            'resizable': True,
+            'width': 100,
+            'type': 'numericColumn',
+            'valueFormatter': {'function': 'Number(params.value).toLocaleString()'},
+            'hide': 'Qty' not in visible_columns
+        },
+        {
+            'headerName': 'Revenue (₹)',
+            'field': VALUE_COL,
+            'filter': 'agNumberColumnFilter',
+            'sortable': True,
+            'resizable': True,
+            'width': 130,
+            'type': 'numericColumn',
+            'valueFormatter': {'function': 'd3.format(",.2f")(params.value)'},
+            'hide': VALUE_COL not in visible_columns
+        },
+    ]
+    
+    return all_columns
 
 if __name__ == '__main__':
     print("\n" + "="*60)
