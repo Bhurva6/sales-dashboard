@@ -17,7 +17,18 @@ html {
 
 body {
     background-color: #f9fafb;
-    color: #1f2937;
+    color: #000000;
+}
+
+/* Force all text to be black unless specifically overridden */
+p, span, div, label, input, select, textarea, small, .text-muted {
+    color: #000000 !important;
+}
+
+/* Keep white text only for elements with colored backgrounds */
+.badge, .btn, .alert, .card-header, 
+.Select--multi .Select-value, .Select-option.is-selected {
+    color: inherit !important;
 }
 
 /* Typography */
@@ -245,27 +256,90 @@ h5 { font-size: 16px; }
 
 /* Dropdown Styling */
 .Select-control {
-    border-radius: 8px !important;
+    border-radius: 6px !important;
+    border-color: #e5e7eb !important;
+    min-height: 38px !important;
+}
+
+.Select-control:hover {
+    border-color: #6366f1 !important;
+}
+
+/* Dropdown placeholder and input text - BLACK */
+.Select-placeholder,
+.Select-input,
+.Select-value-label,
+.Select-control .Select-value,
+.Select-control,
+.Select-control input,
+.Select-control > div,
+.css-1wa3eu0-placeholder,
+.css-1uccc91-singleValue,
+div[class*="singleValue"],
+div[class*="placeholder"],
+div[class*="Input"] input {
+    color: #000000 !important;
+}
+
+/* Dash dcc.Dropdown styling - ensure all text is black */
+.dash-dropdown .Select-control,
+.dash-dropdown .Select-placeholder,
+.dash-dropdown .Select-value-label,
+.dash-dropdown .Select-input,
+.dash-dropdown div,
+.dash-dropdown input,
+.dash-dropdown span {
+    color: #000000 !important;
+}
+
+.Select--multi .Select-value {
+    background-color: #6366f1 !important;
+    border-color: #6366f1 !important;
+    color: white !important;
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin: 2px;
+}
+
+.Select--multi .Select-value-icon {
+    border-right-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.Select--multi .Select-value-icon:hover {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    color: white !important;
+}
+
+.Select-menu-outer {
+    border-radius: 6px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
     border-color: #e5e7eb !important;
 }
 
-/* Collapse Animation */
-.collapse {
-    transition: height 0.3s ease;
+.Select-option {
+    padding: 8px 12px !important;
+    color: #000000 !important;
 }
 
-/* Graph Container */
-.js-plotly-plot {
-    border-radius: 12px;
-    overflow: hidden;
+.Select-option.is-focused {
+    background-color: #f3f4f6 !important;
+    color: #000000 !important;
 }
 
-/* Gradient Text */
-.gradient-text {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+.Select-option.is-selected {
+    background-color: #6366f1 !important;
+    color: white !important;
+}
+
+/* Card Header Styling for Chart Filters */
+.card-header h6 {
+    font-weight: 600;
+    color: #000000;
+    margin-bottom: 0.5rem;
+}
+
+.card-header .Select {
+    font-size: 13px;
 }
 
 /* Shadow Utilities */
@@ -367,4 +441,32 @@ h5 { font-size: 16px; }
 
 .gradient-danger {
     background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+/* Additional comprehensive text color rules */
+/* Ensure all dropdown related elements have black text */
+.Select, .Select div, .Select span, .Select input,
+[class*="Select"], [class*="dropdown"],
+.dash-dropdown, .dash-dropdown *:not(.Select--multi .Select-value):not(.Select-option.is-selected) {
+    color: #000000 !important;
+}
+
+/* Force all label and placeholder text to black */
+label, .label, [class*="label"],
+::placeholder, ::-webkit-input-placeholder, ::-moz-placeholder {
+    color: #000000 !important;
+    opacity: 0.6;
+}
+
+/* Ensure small text and muted text is black */
+small, .small, .text-small,
+.text-secondary, .secondary-text {
+    color: #000000 !important;
+}
+
+/* Make sure all paragraph and span text is black by default */
+p:not(.badge):not(.btn):not(.alert):not([class*="bg-"]),
+span:not(.badge):not(.btn):not(.alert):not([class*="bg-"]):not(.gradient-text),
+div:not(.badge):not(.btn):not(.alert):not(.card-header):not([class*="bg-"]) {
+    color: #000000 !important;
 }

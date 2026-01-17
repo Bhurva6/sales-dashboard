@@ -169,6 +169,7 @@ app.layout = dbc.Container([
     dcc.Location(id='url', refresh=False),
     dcc.Store(id='session-store', storage_type='session'),
     dcc.Store(id='selected-location-store', storage_type='session'),  # Store for map selection
+    dcc.Store(id='chart-data-store', storage_type='memory'),  # Store for chart data
     html.Div(id='saved-charts-data', style={'display': 'none'}),  # Hidden div for saved charts data
     
     # Modern Header with gradient
@@ -178,12 +179,11 @@ app.layout = dbc.Container([
                 html.Div([
                     html.Div([
                         html.H1([
-                            html.Span("📊 ", style={'fontSize': '36px'}),
                             html.Span("Orthopedic Implant Analytics", className="gradient-text")
                         ], className="mb-0", style={'fontWeight': '700', 'letterSpacing': '-0.02em'}),
                         html.P("Real-time Sales & Analytics Dashboard", 
-                               className="text-muted mb-0", 
-                               style={'fontSize': '14px', 'fontWeight': '400'})
+                               className="mb-0", 
+                               style={'fontSize': '14px', 'fontWeight': '400', 'color': '#000000'})
                     ]),
                 ], style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center'})
             ], className="dashboard-header", style={'padding': '1.5rem 0'})
@@ -196,7 +196,7 @@ app.layout = dbc.Container([
         dbc.Col([
             dbc.Card([
                 dbc.CardBody([
-                    html.H5("🔐 Authentication", className="mb-3", style={'fontWeight': '600', 'color': COLORS['dark']}),
+                    html.H5("Authentication", className="mb-3", style={'fontWeight': '600', 'color': COLORS['dark']}),
                     
                     dbc.Input(
                         id='username-input',
@@ -217,7 +217,7 @@ app.layout = dbc.Container([
                     html.Hr(style={'borderColor': '#e5e7eb'}),
                     
                     # Quick Date Selection Section
-                    html.P("⚡ Quick Select:", className='small fw-bold mb-2', style={'color': COLORS['dark']}),
+                    html.P("Quick Select:", className='small fw-bold mb-2', style={'color': COLORS['dark']}),
                     dbc.Stack([
                         dbc.ButtonGroup([
                             dbc.Button("Today", id='quick-today', color='primary', outline=True, size='sm', className='w-100 mb-1'),
@@ -230,7 +230,7 @@ app.layout = dbc.Container([
                         ], className='d-grid gap-1 mb-1'),
                     ], gap=1, className='mb-3'),
                     
-                    html.H5("📅 Date Range", className="mb-3", style={'fontWeight': '600', 'color': COLORS['dark']}),
+                    html.H5("Date Range", className="mb-3", style={'fontWeight': '600', 'color': COLORS['dark']}),
                     
                     dcc.DatePickerRange(
                         id='date-range-picker',
@@ -243,7 +243,7 @@ app.layout = dbc.Container([
                     
                     html.Hr(style={'borderColor': '#e5e7eb'}),
                     
-                    html.H5("🔧 Controls", className="mb-3", style={'fontWeight': '600', 'color': COLORS['dark']}),
+                    html.H5("Controls", className="mb-3", style={'fontWeight': '600', 'color': COLORS['dark']}),
                     
                     dbc.Checkbox(
                         id='hide-innovative-check',
@@ -253,7 +253,7 @@ app.layout = dbc.Container([
                     ),
                     
                     dbc.Button(
-                        "🔄 Refresh Data",
+                        "Refresh Data",
                         id='refresh-btn',
                         color="primary",
                         className="w-100 mb-3",
@@ -263,7 +263,7 @@ app.layout = dbc.Container([
                     html.Hr(style={'borderColor': '#e5e7eb'}),
                     
                     html.Div([
-                        html.P("📊 Data Status:", className="small mb-2 fw-bold", style={'color': COLORS['dark']}),
+                        html.P("Data Status:", className="small mb-2 fw-bold", style={'color': COLORS['dark']}),
                         html.Div(id='data-status', className="alert alert-info py-2 small")
                     ])
                 ])
@@ -273,7 +273,7 @@ app.layout = dbc.Container([
         # Main Content with Tabs
         dbc.Col([
             dcc.Tabs([
-                dcc.Tab(label='📊 Dashboard', children=[
+                dcc.Tab(label='Dashboard', children=[
                     dcc.Loading(
                         id='main-loading', 
                         children=[html.Div(id='main-content')],
@@ -282,7 +282,7 @@ app.layout = dbc.Container([
                         color=COLORS['primary']
                     )
                 ], className='custom-tab'),
-                dcc.Tab(label='📈 My Charts', children=[
+                dcc.Tab(label='My Charts', children=[
                     html.Div(id='my-charts-content')
                 ], className='custom-tab')
             ], style={'marginBottom': '1rem'})
@@ -295,6 +295,7 @@ app.layout = dbc.Container([
 @app.callback(
     Output('main-content', 'children'),
     Output('data-status', 'children'),
+    Output('chart-data-store', 'data'),
     Input('username-input', 'value'),
     Input('password-input', 'value'),
     Input('date-range-picker', 'start_date'),
@@ -307,7 +308,7 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
     """Update entire dashboard when dates change or refresh is clicked"""
     
     if not start_date or not end_date:
-        return dbc.Alert("Please select date range", color="warning"), "No date range"
+        return dbc.Alert("Please select date range", color="warning"), "No date range", None
     
     try:
         # Convert dates to DD-MM-YYYY format
@@ -316,7 +317,7 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
         start_date_str = start_date_obj.strftime("%d-%m-%Y")
         end_date_str = end_date_obj.strftime("%d-%m-%Y")
         
-        print(f"\n📊 DASH UPDATE TRIGGERED")
+        print(f"\nDASH UPDATE TRIGGERED")
         print(f"   Range: {start_date_str} to {end_date_str}")
         print(f"   Hide Innovative: {hide_innovative}")
         print(f"   Refresh clicks: {refresh_clicks}")
@@ -331,29 +332,29 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
             )
             
             if not response.get('success'):
-                status_text = f"❌ API Error: {response.get('message', 'Unknown error')} | {datetime.now().strftime('%H:%M:%S')}"
-                return dbc.Alert(f"Failed to fetch data: {response.get('message')}", color="danger"), status_text
+                status_text = f"API Error: {response.get('message', 'Unknown error')} | {datetime.now().strftime('%H:%M:%S')}"
+                return dbc.Alert(f"Failed to fetch data: {response.get('message')}", color="danger"), status_text, None
             
             # Extract data from response
             api_response = response.get('data', {})
             report_data = api_response.get('report_data', [])
             
             if not report_data:
-                status_text = f"❌ No data | {datetime.now().strftime('%H:%M:%S')}"
-                return dbc.Alert("No data available for this date range", color="warning"), status_text
+                status_text = f"No data | {datetime.now().strftime('%H:%M:%S')}"
+                return dbc.Alert("No data available for this date range", color="warning"), status_text, None
             
             # Convert to DataFrame
             df = pd.DataFrame(report_data)
         except Exception as e:
-            print(f"   ❌ Error: {str(e)}")
-            status_text = f"❌ Error: {str(e)} | {datetime.now().strftime('%H:%M:%S')}"
-            return dbc.Alert(f"Error fetching data: {str(e)}", color="danger"), status_text
+            print(f"   Error: {str(e)}")
+            status_text = f"Error: {str(e)} | {datetime.now().strftime('%H:%M:%S')}"
+            return dbc.Alert(f"Error fetching data: {str(e)}", color="danger"), status_text, None
         
         if df is None or df.empty:
-            status_text = f"❌ No data | {datetime.now().strftime('%H:%M:%S')}"
-            return dbc.Alert("No data available for this date range", color="warning"), status_text
+            status_text = f"No data | {datetime.now().strftime('%H:%M:%S')}"
+            return dbc.Alert("No data available for this date range", color="warning"), status_text, None
         
-        print(f"   ✅ Data fetched: {len(df)} rows")
+        print(f"   Data fetched: {len(df)} rows")
         print(f"   Available columns: {list(df.columns)}")
         
         # Map API column names to standard names
@@ -538,7 +539,7 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
             dbc.Row([
                 dbc.Col([
                     _create_enhanced_metric_card(
-                        icon="💰",
+                        icon="Revenue",
                         label="Revenue",
                         current_value=format_inr(revenue),
                         previous_value=prev_revenue,
@@ -548,11 +549,11 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                         gradient_end='rgba(46, 204, 113, 0.02)',
                         date_range_text=f"{start_date_str} → {end_date_str}"
                     )
-                ], width=3),
+                ], width=3, className="d-flex"),
                 
                 dbc.Col([
                     _create_enhanced_metric_card(
-                        icon="📦",
+                        icon="Quantity",
                         label="Total Quantity",
                         current_value=format_qty(quantity),
                         previous_value=prev_quantity,
@@ -562,30 +563,25 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                         gradient_end='rgba(52, 152, 219, 0.02)',
                         date_range_text=f"{start_date_str} → {end_date_str}"
                     )
-                ], width=3),
-                
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.Div([
-                                html.Span("🏆", style={'fontSize': '24px', 'marginRight': '8px'}),
-                                html.Span("Most Sold", className="text-muted", style={'fontSize': '14px', 'fontWeight': '500'})
-                            ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '8px'}),
-                            html.H4(most_sold[:18], className="fw-bold", style={'fontSize': '20px', 'color': '#2c3e50', 'marginBottom': '4px'}),
-                            html.Small("Top item by quantity", className="text-muted", style={'fontSize': '11px'})
-                        ], style={
-                            'background': 'linear-gradient(135deg, rgba(241, 196, 15, 0.1) 0%, rgba(241, 196, 15, 0.02) 100%)',
-                            'borderRadius': '8px'
-                        })
-                    ], style={
-                        'border': 'none',
-                        'boxShadow': '0 2px 4px rgba(0,0,0,0.05)'
-                    })
-                ], width=3),
+                ], width=3, className="d-flex"),
                 
                 dbc.Col([
                     _create_enhanced_metric_card(
-                        icon="📊",
+                        icon="Most Sold",
+                        label="Most Sold",
+                        current_value=most_sold[:25] if len(most_sold) > 25 else most_sold,
+                        previous_value=0,
+                        trend_values=[],
+                        color='#F1C40F',
+                        gradient_start='rgba(241, 196, 15, 0.1)',
+                        gradient_end='rgba(241, 196, 15, 0.02)',
+                        date_range_text="Top item by quantity"
+                    )
+                ], width=3, className="d-flex"),
+                
+                dbc.Col([
+                    _create_enhanced_metric_card(
+                        icon="Orders",
                         label="Orders",
                         current_value=f"{total_orders:,}",
                         previous_value=prev_orders,
@@ -595,14 +591,14 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                         gradient_end='rgba(231, 76, 60, 0.02)',
                         date_range_text=f"{start_date_str} → {end_date_str}"
                     )
-                ], width=3),
+                ], width=3, className="d-flex"),
             ], className="mb-4 g-2"),
             
             # Second row of metrics - Enhanced with sparklines
             dbc.Row([
                 dbc.Col([
                     _create_enhanced_metric_card(
-                        icon="🗺️",
+                        icon="State",
                         label="Top State",
                         current_value=f"{most_state}\n{state_count} orders",
                         previous_value=prev_state_count,
@@ -612,11 +608,11 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                         gradient_end='rgba(155, 89, 182, 0.02)',
                         date_range_text=f"{start_date_str} → {end_date_str}"
                     )
-                ], width=3),
+                ], width=3, className="d-flex"),
                 
                 dbc.Col([
                     _create_enhanced_metric_card(
-                        icon="🏙️",
+                        icon="City",
                         label="Top City",
                         current_value=f"{most_city}\n{city_count} orders",
                         previous_value=prev_city_count,
@@ -626,11 +622,11 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                         gradient_end='rgba(26, 188, 156, 0.02)',
                         date_range_text=f"{start_date_str} → {end_date_str}"
                     )
-                ], width=3),
+                ], width=3, className="d-flex"),
                 
                 dbc.Col([
                     _create_enhanced_metric_card(
-                        icon="🤝",
+                        icon="Dealer",
                         label="Top Dealer",
                         current_value=f"{most_dealer[:14]}\n{dealer_count} orders",
                         previous_value=prev_dealer_count,
@@ -640,11 +636,11 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                         gradient_end='rgba(230, 126, 34, 0.02)',
                         date_range_text=f"{start_date_str} → {end_date_str}"
                     )
-                ], width=3),
+                ], width=3, className="d-flex"),
                 
                 dbc.Col([
                     _create_enhanced_metric_card(
-                        icon="📂",
+                        icon="Categories",
                         label="Categories",
                         current_value=f"{category_count}",
                         previous_value=prev_category_count,
@@ -654,7 +650,7 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                         gradient_end='rgba(52, 73, 94, 0.02)',
                         date_range_text="Unique categories"
                     )
-                ], width=3),
+                ], width=3, className="d-flex"),
             ], className="mb-4 g-2"),
             
             html.Hr(className="my-4"),
@@ -664,8 +660,8 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                 dbc.Col([
                     dbc.Card([
                         dbc.CardHeader([
-                            html.H5("🗺️ Geographic Sales Distribution", className="mb-0 fw-bold text-primary"),
-                            html.Small("Interactive map showing sales across India", className="text-muted")
+                            html.H5("Geographic Sales Distribution", className="mb-0 fw-bold text-primary"),
+                            html.Small("Interactive map showing sales across India", style={'color': '#000000'})
                         ]),
                         dbc.CardBody([
                             # Map Controls
@@ -675,9 +671,9 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                                     dbc.RadioItems(
                                         id='map-metric-selector',
                                         options=[
-                                            {'label': '💰 Revenue', 'value': 'Revenue'},
-                                            {'label': '📦 Quantity', 'value': 'Quantity'},
-                                            {'label': '📊 Order Count', 'value': 'Orders'}
+                                            {'label': 'Revenue', 'value': 'Revenue'},
+                                            {'label': 'Quantity', 'value': 'Quantity'},
+                                            {'label': 'Order Count', 'value': 'Orders'}
                                         ],
                                         value='Revenue',
                                         inline=True,
@@ -689,8 +685,8 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                                     dbc.RadioItems(
                                         id='map-level-selector',
                                         options=[
-                                            {'label': '🏛️ State', 'value': 'State'},
-                                            {'label': '🏙️ City', 'value': 'City'}
+                                            {'label': 'State', 'value': 'State'},
+                                            {'label': 'City', 'value': 'City'}
                                         ],
                                         value='State',
                                         inline=True,
@@ -706,7 +702,7 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                                         className="mb-2"
                                     ),
                                     dbc.Button(
-                                        "🔍 Reset View",
+                                        "Reset View",
                                         id='map-reset-btn',
                                         size='sm',
                                         color='secondary',
@@ -736,40 +732,92 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
             html.Hr(className="my-4"),
             
             # Charts
-            html.H4("📈 Analytics", className="mb-4 fw-bold"),
+            html.H4("Analytics", className="mb-4 fw-bold"),
             
+            # First Row - Dealers and States
             dbc.Row([
+                # Dealer Pie Chart with Filter
                 dbc.Col([
                     dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Top Dealers by Revenue", className="mb-2"),
+                                dcc.Dropdown(
+                                    id='dealer-filter',
+                                    placeholder='Select dealers...',
+                                    multi=True,
+                                    className='mb-2'
+                                )
+                            ])
+                        ]),
                         dbc.CardBody([
-                            dcc.Graph(figure=_create_dealer_pie(df, VALUE_COL, limit=10), config={'displayModeBar': True})
+                            dcc.Graph(id='dealer-pie-chart', config={'displayModeBar': True})
                         ])
                     ])
-                ], width=3),
+                ], width=6),
                 
+                # State Pie Chart with Filter
                 dbc.Col([
                     dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Revenue by State", className="mb-2"),
+                                dcc.Dropdown(
+                                    id='state-filter',
+                                    placeholder='Select states...',
+                                    multi=True,
+                                    className='mb-2'
+                                )
+                            ])
+                        ]),
                         dbc.CardBody([
-                            dcc.Graph(figure=_create_state_pie(df, VALUE_COL), config={'displayModeBar': True})
+                            dcc.Graph(id='state-pie-chart', config={'displayModeBar': True})
                         ])
                     ])
-                ], width=3),
+                ], width=6),
+            ], className="g-2 mb-3"),
+            
+            # Second Row - Categories and Cities
+            dbc.Row([
+                # Category Bar Chart with Filter
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Revenue by Category", className="mb-2"),
+                                dcc.Dropdown(
+                                    id='category-filter',
+                                    placeholder='Select categories...',
+                                    multi=True,
+                                    className='mb-2'
+                                )
+                            ])
+                        ]),
+                        dbc.CardBody([
+                            dcc.Graph(id='category-bar-chart', config={'displayModeBar': True})
+                        ])
+                    ])
+                ], width=6),
                 
+                # City Bar Chart with Filter
                 dbc.Col([
                     dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Top Cities by Revenue", className="mb-2"),
+                                dcc.Dropdown(
+                                    id='city-filter',
+                                    placeholder='Select cities...',
+                                    multi=True,
+                                    className='mb-2'
+                                )
+                            ])
+                        ]),
                         dbc.CardBody([
-                            dcc.Graph(figure=_create_category_bar(df, VALUE_COL), config={'displayModeBar': True})
+                            dcc.Graph(id='city-bar-chart', config={'displayModeBar': True})
                         ])
                     ])
-                ], width=3),
-                
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            dcc.Graph(figure=_create_city_bar(df, VALUE_COL), config={'displayModeBar': True})
-                        ])
-                    ])
-                ], width=3),
+                ], width=6),
             ], className="g-2 mb-4"),
             
             # New Analytics Section - Only include if date data is available
@@ -799,35 +847,71 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
             ], className="g-2 mb-4"),
             
             dbc.Row([
+                # Dealer Comparison Chart with Filter
                 dbc.Col([
                     dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Dealer Comparison", className="mb-2"),
+                                dcc.Dropdown(
+                                    id='dealer-comp-filter',
+                                    placeholder='Select dealers...',
+                                    multi=True,
+                                    className='mb-2'
+                                )
+                            ])
+                        ]),
                         dbc.CardBody([
-                            dcc.Graph(figure=_create_dealer_comparison(df, VALUE_COL, QTY_COL), config={'displayModeBar': True})
+                            dcc.Graph(id='dealer-comparison-chart', config={'displayModeBar': True})
                         ])
                     ])
                 ], width=4),
                 
+                # City Bar Chart 2 with Filter
                 dbc.Col([
                     dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Cities by Revenue", className="mb-2"),
+                                dcc.Dropdown(
+                                    id='city-filter-2',
+                                    placeholder='Select cities...',
+                                    multi=True,
+                                    className='mb-2'
+                                )
+                            ])
+                        ]),
                         dbc.CardBody([
-                            dcc.Graph(figure=_create_city_bar(df, VALUE_COL), config={'displayModeBar': True})
+                            dcc.Graph(id='city-bar-chart-2', config={'displayModeBar': True})
                         ])
                     ])
                 ], width=4),
                 
+                # Category Sunburst with Filter
                 dbc.Col([
                     dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Category Hierarchy", className="mb-2"),
+                                dcc.Dropdown(
+                                    id='category-sunburst-filter',
+                                    placeholder='Select categories...',
+                                    multi=True,
+                                    className='mb-2'
+                                )
+                            ])
+                        ]),
                         dbc.CardBody([
-                            dcc.Graph(figure=_create_category_sunburst(df, VALUE_COL), config={'displayModeBar': True})
+                            dcc.Graph(id='category-sunburst-chart', config={'displayModeBar': True})
                         ])
                     ])
                 ], width=4),
-            ]),
+            ], className="g-2 mb-4"),
             
             # Advanced Revenue Comparison Section - Only show if date data available
             *([] if not has_date_data else [
                 html.Hr(className="my-4"),
-                html.H4("📈 Advanced Revenue Analysis", className="mb-4 fw-bold"),
+                html.H4("Advanced Revenue Analysis", className="mb-4 fw-bold"),
                 
                 dbc.Row([
                     dbc.Col([
@@ -908,10 +992,10 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
             
             # Custom Chart Builder Section
             html.Hr(),
-            dbc.Button("➕ Create Custom Chart", id="toggle-custom-builder", color="secondary", className="mb-3"),
+            dbc.Button("Create Custom Chart", id="toggle-custom-builder", color="secondary", className="mb-3"),
             dbc.Collapse(
                 dbc.Card([
-                    dbc.CardHeader("🎨 Custom Chart Builder"),
+                    dbc.CardHeader("Custom Chart Builder"),
                     dbc.CardBody([
                         dbc.Row([
                             dbc.Col([
@@ -966,7 +1050,7 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                                 dbc.Input(id='chart-save-name', type='text', placeholder='Enter chart name to save')
                             ], width=8),
                             dbc.Col([
-                                dbc.Button("💾 Save Chart", id='save-chart-btn', color='success', className="mt-2")
+                                dbc.Button("Save Chart", id='save-chart-btn', color='success', className="mt-2")
                             ], width=4),
                         ], className="mb-3"),
                         html.Div(id='save-chart-status'),
@@ -980,7 +1064,7 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
             # Advanced Data Table Section
             html.Hr(className="my-4"),
             dbc.Button(
-                "📋 View Detailed Data Table", 
+                "View Detailed Data Table", 
                 id="toggle-data-table", 
                 color="info", 
                 className="mb-3",
@@ -989,7 +1073,7 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
             dbc.Collapse(
                 dbc.Card([
                     dbc.CardHeader([
-                        html.H5("📊 Detailed Sales Data", className="mb-0 d-inline-block"),
+                        html.H5("Detailed Sales Data", className="mb-0 d-inline-block"),
                         dbc.Badge(f"{len(df):,} records", color="primary", className="ms-2")
                     ]),
                     dbc.CardBody([
@@ -997,7 +1081,7 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                         dbc.Row([
                             dbc.Col([
                                 dbc.InputGroup([
-                                    dbc.InputGroupText("🔍"),
+                                    dbc.InputGroupText("Search"),
                                     dbc.Input(
                                         id='table-global-search',
                                         placeholder="Search across all columns...",
@@ -1008,9 +1092,9 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                             ], width=6),
                             dbc.Col([
                                 dbc.ButtonGroup([
-                                    dbc.Button("📥 Export Selected", id='export-selected-btn', color="success", size="sm"),
-                                    dbc.Button("📥 Export All", id='export-all-btn', color="primary", size="sm"),
-                                    dbc.Button("🔄 Clear Filters", id='clear-filters-btn', color="secondary", size="sm"),
+                                    dbc.Button("Export Selected", id='export-selected-btn', color="success", size="sm"),
+                                    dbc.Button("Export All", id='export-all-btn', color="primary", size="sm"),
+                                    dbc.Button("Clear Filters", id='clear-filters-btn', color="secondary", size="sm"),
                                 ], className="float-end")
                             ], width=6),
                         ], className="mb-3"),
@@ -1150,7 +1234,7 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                         # Info footer
                         html.Div([
                             html.Small([
-                                "💡 Tips: Click column headers to sort • Use filter icons to search • Select rows with checkboxes • Export selected or all data",
+                                "Tips: Click column headers to sort • Use filter icons to search • Select rows with checkboxes • Export selected or all data",
                             ], className="text-muted")
                         ], className="mt-3")
                     ])
@@ -1161,15 +1245,26 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
         ])
         
         # Status text
-        status_text = f"✅ {len(df):,} records | Last updated: {datetime.now().strftime('%H:%M:%S')}"
+        status_text = f"{len(df):,} records | Last updated: {datetime.now().strftime('%H:%M:%S')}"
         
-        return metrics_content, status_text
+        # Prepare chart data for store
+        chart_data = {
+            'data': df.to_dict('records'),
+            'VALUE_COL': VALUE_COL,
+            'QTY_COL': QTY_COL,
+            'dealers': sorted(df['Dealer Name'].unique().tolist()) if 'Dealer Name' in df.columns else [],
+            'states': sorted(df['State'].unique().tolist()) if 'State' in df.columns else [],
+            'cities': sorted(df['City'].unique().tolist()) if 'City' in df.columns else [],
+            'categories': sorted(df['Category'].unique().tolist()) if 'Category' in df.columns else [],
+        }
+        
+        return metrics_content, status_text, chart_data
     
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
+        print(f"Error: {str(e)}")
         traceback.print_exc()
-        status_text = f"❌ Error | {datetime.now().strftime('%H:%M:%S')}"
-        return dbc.Alert(f"Error: {str(e)}", color="danger"), status_text
+        status_text = f"Error | {datetime.now().strftime('%H:%M:%S')}"
+        return dbc.Alert(f"Error: {str(e)}", color="danger"), status_text, None
 
 # Toggle Custom Chart Builder Callback
 @app.callback(
@@ -1181,6 +1276,130 @@ def toggle_custom_builder(n, is_open):
     if n:
         return not is_open
     return is_open
+
+# Populate dropdown options from chart data
+@app.callback(
+    Output('dealer-filter', 'options'),
+    Output('dealer-filter', 'value'),
+    Output('state-filter', 'options'),
+    Output('state-filter', 'value'),
+    Output('category-filter', 'options'),
+    Output('category-filter', 'value'),
+    Output('city-filter', 'options'),
+    Output('city-filter', 'value'),
+    Output('dealer-comp-filter', 'options'),
+    Output('dealer-comp-filter', 'value'),
+    Output('city-filter-2', 'options'),
+    Output('city-filter-2', 'value'),
+    Output('category-sunburst-filter', 'options'),
+    Output('category-sunburst-filter', 'value'),
+    Input('chart-data-store', 'data'),
+    prevent_initial_call=True
+)
+def populate_filter_options(chart_data):
+    """Populate all dropdown filters with available options"""
+    if not chart_data:
+        return [], [], [], [], [], [], [], [], [], [], [], [], [], []
+    
+    dealer_options = [{'label': d, 'value': d} for d in chart_data.get('dealers', [])]
+    state_options = [{'label': s, 'value': s} for s in chart_data.get('states', [])]
+    city_options = [{'label': c, 'value': c} for c in chart_data.get('cities', [])]
+    category_options = [{'label': cat, 'value': cat} for cat in chart_data.get('categories', [])]
+    
+    # Return options and None for values (all selected by default)
+    return (
+        dealer_options, None,  # dealer-filter
+        state_options, None,   # state-filter
+        category_options, None,  # category-filter
+        city_options, None,    # city-filter
+        dealer_options, None,  # dealer-comp-filter
+        city_options, None,    # city-filter-2
+        category_options, None  # category-sunburst-filter
+    )
+
+# Update charts based on filter selections
+@app.callback(
+    Output('dealer-pie-chart', 'figure'),
+    Output('state-pie-chart', 'figure'),
+    Output('category-bar-chart', 'figure'),
+    Output('city-bar-chart', 'figure'),
+    Output('dealer-comparison-chart', 'figure'),
+    Output('city-bar-chart-2', 'figure'),
+    Output('category-sunburst-chart', 'figure'),
+    Input('dealer-filter', 'value'),
+    Input('state-filter', 'value'),
+    Input('category-filter', 'value'),
+    Input('city-filter', 'value'),
+    Input('dealer-comp-filter', 'value'),
+    Input('city-filter-2', 'value'),
+    Input('category-sunburst-filter', 'value'),
+    State('chart-data-store', 'data'),
+    prevent_initial_call=True
+)
+def update_filtered_charts(dealer_filter, state_filter, category_filter, city_filter,
+                           dealer_comp_filter, city_filter_2, category_sunburst_filter,
+                           chart_data):
+    """Update all charts based on filter selections"""
+    
+    if not chart_data or not chart_data.get('data'):
+        empty_fig = go.Figure()
+        empty_fig.add_annotation(
+            text="No data available",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, showarrow=False,
+            font={'size': 16, 'color': 'gray'}
+        )
+        return empty_fig, empty_fig, empty_fig, empty_fig, empty_fig, empty_fig, empty_fig
+    
+    # Convert data back to DataFrame
+    df = pd.DataFrame(chart_data['data'])
+    VALUE_COL = chart_data.get('VALUE_COL', 'Value')
+    QTY_COL = chart_data.get('QTY_COL', 'Qty')
+    
+    # Apply filters and create charts
+    # Dealer Pie Chart
+    df_dealer = df.copy()
+    if dealer_filter and len(dealer_filter) > 0:
+        df_dealer = df_dealer[df_dealer['Dealer Name'].isin(dealer_filter)]
+    fig_dealer = _create_dealer_pie(df_dealer, VALUE_COL, limit=10)
+    
+    # State Pie Chart
+    df_state = df.copy()
+    if state_filter and len(state_filter) > 0:
+        df_state = df_state[df_state['State'].isin(state_filter)]
+    fig_state = _create_state_pie(df_state, VALUE_COL)
+    
+    # Category Bar Chart
+    df_category = df.copy()
+    if category_filter and len(category_filter) > 0:
+        df_category = df_category[df_category['Category'].isin(category_filter)]
+    fig_category = _create_category_bar(df_category, VALUE_COL)
+    
+    # City Bar Chart
+    df_city = df.copy()
+    if city_filter and len(city_filter) > 0:
+        df_city = df_city[df_city['City'].isin(city_filter)]
+    fig_city = _create_city_bar(df_city, VALUE_COL)
+    
+    # Dealer Comparison Chart
+    df_dealer_comp = df.copy()
+    if dealer_comp_filter and len(dealer_comp_filter) > 0:
+        df_dealer_comp = df_dealer_comp[df_dealer_comp['Dealer Name'].isin(dealer_comp_filter)]
+    fig_dealer_comp = _create_dealer_comparison(df_dealer_comp, VALUE_COL, QTY_COL)
+    
+    # City Bar Chart 2
+    df_city_2 = df.copy()
+    if city_filter_2 and len(city_filter_2) > 0:
+        df_city_2 = df_city_2[df_city_2['City'].isin(city_filter_2)]
+    fig_city_2 = _create_city_bar(df_city_2, VALUE_COL)
+    
+    # Category Sunburst
+    df_sunburst = df.copy()
+    if category_sunburst_filter and len(category_sunburst_filter) > 0:
+        df_sunburst = df_sunburst[df_sunburst['Category'].isin(category_sunburst_filter)]
+    fig_sunburst = _create_category_sunburst(df_sunburst, VALUE_COL)
+    
+    return fig_dealer, fig_state, fig_category, fig_city, fig_dealer_comp, fig_city_2, fig_sunburst
 
 # Revenue Comparison Chart Callback
 @app.callback(
@@ -1258,7 +1477,7 @@ def update_revenue_comparison(username, password, start_date, end_date, hide_inn
             dbc.CardHeader([
                 dbc.Row([
                     dbc.Col([
-                        html.H5("📈 Revenue Trend Analysis", className="mb-0 fw-bold text-primary")
+                        html.H5("Revenue Trend Analysis", className="mb-0 fw-bold text-primary")
                     ], width=4),
                     dbc.Col([
                         dbc.ButtonGroup([
@@ -1619,7 +1838,7 @@ app.clientside_callback(
     """
     function(n_clicks, chartName, xAxis, yAxis, chartType, aggType, topN, sortDesc) {
         if (!n_clicks || !chartName || !xAxis || !yAxis || !chartType) {
-            return '⚠️ Please fill in chart name and all required fields';
+            return 'Please fill in chart name and all required fields';
         }
         
         try {
@@ -1658,11 +1877,11 @@ app.clientside_callback(
             // Save back to storage
             window.storage.set('my-saved-charts', JSON.stringify(savedCharts), false);
             
-            return '✅ Chart "' + chartName + '" saved successfully! Switch to "My Charts" tab to view it.';
+            return 'Chart "' + chartName + '" saved successfully! Switch to "My Charts" tab to view it.';
             
         } catch (e) {
             console.error('Error saving chart:', e);
-            return '❌ Error saving chart: ' + e.message;
+            return 'Error saving chart: ' + e.message;
         }
     }
     """,
@@ -1859,7 +2078,7 @@ def update_my_charts(username, password, start_date, end_date, hide_innovative, 
                     dbc.CardBody([
                         dcc.Graph(figure=fig, config={'displayModeBar': True}),
                         dbc.Button(
-                            "🗑️ Delete",
+                            "Delete",
                             id={'type': 'delete-chart-btn', 'index': unique_id},
                             color='danger',
                             size='sm',
@@ -1881,7 +2100,7 @@ def update_my_charts(username, password, start_date, end_date, hide_innovative, 
         # Return header and grid of cards
         return html.Div([
             html.Div([
-                html.H4(f"📊 My Saved Charts ({len(chart_cards)})", className="mb-3"),
+                html.H4(f"My Saved Charts ({len(chart_cards)})", className="mb-3"),
                 html.P(f"Showing data from {start_date_str} to {end_date_str}", className="text-muted small mb-4")
             ]),
             dbc.Row([
@@ -2242,7 +2461,7 @@ def _create_india_map(df, metric, level='State', is_bubble=False):
         )
     
     # Update layout
-    apply_modern_chart_style(fig, f"🗺️ {title_suffix} Distribution by {level}", height=600)
+    apply_modern_chart_style(fig, f"{title_suffix} Distribution by {level}", height=600)
     
     fig.update_layout(
         margin=dict(l=0, r=0, t=50, b=0),
@@ -2271,7 +2490,7 @@ def update_map(metric, level, is_bubble, start_date, end_date,
     """Update geographic map based on user selections"""
     try:
         # Debug logging
-        print(f"\n🗺️ MAP CALLBACK TRIGGERED")
+        print(f"\nMAP CALLBACK TRIGGERED")
         print(f"   Metric: {metric}, Level: {level}, Bubble: {is_bubble}")
         print(f"   Dates: {start_date} to {end_date}")
         print(f"   Username: {username}, Hide Innovative: {hide_innovative}")
@@ -2308,7 +2527,7 @@ def update_map(metric, level, is_bubble, start_date, end_date,
         print(f"   API Response success: {response.get('success')}")
         
         if not response.get('success'):
-            print(f"   ❌ API Error: {response.get('message')}")
+            print(f"   API Error: {response.get('message')}")
             empty_fig = go.Figure()
             empty_fig.add_annotation(
                 text="Failed to fetch data from API",
@@ -2329,7 +2548,7 @@ def update_map(metric, level, is_bubble, start_date, end_date,
         print(f"   Data rows received: {len(report_data)}")
         
         if not report_data:
-            print(f"   ❌ No data available")
+            print(f"   No data available")
             empty_fig = go.Figure()
             empty_fig.add_annotation(
                 text="No data available for selected filters",
@@ -3128,41 +3347,57 @@ def _create_enhanced_metric_card(
             # Middle row: Main value and change badge
             html.Div([
                 html.Div([
-                    html.H2(current_value, className="fw-bold mb-0", style={'fontSize': '28px', 'color': '#2c3e50'}),
+                    html.H2(current_value, className="fw-bold mb-0", style={
+                        'fontSize': '24px', 
+                        'color': '#2c3e50',
+                        'lineHeight': '1.2',
+                        'minHeight': '58px',
+                        'display': 'flex',
+                        'alignItems': 'center',
+                        'whiteSpace': 'pre-wrap',
+                        'wordBreak': 'break-word'
+                    }),
                 ], style={'flex': '1'}),
                 html.Div([
                     html.Span(
-                        f"{arrow} {abs(pct_change):.1f}%",
+                        f"{arrow} {abs(pct_change):.1f}%" if pct_change != 0 else "",
                         style={
                             'fontSize': '14px',
                             'fontWeight': 'bold',
                             'color': change_color,
-                            'backgroundColor': f'{change_color}15',
-                            'padding': '4px 8px',
+                            'backgroundColor': f'{change_color}15' if pct_change != 0 else 'transparent',
+                            'padding': '4px 8px' if pct_change != 0 else '0',
                             'borderRadius': '4px',
-                            'border': f'1px solid {change_color}40'
+                            'border': f'1px solid {change_color}40' if pct_change != 0 else 'none',
+                            'minHeight': '28px'
                         }
                     )
-                ])
-            ], style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between', 'marginBottom': '12px'}),
+                ], style={'display': 'flex', 'alignItems': 'flex-start'})
+            ], style={'display': 'flex', 'alignItems': 'flex-start', 'justifyContent': 'space-between', 'marginBottom': '12px'}),
             
-            # Bottom row: Sparkline
-            dcc.Graph(
-                figure=sparkline_fig,
-                config={'displayModeBar': False, 'staticPlot': True},
-                style={'height': '60px', 'marginBottom': '8px'}
-            ),
+            # Bottom row: Sparkline (fixed height container)
+            html.Div([
+                dcc.Graph(
+                    figure=sparkline_fig,
+                    config={'displayModeBar': False, 'staticPlot': True},
+                    style={'height': '60px', 'marginBottom': '8px'}
+                ) if trend_values and len(trend_values) > 0 else html.Div(style={'height': '60px', 'marginBottom': '8px'})
+            ]),
             
             # Date range text
-            html.Small(date_range_text, className="text-muted", style={'fontSize': '11px'})
+            html.Small(date_range_text, className="text-muted", style={'fontSize': '11px', 'display': 'block', 'minHeight': '16px'})
         ], style={
             'background': f'linear-gradient(135deg, {gradient_start} 0%, {gradient_end} 100%)',
-            'borderRadius': '8px'
+            'borderRadius': '8px',
+            'minHeight': '200px',
+            'display': 'flex',
+            'flexDirection': 'column'
         })
     ], style={
         'border': 'none',
         'boxShadow': '0 2px 4px rgba(0,0,0,0.05)',
-        'transition': 'transform 0.2s, box-shadow 0.2s'
+        'transition': 'transform 0.2s, box-shadow 0.2s',
+        'height': '100%'
     })
     
     return card
