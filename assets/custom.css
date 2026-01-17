@@ -470,3 +470,20 @@ span:not(.badge):not(.btn):not(.alert):not([class*="bg-"]):not(.gradient-text),
 div:not(.badge):not(.btn):not(.alert):not(.card-header):not([class*="bg-"]) {
     color: #000000 !important;
 }
+
+/* Plotly hover labels - ensure black text */
+.hoverlayer .hovertext,
+.hoverlayer .hovertext text,
+g.hovertext text,
+.plotly .hovertext,
+.plotly .hovertext text,
+path.hovertext,
+text.hovertext {
+    fill: #000000 !important;
+    color: #000000 !important;
+}
+
+/* Plotly hover background */
+.hoverlayer .hovertext path {
+    fill: white !important;
+}

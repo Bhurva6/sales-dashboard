@@ -2362,6 +2362,12 @@ def _create_india_map(df, metric, level='State', is_bubble=False):
                 f'{title_suffix}: {hover_format}<br>' +
                 'Share: %{customdata[2]:.2f}%<br>' +
                 '<extra></extra>'
+            ),
+            hoverlabel=dict(
+                bgcolor="white",
+                font_size=14,
+                font_family="Inter, sans-serif",
+                font_color="black"
             )
         ))
         
@@ -2440,6 +2446,12 @@ def _create_india_map(df, metric, level='State', is_bubble=False):
                 f'{title_suffix}: {hover_format}<br>' +
                 'Share: %{customdata[2]:.2f}%<br>' +
                 '<extra></extra>'
+            ),
+            hoverlabel=dict(
+                bgcolor="white",
+                font_size=14,
+                font_family="Inter, sans-serif",
+                font_color="black"
             )
         ))
         
@@ -2703,6 +2715,7 @@ def apply_modern_chart_style(fig, title="", height=400):
             bgcolor='white',
             font_size=12,
             font_family='Inter, sans-serif',
+            font_color='black',
             bordercolor='#e5e7eb'
         ),
         xaxis=dict(
