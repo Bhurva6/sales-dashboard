@@ -368,7 +368,11 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
             'meta_keyword': 'Product Name',
             'parent_category': 'Sub Category',
             'cust_id': 'Customer ID',
-            'id': 'Order ID'
+            'id': 'Order ID',
+            'date': 'Date',             # Date field
+            'order_date': 'Date',       # Alternative date field
+            'created_at': 'Date',       # Alternative date field
+            'sale_date': 'Date'         # Alternative date field
         }
         
         # Rename columns that exist in the dataframe
@@ -376,6 +380,15 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
         if rename_dict:
             df = df.rename(columns=rename_dict)
             print(f"   Column mapping applied: {rename_dict}")
+            # Check if any date field was mapped
+            date_fields = ['date', 'order_date', 'created_at', 'sale_date']
+            mapped_date_fields = [field for field in date_fields if field in rename_dict.keys()]
+            if mapped_date_fields:
+                print(f"   Date field(s) found and mapped: {mapped_date_fields}")
+            else:
+                print(f"   ⚠️  No date field found in API response!")
+        else:
+            print(f"   ⚠️  No columns matched for mapping!")
         
         # Convert numeric columns to float
         if 'Value' in df.columns:
@@ -530,8 +543,22 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                 pass
 
         
-        # Check if date data is available
-        has_date_data = 'Date' in df.columns
+        # Check if date data is available and valid
+        has_date_data = False
+        if 'Date' in df.columns:
+            # Convert Date to datetime if not already done
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            # Check if we have any valid dates
+            has_date_data = df['Date'].notna().any()
+        
+        print(f"   Has date data: {has_date_data}")
+        if has_date_data:
+            print(f"   Date column sample: {df['Date'].head()}")
+            print(f"   Valid dates: {df['Date'].notna().sum()} out of {len(df)}")
+        else:
+            print(f"   Available columns: {list(df.columns)}")
+            if 'Date' in df.columns:
+                print(f"   Date column exists but no valid dates found")
         
         # Build dashboard content
         metrics_content = html.Div([
@@ -989,6 +1016,335 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
                     ])
                 ], width=6) if not has_date_data else []),
             ], className="g-2 mb-4"),
+            
+            # Slow-Moving Items Tracker Section - Always visible
+            html.Hr(className="my-4"),
+            html.H4("📦 Slow-Moving Items Tracker", className="mb-3 fw-bold"),
+            html.P("Identify products with low sales velocity to optimize inventory management", className="text-muted mb-4"),
+                
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardHeader([
+                                html.Div([
+                                    html.H6("Slow-Moving Products Analysis", className="mb-2 d-inline-block"),
+                                    dbc.Badge(f"{start_date_str} → {end_date_str}", color="info", className="ms-2")
+                                ])
+                            ]),
+                            dbc.CardBody([
+                                # Enhanced Filters Row
+                                dbc.Row([
+                                    dbc.Col([
+                                        dbc.Label("Inactivity Period", className="fw-bold small"),
+                                        dbc.RadioItems(
+                                            id='slow-moving-days-filter',
+                                            options=[
+                                                {'label': '7 Days', 'value': 7},
+                                                {'label': '15 Days', 'value': 15},
+                                                {'label': '30 Days', 'value': 30},
+                                                {'label': '60 Days', 'value': 60},
+                                                {'label': '90 Days', 'value': 90}
+                                            ],
+                                            value=30,
+                                            inline=True,
+                                            className="mb-2"
+                                        )
+                                    ], width=12)
+                                ], className="mb-3"),
+                                
+                                dbc.Row([
+                                    dbc.Col([
+                                        dbc.Label("Filter by Category", className="fw-bold small"),
+                                        dcc.Dropdown(
+                                            id='slow-moving-category-filter',
+                                            placeholder='All Categories',
+                                            multi=True,
+                                            className='mb-2'
+                                        )
+                                    ], width=4),
+                                    dbc.Col([
+                                        dbc.Label("Filter by Dealer", className="fw-bold small"),
+                                        dcc.Dropdown(
+                                            id='slow-moving-dealer-filter',
+                                            placeholder='All Dealers',
+                                            multi=True,
+                                            className='mb-2'
+                                        )
+                                    ], width=4),
+                                    dbc.Col([
+                                        dbc.Label("Sort By", className="fw-bold small"),
+                                        dbc.Select(
+                                            id='slow-moving-sort-by',
+                                            options=[
+                                                {'label': 'Days Since Last Sale', 'value': 'days'},
+                                                {'label': 'Total Revenue', 'value': 'revenue'},
+                                                {'label': 'Total Quantity', 'value': 'quantity'},
+                                                {'label': 'Sales Velocity', 'value': 'velocity'}
+                                            ],
+                                            value='days',
+                                            className='mb-2'
+                                        )
+                                    ], width=4),
+                                ], className="mb-3"),
+                                
+                                dbc.Row([
+                                    dbc.Col([
+                                        dbc.Label("Show Top N Items", className="fw-bold small"),
+                                        dbc.Input(
+                                            id='slow-moving-top-n',
+                                            type='number',
+                                            min=10,
+                                            max=100,
+                                            step=10,
+                                            value=20,
+                                            className='mb-2'
+                                        )
+                                    ], width=3),
+                                    dbc.Col([
+                                        dbc.Label("Minimum Revenue", className="fw-bold small"),
+                                        dbc.Input(
+                                            id='slow-moving-min-revenue',
+                                            type='number',
+                                            placeholder='Optional',
+                                            className='mb-2'
+                                        )
+                                    ], width=3),
+                                    dbc.Col([
+                                        dbc.Button(
+                                            "Download Report",
+                                            id='slow-moving-download-btn',
+                                            color='success',
+                                            size='sm',
+                                            className='mt-4'
+                                        ),
+                                        dcc.Download(id='slow-moving-download')
+                                    ], width=3),
+                                    dbc.Col([
+                                        dbc.Button(
+                                            "Reset Filters",
+                                            id='slow-moving-reset-btn',
+                                            color='secondary',
+                                            outline=True,
+                                            size='sm',
+                                            className='mt-4'
+                                        )
+                                    ], width=3),
+                                ], className="mb-3"),
+                                
+                                html.Div(id='slow-moving-items-content')
+                            ])
+                        ], className="shadow-sm")
+                    ], width=12)
+                ], className="mb-4"),
+            
+            # Cross-Selling Analysis Section - Always visible
+            html.Hr(className="my-4"),
+            html.H4("🔗 Cross-Selling Analysis", className="mb-3 fw-bold"),
+            html.P("Discover product relationships and frequently bought together items to boost sales opportunities", className="text-muted mb-4"),
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Product Association Analysis", className="mb-2 d-inline-block"),
+                                dbc.Badge(f"{start_date_str} → {end_date_str}", color="info", className="ms-2")
+                            ])
+                        ]),
+                        dbc.CardBody([
+                            # Enhanced Filters Row
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Label("Analysis Type", className="fw-bold small"),
+                                    dbc.RadioItems(
+                                        id='cross-sell-analysis-type',
+                                        options=[
+                                            {'label': 'By Product', 'value': 'product'},
+                                            {'label': 'By Category', 'value': 'category'},
+                                            {'label': 'By Dealer', 'value': 'dealer'}
+                                        ],
+                                        value='product',
+                                        inline=True,
+                                        className="mb-2"
+                                    )
+                                ], width=12)
+                            ], className="mb-3"),
+                            
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Label("Filter by Category", className="fw-bold small"),
+                                    dcc.Dropdown(
+                                        id='cross-sell-category-filter',
+                                        placeholder='All Categories',
+                                        multi=True,
+                                        className='mb-2'
+                                    )
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Label("Filter by Dealer", className="fw-bold small"),
+                                    dcc.Dropdown(
+                                        id='cross-sell-dealer-filter',
+                                        placeholder='All Dealers',
+                                        multi=True,
+                                        className='mb-2'
+                                    )
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Label("Minimum Support (%)", className="fw-bold small"),
+                                    dbc.Input(
+                                        id='cross-sell-min-support',
+                                        type='number',
+                                        min=1,
+                                        max=100,
+                                        step=1,
+                                        value=5,
+                                        className='mb-2'
+                                    )
+                                ], width=4),
+                            ], className="mb-3"),
+                            
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Label("Top N Associations", className="fw-bold small"),
+                                    dbc.Input(
+                                        id='cross-sell-top-n',
+                                        type='number',
+                                        min=5,
+                                        max=50,
+                                        step=5,
+                                        value=10,
+                                        className='mb-2'
+                                    )
+                                ], width=3),
+                                dbc.Col([
+                                    dbc.Label("Minimum Confidence (%)", className="fw-bold small"),
+                                    dbc.Input(
+                                        id='cross-sell-min-confidence',
+                                        type='number',
+                                        min=1,
+                                        max=100,
+                                        step=1,
+                                        value=10,
+                                        className='mb-2'
+                                    )
+                                ], width=3),
+                                dbc.Col([
+                                    dbc.Button(
+                                        "Download Report",
+                                        id='cross-sell-download-btn',
+                                        color='success',
+                                        size='sm',
+                                        className='mt-4'
+                                    ),
+                                    dcc.Download(id='cross-sell-download')
+                                ], width=3),
+                                dbc.Col([
+                                    dbc.Button(
+                                        "Reset Filters",
+                                        id='cross-sell-reset-btn',
+                                        color='secondary',
+                                        outline=True,
+                                        size='sm',
+                                        className='mt-4'
+                                    )
+                                ], width=3),
+                            ], className="mb-3"),
+                            
+                            html.Div(id='cross-sell-content')
+                        ])
+                    ], className="shadow-sm")
+                ], width=12)
+            ], className="mb-4"),
+            
+            # Sales CRM Section
+            html.Hr(className="my-4"),
+            html.H4("💼 Sales CRM", className="mb-3 fw-bold"),
+            html.P("Comprehensive sales transaction management with detailed insights", className="text-muted mb-4"),
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Sales Transactions", className="mb-2 d-inline-block"),
+                                dbc.Badge(f"{start_date_str} → {end_date_str}", color="info", className="ms-2"),
+                                dbc.Badge(f"{len(df):,} Transactions", color="success", className="ms-2")
+                            ])
+                        ]),
+                        dbc.CardBody([
+                            # Filter Controls Row
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Label("Filter by Dealer", className="fw-bold small"),
+                                    dcc.Dropdown(
+                                        id='crm-dealer-filter',
+                                        placeholder='All Dealers',
+                                        multi=True,
+                                        className='mb-2'
+                                    )
+                                ], width=3),
+                                dbc.Col([
+                                    dbc.Label("Filter by State", className="fw-bold small"),
+                                    dcc.Dropdown(
+                                        id='crm-state-filter',
+                                        placeholder='All States',
+                                        multi=True,
+                                        className='mb-2'
+                                    )
+                                ], width=3),
+                                dbc.Col([
+                                    dbc.Label("Filter by Product Family", className="fw-bold small"),
+                                    dcc.Dropdown(
+                                        id='crm-product-family-filter',
+                                        placeholder='All Product Families',
+                                        multi=True,
+                                        className='mb-2'
+                                    )
+                                ], width=3),
+                                dbc.Col([
+                                    dbc.Label("Payment Status", className="fw-bold small"),
+                                    dcc.Dropdown(
+                                        id='crm-payment-status-filter',
+                                        options=[
+                                            {'label': 'All', 'value': 'all'},
+                                            {'label': 'Paid', 'value': 'paid'},
+                                            {'label': 'Pending', 'value': 'pending'},
+                                            {'label': 'Overdue', 'value': 'overdue'}
+                                        ],
+                                        value='all',
+                                        className='mb-2'
+                                    )
+                                ], width=3),
+                            ], className="mb-3"),
+                            
+                            # Search and Export Controls
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.InputGroup([
+                                        dbc.InputGroupText("🔍"),
+                                        dbc.Input(
+                                            id='crm-search-input',
+                                            placeholder="Search across all fields...",
+                                            type="text",
+                                            debounce=True
+                                        )
+                                    ])
+                                ], width=8),
+                                dbc.Col([
+                                    dbc.ButtonGroup([
+                                        dbc.Button("Export CRM Data", id='crm-export-btn', color="success", size="sm"),
+                                        dbc.Button("Clear Filters", id='crm-clear-filters-btn', color="secondary", outline=True, size="sm"),
+                                    ], className="float-end"),
+                                    dcc.Download(id='crm-download')
+                                ], width=4),
+                            ], className="mb-3"),
+                            
+                            # CRM Table
+                            html.Div(id='crm-table-container')
+                        ])
+                    ], className="shadow-sm")
+                ], width=12)
+            ], className="mb-4"),
             
             # Custom Chart Builder Section
             html.Hr(),
@@ -2112,6 +2468,1175 @@ def update_my_charts(username, password, start_date, end_date, hide_innovative, 
         print(f"Error in update_my_charts: {str(e)}")
         traceback.print_exc()
         return dbc.Alert(f"Error loading My Charts: {str(e)}", color="danger")
+
+# Slow-Moving Items Tracker Callback
+@app.callback(
+    Output('slow-moving-items-content', 'children'),
+    Output('slow-moving-category-filter', 'options'),
+    Output('slow-moving-dealer-filter', 'options'),
+    Input('slow-moving-days-filter', 'value'),
+    Input('slow-moving-category-filter', 'value'),
+    Input('slow-moving-dealer-filter', 'value'),
+    Input('slow-moving-sort-by', 'value'),
+    Input('slow-moving-top-n', 'value'),
+    Input('slow-moving-min-revenue', 'value'),
+    Input('username-input', 'value'),
+    Input('password-input', 'value'),
+    Input('date-range-picker', 'start_date'),
+    Input('date-range-picker', 'end_date'),
+    Input('hide-innovative-check', 'value'),
+    prevent_initial_call=False
+)
+def update_slow_moving_items(days_filter, category_filter, dealer_filter, sort_by, top_n, 
+                            min_revenue, username, password, start_date, end_date, hide_innovative):
+    """Analyze slow-moving items based on sales velocity with enhanced filters"""
+    
+    if not start_date or not end_date:
+        return dbc.Alert("Please select date range", color="warning"), [], []
+    
+    try:
+        # Convert dates
+        start_date_obj = pd.to_datetime(start_date)
+        end_date_obj = pd.to_datetime(end_date)
+        start_date_str = start_date_obj.strftime("%d-%m-%Y")
+        end_date_str = end_date_obj.strftime("%d-%m-%Y")
+        
+        # Fetch data from API
+        api_client = APIClient(username=username, password=password)
+        response = api_client.get_sales_report(
+            start_date=start_date_str,
+            end_date=end_date_str
+        )
+        
+        if not response.get('success'):
+            return dbc.Alert(f"API Error: {response.get('message')}", color="danger"), [], []
+        
+        api_response = response.get('data', {})
+        report_data = api_response.get('report_data', [])
+        
+        if not report_data:
+            return dbc.Alert("No data available for this date range", color="warning"), [], []
+        
+        df = pd.DataFrame(report_data)
+        
+        # Map columns
+        column_mapping = {
+            'SV': 'Value', 'SQ': 'Qty', 'comp_nm': 'Dealer Name',
+            'category_name': 'Category', 'state': 'State', 'city': 'City',
+            'meta_keyword': 'Product Name', 'parent_category': 'Sub Category',
+            'date': 'Date', 'order_date': 'Date', 'created_at': 'Date', 'sale_date': 'Date'
+        }
+        df = df.rename(columns={old: new for old, new in column_mapping.items() if old in df.columns})
+        
+        # Convert numeric columns
+        if 'Value' in df.columns:
+            df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+        if 'Qty' in df.columns:
+            df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
+        
+        # Apply filter
+        if hide_innovative and 'Dealer Name' in df.columns:
+            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Get filter options
+        category_options = []
+        dealer_options = []
+        if 'Category' in df.columns:
+            category_options = [{'label': cat, 'value': cat} for cat in sorted(df['Category'].dropna().unique())]
+        if 'Dealer Name' in df.columns:
+            dealer_options = [{'label': dealer, 'value': dealer} for dealer in sorted(df['Dealer Name'].dropna().unique())]
+        
+        # Check for required columns
+        if 'Date' not in df.columns or 'Product Name' not in df.columns:
+            return dbc.Alert("Date or Product Name data not available", color="warning"), category_options, dealer_options
+        
+        # Convert Date column
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df = df.dropna(subset=['Date'])
+        
+        if df.empty:
+            return dbc.Alert("No valid date data available", color="warning"), category_options, dealer_options
+        
+        VALUE_COL = 'Value' if 'Value' in df.columns else None
+        QTY_COL = 'Qty' if 'Qty' in df.columns else None
+        
+        if not VALUE_COL or not QTY_COL:
+            return dbc.Alert("Revenue or Quantity data not available", color="warning"), category_options, dealer_options
+        
+        # Apply category filter
+        if category_filter and 'Category' in df.columns:
+            df = df[df['Category'].isin(category_filter)]
+        
+        # Apply dealer filter
+        if dealer_filter and 'Dealer Name' in df.columns:
+            df = df[df['Dealer Name'].isin(dealer_filter)]
+        
+        # Calculate date range
+        date_range_days = (end_date_obj - start_date_obj).days + 1
+        
+        # Group by product with additional fields
+        agg_dict = {
+            VALUE_COL: 'sum',
+            QTY_COL: 'sum',
+            'Date': ['min', 'max', 'count']
+        }
+        
+        # Add category and dealer if available
+        if 'Category' in df.columns:
+            agg_dict['Category'] = 'first'
+        if 'Dealer Name' in df.columns:
+            agg_dict['Dealer Name'] = lambda x: ', '.join(x.unique()[:3])  # Top 3 dealers
+        
+        product_analysis = df.groupby('Product Name').agg(agg_dict).reset_index()
+        
+        # Flatten column names
+        product_analysis.columns = ['Product Name', 'Total Revenue', 'Total Quantity', 'First Sale', 'Last Sale', 'Order Count'] + \
+                                   (['Category'] if 'Category' in df.columns else []) + \
+                                   (['Dealers'] if 'Dealer Name' in df.columns else [])
+        
+        # Calculate days since last sale
+        product_analysis['Days Since Last Sale'] = (end_date_obj - product_analysis['Last Sale']).dt.days
+        
+        # Calculate sales velocity (quantity per day)
+        product_analysis['Sales Velocity'] = product_analysis['Total Quantity'] / date_range_days
+        
+        # Calculate average order value
+        product_analysis['Avg Order Value'] = product_analysis['Total Revenue'] / product_analysis['Order Count']
+        
+        # Filter slow-moving items (based on days filter)
+        slow_moving = product_analysis[product_analysis['Days Since Last Sale'] >= days_filter].copy()
+        
+        # Apply minimum revenue filter
+        if min_revenue:
+            try:
+                slow_moving = slow_moving[slow_moving['Total Revenue'] >= float(min_revenue)]
+            except:
+                pass
+        
+        # Sort based on selected criteria
+        sort_column_map = {
+            'days': 'Days Since Last Sale',
+            'revenue': 'Total Revenue',
+            'quantity': 'Total Quantity',
+            'velocity': 'Sales Velocity'
+        }
+        sort_column = sort_column_map.get(sort_by, 'Days Since Last Sale')
+        ascending = False if sort_by in ['revenue', 'quantity', 'velocity'] else False
+        slow_moving = slow_moving.sort_values(sort_column, ascending=ascending)
+        
+        # Limit to top N
+        top_n = top_n or 20
+        slow_moving_display = slow_moving.head(top_n)
+        
+        if slow_moving.empty:
+            return dbc.Alert(
+                f"✅ Great! No products found with no sales in the last {days_filter} days",
+                color="success"
+            ), category_options, dealer_options
+        
+        # Create visualizations
+        # 1. Summary cards
+        summary_cards = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-box-seam", style={'fontSize': '24px', 'color': '#ef4444'}),
+                        html.H3(f"{len(slow_moving)}", className="text-danger mb-0 mt-2"),
+                        html.P("Slow-Moving Products", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-calendar-x", style={'fontSize': '24px', 'color': '#f59e0b'}),
+                        html.H3(f"{slow_moving['Days Since Last Sale'].mean():.0f}", className="text-warning mb-0 mt-2"),
+                        html.P("Avg Days Since Sale", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-currency-rupee", style={'fontSize': '24px', 'color': '#3b82f6'}),
+                        html.H3(format_inr(slow_moving['Total Revenue'].sum()), className="text-info mb-0 mt-2"),
+                        html.P("Total Revenue Impact", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-graph-down", style={'fontSize': '24px', 'color': '#6366f1'}),
+                        html.H3(f"{slow_moving['Total Quantity'].sum():,.0f}", className="text-secondary mb-0 mt-2"),
+                        html.P("Total Units", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+        ], className="mb-4 g-2")
+        
+        # 2. Chart showing days since last sale (or other metric based on sort)
+        fig_bar = go.Figure()
+        
+        # Determine what to display based on sort_by
+        if sort_by == 'revenue':
+            y_values = slow_moving_display['Total Revenue']
+            y_label = "Revenue (₹)"
+            color_values = slow_moving_display['Total Revenue']
+            text_format = lambda x: format_inr(x)
+        elif sort_by == 'quantity':
+            y_values = slow_moving_display['Total Quantity']
+            y_label = "Quantity"
+            color_values = slow_moving_display['Total Quantity']
+            text_format = lambda x: f"{x:,.0f}"
+        elif sort_by == 'velocity':
+            y_values = slow_moving_display['Sales Velocity']
+            y_label = "Sales Velocity (units/day)"
+            color_values = slow_moving_display['Sales Velocity']
+            text_format = lambda x: f"{x:.2f}/day"
+        else:
+            y_values = slow_moving_display['Days Since Last Sale']
+            y_label = "Days Since Last Sale"
+            color_values = slow_moving_display['Days Since Last Sale']
+            text_format = lambda x: f"{x:.0f} days"
+        
+        fig_bar.add_trace(go.Bar(
+            x=y_values,
+            y=slow_moving_display['Product Name'],
+            orientation='h',
+            marker=dict(
+                color=color_values,
+                colorscale=[[0, '#10b981'], [0.5, '#f59e0b'], [1, '#ef4444']],
+                showscale=True,
+                colorbar=dict(title=y_label, thickness=15)
+            ),
+            text=[text_format(v) for v in y_values],
+            textposition='outside',
+            hovertemplate='<b>%{y}</b><br>' + y_label + ': %{x}<br><extra></extra>'
+        ))
+        
+        chart_title = f"Top {top_n} Slow-Moving Products (No Sales in Last {days_filter}+ Days)"
+        if sort_by != 'days':
+            chart_title = f"Top {top_n} Slow-Moving Products by {y_label}"
+        
+        apply_modern_chart_style(fig_bar, chart_title, height=max(400, top_n * 20))
+        fig_bar.update_xaxes(title=y_label)
+        fig_bar.update_yaxes(title="", tickfont=dict(size=9))
+        fig_bar.update_layout(margin=dict(l=250, r=40, t=60, b=40))
+        
+        # 3. Additional pie chart - Category distribution of slow-moving items
+        fig_pie = None
+        if 'Category' in slow_moving.columns:
+            category_dist = slow_moving.groupby('Category')['Total Revenue'].sum().reset_index()
+            category_dist = category_dist.sort_values('Total Revenue', ascending=False)
+            
+            fig_pie = go.Figure(data=[go.Pie(
+                labels=category_dist['Category'],
+                values=category_dist['Total Revenue'],
+                hole=0.4,
+                marker=dict(colors=px.colors.qualitative.Set3),
+                textinfo='label+percent',
+                hovertemplate='<b>%{label}</b><br>Revenue: ₹%{value:,.0f}<br>%{percent}<extra></extra>'
+            )])
+            
+            apply_modern_chart_style(fig_pie, "Slow-Moving Items by Category", height=400)
+        
+        # 4. Data table
+        table_data = slow_moving_display.copy()
+        table_data['Total Revenue'] = table_data['Total Revenue'].apply(lambda x: f"₹ {x:,.0f}")
+        table_data['Total Quantity'] = table_data['Total Quantity'].apply(lambda x: f"{x:,.0f}")
+        table_data['Sales Velocity'] = table_data['Sales Velocity'].apply(lambda x: f"{x:.2f}/day")
+        table_data['Avg Order Value'] = table_data['Avg Order Value'].apply(lambda x: f"₹ {x:,.0f}")
+        table_data['First Sale'] = table_data['First Sale'].dt.strftime('%d-%b-%Y')
+        table_data['Last Sale'] = table_data['Last Sale'].dt.strftime('%d-%b-%Y')
+        
+        # Select columns for display
+        display_columns = ['Product Name', 'Days Since Last Sale', 'Last Sale', 'Total Revenue', 
+                         'Total Quantity', 'Order Count', 'Sales Velocity']
+        if 'Category' in table_data.columns:
+            display_columns.insert(1, 'Category')
+        
+        table = dbc.Table.from_dataframe(
+            table_data[display_columns],
+            striped=True,
+            bordered=True,
+            hover=True,
+            size='sm',
+            style={'fontSize': '11px'}
+        )
+        
+        # Return layout
+        content = html.Div([
+            summary_cards,
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            dcc.Graph(figure=fig_bar, config={'displayModeBar': True})
+                        ])
+                    ], className="shadow-sm")
+                ], width=8 if fig_pie else 12),
+                
+                # Category pie chart
+                *([] if not fig_pie else [dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            dcc.Graph(figure=fig_pie, config={'displayModeBar': True})
+                        ])
+                    ], className="shadow-sm")
+                ], width=4)])
+            ], className="mb-3 g-2"),
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.H6(f"Detailed Slow-Moving Items Report (Showing {len(slow_moving_display)} of {len(slow_moving)})", className="mb-0")
+                        ]),
+                        dbc.CardBody([
+                            html.Div(table, style={'maxHeight': '500px', 'overflowY': 'auto'})
+                        ])
+                    ], className="shadow-sm")
+                ], width=12)
+            ])
+        ])
+        
+        return content, category_options, dealer_options
+        
+    except Exception as e:
+        print(f"Error in slow-moving items: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return dbc.Alert(f"Error analyzing slow-moving items: {str(e)}", color="danger"), [], []
+
+# Reset Slow-Moving Items Filters Callback
+@app.callback(
+    Output('slow-moving-category-filter', 'value'),
+    Output('slow-moving-dealer-filter', 'value'),
+    Output('slow-moving-sort-by', 'value'),
+    Output('slow-moving-top-n', 'value'),
+    Output('slow-moving-min-revenue', 'value'),
+    Output('slow-moving-days-filter', 'value'),
+    Input('slow-moving-reset-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def reset_slow_moving_filters(n_clicks):
+    """Reset all slow-moving items filters to default values"""
+    if n_clicks:
+        return None, None, 'days', 20, None, 30
+    return no_update, no_update, no_update, no_update, no_update, no_update
+
+# Download Slow-Moving Items Report Callback
+@app.callback(
+    Output('slow-moving-download', 'data'),
+    Input('slow-moving-download-btn', 'n_clicks'),
+    State('chart-data-store', 'data'),
+    State('slow-moving-days-filter', 'value'),
+    State('date-range-picker', 'start_date'),
+    State('date-range-picker', 'end_date'),
+    prevent_initial_call=True
+)
+def download_slow_moving_report(n_clicks, chart_data, days_filter, start_date, end_date):
+    """Download slow-moving items report as CSV"""
+    if not n_clicks or not chart_data:
+        return no_update
+    
+    try:
+        df = pd.DataFrame(chart_data['data'])
+        VALUE_COL = chart_data.get('VALUE_COL')
+        QTY_COL = chart_data.get('QTY_COL')
+        
+        if df.empty or not VALUE_COL or not QTY_COL:
+            return no_update
+        
+        # Convert Date column
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+            df = df.dropna(subset=['Date'])
+        
+        if df.empty:
+            return no_update
+        
+        start_date_obj = pd.to_datetime(start_date)
+        end_date_obj = pd.to_datetime(end_date)
+        date_range_days = (end_date_obj - start_date_obj).days + 1
+        
+        # Group by product
+        product_analysis = df.groupby('Product Name').agg({
+            VALUE_COL: 'sum',
+            QTY_COL: 'sum',
+            'Date': ['min', 'max', 'count']
+        }).reset_index()
+        
+        product_analysis.columns = ['Product Name', 'Total Revenue', 'Total Quantity', 'First Sale', 'Last Sale', 'Order Count']
+        product_analysis['Days Since Last Sale'] = (end_date_obj - product_analysis['Last Sale']).dt.days
+        product_analysis['Sales Velocity'] = product_analysis['Total Quantity'] / date_range_days
+        product_analysis['Avg Order Value'] = product_analysis['Total Revenue'] / product_analysis['Order Count']
+        
+        # Filter slow-moving items
+        slow_moving = product_analysis[product_analysis['Days Since Last Sale'] >= days_filter].copy()
+        slow_moving = slow_moving.sort_values('Days Since Last Sale', ascending=False)
+        
+        # Format dates
+        slow_moving['First Sale'] = slow_moving['First Sale'].dt.strftime('%d-%b-%Y')
+        slow_moving['Last Sale'] = slow_moving['Last Sale'].dt.strftime('%d-%b-%Y')
+        
+        # Generate filename
+        filename = f"slow_moving_items_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        
+        return dcc.send_data_frame(slow_moving.to_csv, filename, index=False)
+        
+    except Exception as e:
+        print(f"Error downloading report: {str(e)}")
+        return no_update
+
+# Cross-Selling Analysis Callback
+@app.callback(
+    Output('cross-sell-content', 'children'),
+    Output('cross-sell-category-filter', 'options'),
+    Output('cross-sell-dealer-filter', 'options'),
+    Input('cross-sell-analysis-type', 'value'),
+    Input('cross-sell-category-filter', 'value'),
+    Input('cross-sell-dealer-filter', 'value'),
+    Input('cross-sell-min-support', 'value'),
+    Input('cross-sell-min-confidence', 'value'),
+    Input('cross-sell-top-n', 'value'),
+    Input('username-input', 'value'),
+    Input('password-input', 'value'),
+    Input('date-range-picker', 'start_date'),
+    Input('date-range-picker', 'end_date'),
+    Input('hide-innovative-check', 'value'),
+    prevent_initial_call=False
+)
+def update_cross_selling_analysis(analysis_type, category_filter, dealer_filter, min_support, 
+                                  min_confidence, top_n, username, password, start_date, end_date, hide_innovative):
+    """Analyze cross-selling patterns and product associations"""
+    
+    if not start_date or not end_date:
+        return dbc.Alert("Please select date range", color="warning"), [], []
+    
+    try:
+        # Convert dates
+        start_date_obj = pd.to_datetime(start_date)
+        end_date_obj = pd.to_datetime(end_date)
+        start_date_str = start_date_obj.strftime("%d-%m-%Y")
+        end_date_str = end_date_obj.strftime("%d-%m-%Y")
+        
+        # Fetch data from API
+        api_client = APIClient(username=username, password=password)
+        response = api_client.get_sales_report(
+            start_date=start_date_str,
+            end_date=end_date_str
+        )
+        
+        if not response.get('success'):
+            return dbc.Alert(f"API Error: {response.get('message')}", color="danger"), [], []
+        
+        api_response = response.get('data', {})
+        report_data = api_response.get('report_data', [])
+        
+        if not report_data:
+            return dbc.Alert("No data available for this date range", color="warning"), [], []
+        
+        df = pd.DataFrame(report_data)
+        
+        # Map columns
+        column_mapping = {
+            'SV': 'Value', 'SQ': 'Qty', 'comp_nm': 'Dealer Name',
+            'category_name': 'Category', 'state': 'State', 'city': 'City',
+            'meta_keyword': 'Product Name', 'parent_category': 'Sub Category',
+            'cust_id': 'Customer ID', 'id': 'Order ID',
+            'date': 'Date', 'order_date': 'Date', 'created_at': 'Date', 'sale_date': 'Date'
+        }
+        df = df.rename(columns={old: new for old, new in column_mapping.items() if old in df.columns})
+        
+        # Convert numeric columns
+        if 'Value' in df.columns:
+            df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+        if 'Qty' in df.columns:
+            df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
+        
+        # Apply filter
+        if hide_innovative and 'Dealer Name' in df.columns:
+            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Prepare filter options
+        category_options = []
+        dealer_options = []
+        
+        if 'Category' in df.columns:
+            categories = sorted(df['Category'].dropna().unique().tolist())
+            category_options = [{'label': cat, 'value': cat} for cat in categories]
+        
+        if 'Dealer Name' in df.columns:
+            dealers = sorted(df['Dealer Name'].dropna().unique().tolist())
+            dealer_options = [{'label': dealer, 'value': dealer} for dealer in dealers]
+        
+        # Apply filters
+        filtered_df = df.copy()
+        if category_filter and len(category_filter) > 0 and 'Category' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['Category'].isin(category_filter)]
+        
+        if dealer_filter and len(dealer_filter) > 0 and 'Dealer Name' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['Dealer Name'].isin(dealer_filter)]
+        
+        # Check required columns
+        if 'Product Name' not in filtered_df.columns or 'Order ID' not in filtered_df.columns:
+            return dbc.Alert("Required columns (Product Name, Order ID) not found in data", color="warning"), category_options, dealer_options
+        
+        if len(filtered_df) == 0:
+            return dbc.Alert("No data available with current filters", color="warning"), category_options, dealer_options
+        
+        # Group by order/customer to find associations
+        if analysis_type == 'product':
+            group_col = 'Product Name'
+            entity_col = 'Order ID'
+        elif analysis_type == 'category':
+            group_col = 'Category'
+            entity_col = 'Order ID'
+        else:  # dealer
+            group_col = 'Product Name'
+            entity_col = 'Dealer Name'
+        
+        # Create transaction lists (items bought together)
+        transactions = filtered_df.groupby(entity_col)[group_col].apply(list).tolist()
+        
+        # Calculate item frequencies
+        from collections import Counter
+        item_counts = Counter()
+        for transaction in transactions:
+            for item in set(transaction):  # Use set to count each item once per transaction
+                item_counts[item] += 1
+        
+        total_transactions = len(transactions)
+        
+        # Find associations (items that appear together)
+        associations = []
+        
+        for transaction in transactions:
+            unique_items = list(set(transaction))
+            # Generate pairs
+            for i in range(len(unique_items)):
+                for j in range(i + 1, len(unique_items)):
+                    item1, item2 = unique_items[i], unique_items[j]
+                    associations.append((item1, item2))
+        
+        # Count pair frequencies
+        pair_counts = Counter(associations)
+        
+        # Calculate support and confidence
+        association_rules = []
+        
+        min_support_count = (min_support / 100) * total_transactions
+        
+        for (item1, item2), count in pair_counts.items():
+            support = (count / total_transactions) * 100
+            
+            if support >= min_support:
+                # Confidence: P(item2 | item1)
+                confidence1 = (count / item_counts[item1]) * 100
+                # Confidence: P(item1 | item2)
+                confidence2 = (count / item_counts[item2]) * 100
+                
+                # Get revenue data for these items
+                item1_revenue = filtered_df[filtered_df[group_col] == item1]['Value'].sum()
+                item2_revenue = filtered_df[filtered_df[group_col] == item2]['Value'].sum()
+                
+                if confidence1 >= min_confidence:
+                    association_rules.append({
+                        'Item A': item1,
+                        'Item B': item2,
+                        'Support (%)': round(support, 2),
+                        'Confidence (%)': round(confidence1, 2),
+                        'Frequency': count,
+                        'Item A Revenue': item1_revenue,
+                        'Item B Revenue': item2_revenue,
+                        'Direction': 'A→B'
+                    })
+                
+                if confidence2 >= min_confidence:
+                    association_rules.append({
+                        'Item A': item2,
+                        'Item B': item1,
+                        'Support (%)': round(support, 2),
+                        'Confidence (%)': round(confidence2, 2),
+                        'Frequency': count,
+                        'Item A Revenue': item2_revenue,
+                        'Item B Revenue': item1_revenue,
+                        'Direction': 'B→A'
+                    })
+        
+        if len(association_rules) == 0:
+            return html.Div([
+                dbc.Alert([
+                    html.H5("No Associations Found", className="mb-2"),
+                    html.P("Try adjusting the minimum support or confidence thresholds to discover more patterns.")
+                ], color="info")
+            ]), category_options, dealer_options
+        
+        # Convert to DataFrame and sort
+        assoc_df = pd.DataFrame(association_rules)
+        assoc_df = assoc_df.sort_values('Confidence (%)', ascending=False).head(top_n)
+        
+        # Create visualizations
+        # 1. Summary Cards
+        total_associations = len(assoc_df)
+        avg_confidence = assoc_df['Confidence (%)'].mean()
+        avg_support = assoc_df['Support (%)'].mean()
+        most_common_item = assoc_df['Item A'].mode()[0] if len(assoc_df) > 0 else "N/A"
+        
+        summary_cards = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.Div([
+                            html.I(className="bi bi-diagram-3", style={'fontSize': '32px', 'color': COLORS['primary']}),
+                            html.H3(f"{total_associations}", className="mt-2 mb-0"),
+                            html.P("Associations Found", className="text-muted mb-0 small")
+                        ], className="text-center")
+                    ])
+                ], className="shadow-sm h-100")
+            ], width=3),
+            
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.Div([
+                            html.I(className="bi bi-graph-up-arrow", style={'fontSize': '32px', 'color': COLORS['success']}),
+                            html.H3(f"{avg_confidence:.1f}%", className="mt-2 mb-0"),
+                            html.P("Avg Confidence", className="text-muted mb-0 small")
+                        ], className="text-center")
+                    ])
+                ], className="shadow-sm h-100")
+            ], width=3),
+            
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.Div([
+                            html.I(className="bi bi-bar-chart", style={'fontSize': '32px', 'color': COLORS['info']}),
+                            html.H3(f"{avg_support:.1f}%", className="mt-2 mb-0"),
+                            html.P("Avg Support", className="text-muted mb-0 small")
+                        ], className="text-center")
+                    ])
+                ], className="shadow-sm h-100")
+            ], width=3),
+            
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.Div([
+                            html.I(className="bi bi-star-fill", style={'fontSize': '32px', 'color': COLORS['warning']}),
+                            html.H6(most_common_item[:20], className="mt-2 mb-0", style={'fontSize': '16px'}),
+                            html.P("Top Item", className="text-muted mb-0 small")
+                        ], className="text-center")
+                    ])
+                ], className="shadow-sm h-100")
+            ], width=3),
+        ], className="g-2 mb-4")
+        
+        # 2. Network/Chord Diagram - Using Sankey as relation chart
+        import plotly.graph_objects as go
+        
+        # Prepare data for Sankey diagram
+        unique_items = list(set(assoc_df['Item A'].tolist() + assoc_df['Item B'].tolist()))
+        item_to_idx = {item: idx for idx, item in enumerate(unique_items)}
+        
+        source_indices = [item_to_idx[item] for item in assoc_df['Item A'].tolist()]
+        target_indices = [item_to_idx[item] for item in assoc_df['Item B'].tolist()]
+        values = assoc_df['Confidence (%)'].tolist()
+        
+        # Create color scheme for links based on confidence
+        link_colors = []
+        for conf in assoc_df['Confidence (%)']:
+            if conf >= 50:
+                link_colors.append('rgba(46, 204, 113, 0.4)')  # Green for high confidence
+            elif conf >= 30:
+                link_colors.append('rgba(52, 152, 219, 0.4)')  # Blue for medium
+            else:
+                link_colors.append('rgba(241, 196, 15, 0.4)')  # Yellow for low
+        
+        sankey_fig = go.Figure(data=[go.Sankey(
+            node=dict(
+                pad=15,
+                thickness=20,
+                line=dict(color="white", width=0.5),
+                label=[item[:30] + "..." if len(item) > 30 else item for item in unique_items],
+                color=COLORS['primary']
+            ),
+            link=dict(
+                source=source_indices,
+                target=target_indices,
+                value=values,
+                color=link_colors,
+                customdata=assoc_df[['Item A', 'Item B', 'Confidence (%)', 'Support (%)']].values,
+                hovertemplate='%{customdata[0]} → %{customdata[1]}<br>Confidence: %{customdata[2]:.1f}%<br>Support: %{customdata[3]:.1f}%<extra></extra>'
+            )
+        )])
+        
+        sankey_fig.update_layout(
+            title=f"Product Association Network ({analysis_type.title()} Level)",
+            font=dict(size=12),
+            height=500,
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
+        
+        # 3. Bar chart - Top associations by confidence
+        bar_fig = px.bar(
+            assoc_df.head(15),
+            x='Confidence (%)',
+            y=assoc_df.head(15).apply(lambda row: f"{row['Item A'][:20]} → {row['Item B'][:20]}", axis=1),
+            color='Support (%)',
+            color_continuous_scale='Viridis',
+            orientation='h',
+            title=f"Top {min(15, len(assoc_df))} Product Associations by Confidence",
+            labels={'y': 'Association', 'Confidence (%)': 'Confidence'},
+            height=400
+        )
+        bar_fig.update_layout(
+            yaxis={'categoryorder': 'total ascending'},
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
+        
+        # 4. Scatter plot - Support vs Confidence
+        scatter_fig = px.scatter(
+            assoc_df,
+            x='Support (%)',
+            y='Confidence (%)',
+            size='Frequency',
+            color='Frequency',
+            hover_data=['Item A', 'Item B'],
+            title="Association Rules: Support vs Confidence",
+            color_continuous_scale='Sunset',
+            height=400
+        )
+        scatter_fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
+        
+        # 5. Data Table
+        table_data = assoc_df.to_dict('records')
+        
+        table = html.Div([
+            dag.AgGrid(
+                rowData=table_data,
+                columnDefs=[
+                    {'headerName': 'Item A', 'field': 'Item A', 'filter': True, 'sortable': True, 'width': 200},
+                    {'headerName': 'Item B', 'field': 'Item B', 'filter': True, 'sortable': True, 'width': 200},
+                    {'headerName': 'Confidence (%)', 'field': 'Confidence (%)', 'filter': True, 'sortable': True, 'width': 130},
+                    {'headerName': 'Support (%)', 'field': 'Support (%)', 'filter': True, 'sortable': True, 'width': 120},
+                    {'headerName': 'Frequency', 'field': 'Frequency', 'filter': True, 'sortable': True, 'width': 110},
+                    {'headerName': 'Item A Revenue', 'field': 'Item A Revenue', 'filter': True, 'sortable': True, 'width': 150,
+                     'valueFormatter': {'function': "d3.format('₹,.0f')(params.value)"}},
+                    {'headerName': 'Item B Revenue', 'field': 'Item B Revenue', 'filter': True, 'sortable': True, 'width': 150,
+                     'valueFormatter': {'function': "d3.format('₹,.0f')(params.value)"}},
+                ],
+                defaultColDef={'resizable': True, 'sortable': True, 'filter': True},
+                dashGridOptions={'pagination': True, 'paginationPageSize': 10},
+                className="ag-theme-alpine",
+                style={'height': '400px'}
+            )
+        ])
+        
+        # Build content
+        content = html.Div([
+            summary_cards,
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            dcc.Graph(figure=sankey_fig, config={'displayModeBar': True})
+                        ])
+                    ], className="shadow-sm")
+                ], width=12)
+            ], className="mb-4"),
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            dcc.Graph(figure=bar_fig, config={'displayModeBar': True})
+                        ])
+                    ], className="shadow-sm")
+                ], width=6),
+                
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            dcc.Graph(figure=scatter_fig, config={'displayModeBar': True})
+                        ])
+                    ], className="shadow-sm")
+                ], width=6),
+            ], className="g-2 mb-4"),
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.H6(f"Detailed Association Rules (Showing {len(assoc_df)} rules)", className="mb-0")
+                        ]),
+                        dbc.CardBody([
+                            table
+                        ])
+                    ], className="shadow-sm")
+                ], width=12)
+            ])
+        ])
+        
+        return content, category_options, dealer_options
+        
+    except Exception as e:
+        print(f"Error in cross-selling analysis: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return dbc.Alert(f"Error analyzing cross-selling patterns: {str(e)}", color="danger"), [], []
+
+# Reset Cross-Selling Filters Callback
+@app.callback(
+    Output('cross-sell-category-filter', 'value'),
+    Output('cross-sell-dealer-filter', 'value'),
+    Output('cross-sell-analysis-type', 'value'),
+    Output('cross-sell-min-support', 'value'),
+    Output('cross-sell-min-confidence', 'value'),
+    Output('cross-sell-top-n', 'value'),
+    Input('cross-sell-reset-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def reset_cross_sell_filters(n_clicks):
+    """Reset all cross-selling filters to default values"""
+    if n_clicks:
+        return None, None, 'product', 5, 10, 10
+    return no_update, no_update, no_update, no_update, no_update, no_update
+
+# Download Cross-Selling Report Callback
+@app.callback(
+    Output('cross-sell-download', 'data'),
+    Input('cross-sell-download-btn', 'n_clicks'),
+    State('chart-data-store', 'data'),
+    State('cross-sell-analysis-type', 'value'),
+    State('date-range-picker', 'start_date'),
+    State('date-range-picker', 'end_date'),
+    prevent_initial_call=True
+)
+def download_cross_sell_report(n_clicks, chart_data, analysis_type, start_date, end_date):
+    """Download cross-selling analysis report as CSV"""
+    
+    if not n_clicks or not chart_data:
+        return no_update
+    
+    try:
+        # This would contain the actual association rules data
+        # For now, return a simple message
+        import io
+        
+        output = io.StringIO()
+        output.write(f"Cross-Selling Analysis Report\n")
+        output.write(f"Date Range: {start_date} to {end_date}\n")
+        output.write(f"Analysis Type: {analysis_type}\n")
+        output.write(f"\nNote: Detailed association rules will be included in future versions.\n")
+        
+        return dict(content=output.getvalue(), filename=f"cross_sell_analysis_{start_date}_{end_date}.csv")
+    
+    except Exception as e:
+        print(f"Error downloading cross-sell report: {str(e)}")
+        return no_update
+
+# Sales CRM Callback
+@app.callback(
+    Output('crm-table-container', 'children'),
+    Output('crm-dealer-filter', 'options'),
+    Output('crm-state-filter', 'options'),
+    Output('crm-product-family-filter', 'options'),
+    Input('crm-dealer-filter', 'value'),
+    Input('crm-state-filter', 'value'),
+    Input('crm-product-family-filter', 'value'),
+    Input('crm-payment-status-filter', 'value'),
+    Input('crm-search-input', 'value'),
+    Input('username-input', 'value'),
+    Input('password-input', 'value'),
+    Input('date-range-picker', 'start_date'),
+    Input('date-range-picker', 'end_date'),
+    Input('hide-innovative-check', 'value'),
+    prevent_initial_call=False
+)
+def update_crm_table(dealer_filter, state_filter, product_family_filter, payment_status_filter, 
+                     search_input, username, password, start_date, end_date, hide_innovative):
+    """Update the Sales CRM table with filtered data"""
+    
+    if not start_date or not end_date:
+        return dbc.Alert("Please select date range", color="warning"), [], [], []
+    
+    try:
+        # Convert dates
+        start_date_obj = pd.to_datetime(start_date)
+        end_date_obj = pd.to_datetime(end_date)
+        start_date_str = start_date_obj.strftime("%d-%m-%Y")
+        end_date_str = end_date_obj.strftime("%d-%m-%Y")
+        
+        # Fetch data from API
+        api_client = APIClient(username=username, password=password)
+        response = api_client.get_sales_report(
+            start_date=start_date_str,
+            end_date=end_date_str
+        )
+        
+        if not response.get('success'):
+            return dbc.Alert(f"API Error: {response.get('message')}", color="danger"), [], [], []
+        
+        api_response = response.get('data', {})
+        report_data = api_response.get('report_data', [])
+        
+        if not report_data:
+            return dbc.Alert("No data available for this date range", color="warning"), [], [], []
+        
+        df = pd.DataFrame(report_data)
+        
+        # Map columns
+        column_mapping = {
+            'SV': 'Value', 'SQ': 'Qty', 'comp_nm': 'Dealer Name',
+            'category_name': 'Category', 'state': 'State', 'city': 'City',
+            'meta_keyword': 'Product Name', 'parent_category': 'Sub Category',
+            'cust_id': 'Customer ID', 'id': 'Order ID',
+            'date': 'Date', 'order_date': 'Date', 'created_at': 'Date', 'sale_date': 'Date'
+        }
+        df = df.rename(columns={old: new for old, new in column_mapping.items() if old in df.columns})
+        
+        # Convert numeric columns
+        if 'Value' in df.columns:
+            df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+        if 'Qty' in df.columns:
+            df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
+        
+        # Apply filter for Innovative
+        if hide_innovative and 'Dealer Name' in df.columns:
+            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Create CRM DataFrame with all required columns
+        crm_df = pd.DataFrame()
+        
+        # Transaction ID - from Order ID or generate
+        crm_df['Transaction ID'] = df['Order ID'] if 'Order ID' in df.columns else [f"TXN-{i+1:06d}" for i in range(len(df))]
+        
+        # Date - from available date field
+        if 'Date' in df.columns:
+            crm_df['Date'] = pd.to_datetime(df['Date'], errors='coerce').dt.strftime('%Y-%m-%d')
+            crm_df['Month'] = pd.to_datetime(df['Date'], errors='coerce').dt.strftime('%B')
+            crm_df['Year'] = pd.to_datetime(df['Date'], errors='coerce').dt.year
+            crm_df['Quarter'] = pd.to_datetime(df['Date'], errors='coerce').dt.quarter.apply(lambda x: f"Q{x}" if pd.notna(x) else "Awaiting API updation for data")
+        else:
+            crm_df['Date'] = "Awaiting API updation for data"
+            crm_df['Month'] = "Awaiting API updation for data"
+            crm_df['Year'] = "Awaiting API updation for data"
+            crm_df['Quarter'] = "Awaiting API updation for data"
+        
+        # Dealer - from Dealer Name
+        crm_df['Dealer'] = df['Dealer Name'] if 'Dealer Name' in df.columns else "Awaiting API updation for data"
+        
+        # State - from State
+        crm_df['State'] = df['State'] if 'State' in df.columns else "Awaiting API updation for data"
+        
+        # City - from City
+        crm_df['City'] = df['City'] if 'City' in df.columns else "Awaiting API updation for data"
+        
+        # Executive - not available in API
+        crm_df['Executive'] = "Awaiting API updation for data"
+        
+        # Product - from Product Name
+        crm_df['Product'] = df['Product Name'] if 'Product Name' in df.columns else "Awaiting API updation for data"
+        
+        # Product Family - from Category or Sub Category
+        crm_df['Product Family'] = df['Category'] if 'Category' in df.columns else "Awaiting API updation for data"
+        
+        # Quantity - from Qty
+        crm_df['Quantity'] = df['Qty'] if 'Qty' in df.columns else 0
+        
+        # Revenue - from Value
+        crm_df['Revenue'] = df['Value'] if 'Value' in df.columns else 0
+        
+        # Calculate Unit Price (Revenue / Quantity)
+        if 'Value' in df.columns and 'Qty' in df.columns:
+            crm_df['Unit Price'] = (df['Value'] / df['Qty']).fillna(0).round(2)
+        else:
+            crm_df['Unit Price'] = "Awaiting API updation for data"
+        
+        # Payment Status - not available in API
+        crm_df['Payment Status'] = "Awaiting API updation for data"
+        
+        # Days Overdue - not available in API
+        crm_df['Days Overdue'] = "Awaiting API updation for data"
+        
+        # Interest Amount - not available in API
+        crm_df['Interest Amount'] = "Awaiting API updation for data"
+        
+        # Prepare filter options
+        dealer_options = [{'label': dealer, 'value': dealer} for dealer in sorted(crm_df['Dealer'].unique()) if dealer != "Awaiting API updation for data"]
+        state_options = [{'label': state, 'value': state} for state in sorted(crm_df['State'].unique()) if state != "Awaiting API updation for data"]
+        product_family_options = [{'label': pf, 'value': pf} for pf in sorted(crm_df['Product Family'].unique()) if pf != "Awaiting API updation for data"]
+        
+        # Apply filters
+        filtered_df = crm_df.copy()
+        
+        if dealer_filter:
+            filtered_df = filtered_df[filtered_df['Dealer'].isin(dealer_filter)]
+        
+        if state_filter:
+            filtered_df = filtered_df[filtered_df['State'].isin(state_filter)]
+        
+        if product_family_filter:
+            filtered_df = filtered_df[filtered_df['Product Family'].isin(product_family_filter)]
+        
+        # Apply search filter
+        if search_input:
+            mask = filtered_df.astype(str).apply(lambda row: row.str.contains(search_input, case=False, na=False).any(), axis=1)
+            filtered_df = filtered_df[mask]
+        
+        # Create AG Grid table
+        column_defs = [
+            {'headerName': 'Transaction ID', 'field': 'Transaction ID', 'filter': 'agTextColumnFilter', 'sortable': True, 'resizable': True, 'width': 150, 'pinned': 'left', 'checkboxSelection': True, 'headerCheckboxSelection': True},
+            {'headerName': 'Date', 'field': 'Date', 'filter': 'agDateColumnFilter', 'sortable': True, 'resizable': True, 'width': 120},
+            {'headerName': 'Month', 'field': 'Month', 'filter': 'agTextColumnFilter', 'sortable': True, 'resizable': True, 'width': 110},
+            {'headerName': 'Year', 'field': 'Year', 'filter': 'agNumberColumnFilter', 'sortable': True, 'resizable': True, 'width': 90},
+            {'headerName': 'Quarter', 'field': 'Quarter', 'filter': 'agTextColumnFilter', 'sortable': True, 'resizable': True, 'width': 90},
+            {'headerName': 'Dealer', 'field': 'Dealer', 'filter': 'agTextColumnFilter', 'sortable': True, 'resizable': True, 'width': 200},
+            {'headerName': 'State', 'field': 'State', 'filter': 'agTextColumnFilter', 'sortable': True, 'resizable': True, 'width': 130},
+            {'headerName': 'City', 'field': 'City', 'filter': 'agTextColumnFilter', 'sortable': True, 'resizable': True, 'width': 130},
+            {'headerName': 'Executive', 'field': 'Executive', 'filter': 'agTextColumnFilter', 'sortable': True, 'resizable': True, 'width': 150},
+            {'headerName': 'Product', 'field': 'Product', 'filter': 'agTextColumnFilter', 'sortable': True, 'resizable': True, 'width': 250},
+            {'headerName': 'Product Family', 'field': 'Product Family', 'filter': 'agTextColumnFilter', 'sortable': True, 'resizable': True, 'width': 180},
+            {'headerName': 'Quantity', 'field': 'Quantity', 'filter': 'agNumberColumnFilter', 'sortable': True, 'resizable': True, 'width': 110, 'type': 'numericColumn', 'valueFormatter': {'function': 'Number(params.value).toLocaleString()'}},
+            {'headerName': 'Revenue (₹)', 'field': 'Revenue', 'filter': 'agNumberColumnFilter', 'sortable': True, 'resizable': True, 'width': 140, 'type': 'numericColumn', 'valueFormatter': {'function': 'd3.format(",.2f")(params.value)'}},
+            {'headerName': 'Unit Price (₹)', 'field': 'Unit Price', 'filter': 'agNumberColumnFilter', 'sortable': True, 'resizable': True, 'width': 130, 'type': 'numericColumn', 'valueFormatter': {'function': 'typeof params.value === "number" ? d3.format(",.2f")(params.value) : params.value'}},
+            {'headerName': 'Payment Status', 'field': 'Payment Status', 'filter': 'agTextColumnFilter', 'sortable': True, 'resizable': True, 'width': 150},
+            {'headerName': 'Days Overdue', 'field': 'Days Overdue', 'filter': 'agNumberColumnFilter', 'sortable': True, 'resizable': True, 'width': 130},
+            {'headerName': 'Interest Amount (₹)', 'field': 'Interest Amount', 'filter': 'agNumberColumnFilter', 'sortable': True, 'resizable': True, 'width': 160},
+        ]
+        
+        crm_table = html.Div([
+            # Summary Stats Row
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H3(f"{len(filtered_df):,}", className="mb-0 text-primary"),
+                            html.P("Total Transactions", className="text-muted mb-0 small")
+                        ])
+                    ], className="shadow-sm")
+                ], width=3),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H3(format_inr(filtered_df['Revenue'].sum() if pd.api.types.is_numeric_dtype(filtered_df['Revenue']) else 0), className="mb-0 text-success"),
+                            html.P("Total Revenue", className="text-muted mb-0 small")
+                        ])
+                    ], className="shadow-sm")
+                ], width=3),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H3(format_qty(filtered_df['Quantity'].sum() if pd.api.types.is_numeric_dtype(filtered_df['Quantity']) else 0), className="mb-0 text-info"),
+                            html.P("Total Quantity", className="text-muted mb-0 small")
+                        ])
+                    ], className="shadow-sm")
+                ], width=3),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H3(f"{filtered_df['Dealer'].nunique() if filtered_df['Dealer'].dtype == 'object' else 0}", className="mb-0 text-warning"),
+                            html.P("Unique Dealers", className="text-muted mb-0 small")
+                        ])
+                    ], className="shadow-sm")
+                ], width=3),
+            ], className="g-2 mb-4"),
+            
+            # AG Grid Table
+            dag.AgGrid(
+                id='crm-data-table',
+                rowData=filtered_df.to_dict('records'),
+                columnDefs=column_defs,
+                defaultColDef={
+                    'filter': True,
+                    'sortable': True,
+                    'resizable': True,
+                    'minWidth': 100,
+                },
+                dashGridOptions={
+                    'pagination': True,
+                    'paginationPageSize': 50,
+                    'paginationPageSizeSelector': [25, 50, 100, 200, 500],
+                    'enableRangeSelection': True,
+                    'rowSelection': 'multiple',
+                    'suppressRowClickSelection': True,
+                    'animateRows': True,
+                    'enableCellTextSelection': True,
+                },
+                className="ag-theme-alpine",
+                style={'height': '600px', 'width': '100%'},
+            ),
+            
+            # Info footer
+            html.Div([
+                html.Small([
+                    html.I(className="bi bi-info-circle me-2"),
+                    "Click column headers to sort • Use filter icons to search specific columns • Select rows with checkboxes for bulk export • Scroll horizontally for all columns"
+                ], className="text-muted")
+            ], className="mt-3")
+        ])
+        
+        return crm_table, dealer_options, state_options, product_family_options
+        
+    except Exception as e:
+        print(f"Error in CRM table: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return dbc.Alert(f"Error loading CRM data: {str(e)}", color="danger"), [], [], []
+
+# Clear CRM Filters Callback
+@app.callback(
+    Output('crm-dealer-filter', 'value'),
+    Output('crm-state-filter', 'value'),
+    Output('crm-product-family-filter', 'value'),
+    Output('crm-payment-status-filter', 'value'),
+    Output('crm-search-input', 'value'),
+    Input('crm-clear-filters-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def clear_crm_filters(n_clicks):
+    """Clear all CRM filters"""
+    if n_clicks:
+        return None, None, None, 'all', ""
+    return no_update, no_update, no_update, no_update, no_update
+
+# Export CRM Data Callback
+@app.callback(
+    Output('crm-download', 'data'),
+    Input('crm-export-btn', 'n_clicks'),
+    State('crm-data-table', 'rowData'),
+    State('date-range-picker', 'start_date'),
+    State('date-range-picker', 'end_date'),
+    prevent_initial_call=True
+)
+def export_crm_data(n_clicks, row_data, start_date, end_date):
+    """Export CRM data to CSV"""
+    
+    if not n_clicks or not row_data:
+        return no_update
+    
+    try:
+        df = pd.DataFrame(row_data)
+        
+        # Convert to CSV
+        csv_string = df.to_csv(index=False, encoding='utf-8')
+        
+        return dict(content=csv_string, filename=f"sales_crm_{start_date}_{end_date}.csv")
+    
+    except Exception as e:
+        print(f"Error exporting CRM data: {str(e)}")
+        return no_update
+
 # Quick Date Selection Callback
 @app.callback(
     Output('date-range-picker', 'start_date'),
