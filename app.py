@@ -16,6 +16,8 @@ import os
 import uuid
 import traceback
 import logging
+from flask_caching import Cache
+import hashlib
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -31,6 +33,13 @@ app = dash.Dash(
         {"name": "viewport", "content": "width=device-width, initial-scale=1"}
     ]
 )
+
+# Configure Flask-Caching for performance
+cache = Cache(app.server, config={
+    'CACHE_TYPE': 'SimpleCache',  # Use filesystem for better persistence
+    'CACHE_DEFAULT_TIMEOUT': 300,  # 5 minutes cache
+    'CACHE_THRESHOLD': 100  # Maximum number of items
+})
 
 # App title
 app.title = "Orthopedic Implant Analytics Dashboard"
@@ -164,6 +173,62 @@ STATE_COORDS = {
     'Goa': (15.2993, 74.1240),
 }
 
+# Cached API data fetch function
+@cache.memoize(timeout=300)  # Cache for 5 minutes
+def fetch_sales_data_cached(username, password, start_date, end_date, hide_innovative):
+    """
+    Cached version of API data fetch to prevent duplicate calls
+    Returns processed DataFrame or None if error
+    """
+    try:
+        print(f"🔄 Fetching data from API (not cached) for {start_date} to {end_date}")
+        api_client = APIClient(username=username, password=password)
+        response = api_client.get_sales_report(
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        if not response.get('success'):
+            print(f"❌ API Error: {response.get('message')}")
+            return None
+        
+        api_response = response.get('data', {})
+        report_data = api_response.get('report_data', [])
+        
+        if not report_data:
+            print("⚠️ No data available")
+            return None
+        
+        df = pd.DataFrame(report_data)
+        
+        # Apply column mapping
+        column_mapping = {
+            'SV': 'Value', 'SQ': 'Qty', 'comp_nm': 'Dealer Name',
+            'category_name': 'Category', 'state': 'State', 'city': 'City',
+            'meta_keyword': 'Product Name', 'parent_category': 'Sub Category',
+            'cust_id': 'Customer ID', 'id': 'Order ID',
+            'date': 'Date', 'order_date': 'Date', 'created_at': 'Date', 'sale_date': 'Date'
+        }
+        df = df.rename(columns={old: new for old, new in column_mapping.items() if old in df.columns})
+        
+        # Convert numeric columns
+        if 'Value' in df.columns:
+            df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+        if 'Qty' in df.columns:
+            df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
+        
+        # Apply filter
+        if hide_innovative and 'Dealer Name' in df.columns:
+            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        print(f"✅ Data fetched successfully: {len(df)} rows")
+        return df
+        
+    except Exception as e:
+        print(f"❌ Error fetching cached data: {str(e)}")
+        traceback.print_exc()
+        return None
+
 # App layout
 app.layout = dbc.Container([
     dcc.Location(id='url', refresh=False),
@@ -172,18 +237,44 @@ app.layout = dbc.Container([
     dcc.Store(id='chart-data-store', storage_type='memory'),  # Store for chart data
     html.Div(id='saved-charts-data', style={'display': 'none'}),  # Hidden div for saved charts data
     
-    # Modern Header with gradient
+    # Modern Header with gradient and toggle button
     dbc.Row([
         dbc.Col([
             html.Div([
                 html.Div([
                     html.Div([
-                        html.H1([
-                            html.Span("Orthopedic Implant Analytics", className="gradient-text")
-                        ], className="mb-0", style={'fontWeight': '700', 'letterSpacing': '-0.02em'}),
-                        html.P("Real-time Sales & Analytics Dashboard", 
-                               className="mb-0", 
-                               style={'fontSize': '14px', 'fontWeight': '400', 'color': '#000000'})
+                        html.Div([
+                            dbc.Button(
+                                "◀",  # Unicode arrow character as fallback
+                                id="sidebar-toggle",
+                                color="light",
+                                className="me-3",
+                                style={
+                                    'backgroundColor': '#ffffff',
+                                    'border': '2px solid #000000',
+                                    'boxShadow': 'none',
+                                    'width': '48px',
+                                    'height': '48px',
+                                    'padding': '0',
+                                    'display': 'flex',
+                                    'alignItems': 'center',
+                                    'justifyContent': 'center',
+                                    'fontSize': '28px',
+                                    'fontWeight': 'bold',
+                                    'color': '#000000',
+                                    'cursor': 'pointer',
+                                    'borderRadius': '8px'
+                                }
+                            ),
+                            html.Div([
+                                html.H1([
+                                    html.Span("Orthopedic Implant Analytics", className="gradient-text")
+                                ], className="mb-0", style={'fontWeight': '700', 'letterSpacing': '-0.02em'}),
+                                html.P("Real-time Sales & Analytics Dashboard", 
+                                       className="mb-0", 
+                                       style={'fontSize': '14px', 'fontWeight': '400', 'color': '#000000'})
+                            ])
+                        ], style={'display': 'flex', 'alignItems': 'center'}),
                     ]),
                 ], style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center'})
             ], className="dashboard-header", style={'padding': '1.5rem 0'})
@@ -192,7 +283,7 @@ app.layout = dbc.Container([
     
     # Sidebar + Main Content
     dbc.Row([
-        # Modern Sidebar
+        # Modern Sidebar (Collapsible with horizontal slide)
         dbc.Col([
             dbc.Card([
                 dbc.CardBody([
@@ -268,7 +359,7 @@ app.layout = dbc.Container([
                     ])
                 ])
             ], className="sidebar-card shadow")
-        ], width=3, lg=3, md=12, sm=12),
+        ], id="sidebar-col", width=3, lg=3, md=12, sm=12, style={'transition': 'all 0.3s ease-in-out'}),
         
         # Main Content with Tabs
         dbc.Col([
@@ -286,26 +377,134 @@ app.layout = dbc.Container([
                     html.Div(id='my-charts-content')
                 ], className='custom-tab')
             ], style={'marginBottom': '1rem'})
-        ], width=9, lg=9, md=12, sm=12)
+        ], id="main-col", width=9, lg=9, md=12, sm=12)
     ], className="g-3"),
     
 ], fluid=True, className="py-4", style={'maxWidth': '1400px', 'margin': '0 auto'})
+
+# Helper function for monthly slow-moving summary
+def _create_monthly_slow_moving_summary(df, value_col, qty_col, end_date):
+    """Create summary cards for this month's slow-moving items by category and dealer"""
+    if df is None or df.empty or 'Date' not in df.columns:
+        return []
+    
+    # Convert Date column if needed
+    df_copy = df.copy()
+    if not pd.api.types.is_datetime64_any_dtype(df_copy['Date']):
+        df_copy['Date'] = pd.to_datetime(df_copy['Date'], errors='coerce')
+    
+    # Calculate slow-moving threshold (30 days)
+    slow_moving_days = 30
+    
+    # Identify products with no sales in last 30 days
+    all_products = df_copy['Product Name'].unique()
+    slow_moving_items = []
+    
+    for product in all_products:
+        product_sales = df_copy[df_copy['Product Name'] == product]['Date']
+        if not product_sales.empty:
+            last_sale_date = product_sales.max()
+            days_since_sale = (end_date - last_sale_date).days
+            
+            if days_since_sale >= slow_moving_days:
+                product_data = df_copy[df_copy['Product Name'] == product].iloc[0]
+                slow_moving_items.append({
+                    'Product Name': product,
+                    'Category': product_data.get('Category', 'N/A') if 'Category' in df_copy.columns else 'N/A',
+                    'Dealer Name': product_data.get('Dealer Name', 'N/A') if 'Dealer Name' in df_copy.columns else 'N/A',
+                    'Days Since Last Sale': days_since_sale
+                })
+    
+    if not slow_moving_items:
+        return [dbc.Row([dbc.Col([dbc.Alert("✅ Great! No slow-moving items found for this month.", color="success", className="mb-3")], width=12)], className="mb-3")]
+    
+    slow_df = pd.DataFrame(slow_moving_items)
+    
+    # Summary by Category
+    category_summary = slow_df.groupby('Category')['Product Name'].count().reset_index() if 'Category' in slow_df.columns else None
+    dealer_summary = slow_df.groupby('Dealer Name')['Product Name'].count().reset_index() if 'Dealer Name' in slow_df.columns else None
+    
+    # Create summary cards
+    summary_components = [
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.Div([
+                            html.I(className="bi bi-exclamation-triangle", style={'fontSize': '32px', 'color': '#f59e0b'}),
+                            html.H4(f"{len(slow_moving_items)}", className="mt-2 mb-0 text-warning"),
+                            html.P("Slow-Moving Items This Month", className="text-muted mb-0 small"),
+                            html.Small(f"No sales in last {slow_moving_days} days", className="text-muted")
+                        ], className="text-center")
+                    ])
+                ], className="shadow-sm border-warning")
+            ], width=12)
+        ], className="mb-3")
+    ]
+    
+    # Category and Dealer breakdown
+    breakdown_cols = []
+    
+    if category_summary is not None and not category_summary.empty:
+        top_cat = category_summary.sort_values('Product Name', ascending=False).head(5)
+        breakdown_cols.append(
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader([html.H6([html.I(className="bi bi-tag me-2"), "By Category"], className="mb-0")]),
+                    dbc.CardBody([
+                        html.Div([
+                            *[dbc.Row([
+                                dbc.Col(html.Span(row['Category'][:30]), width=8, className="small"),
+                                dbc.Col(dbc.Badge(f"{row['Product Name']}", color="warning", pill=True), width=4, className="text-end")
+                            ], className="mb-2") for _, row in top_cat.iterrows()]
+                        ])
+                    ])
+                ], className="shadow-sm h-100")
+            ], width=6)
+        )
+    
+    if dealer_summary is not None and not dealer_summary.empty:
+        top_dealer = dealer_summary.sort_values('Product Name', ascending=False).head(5)
+        breakdown_cols.append(
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader([html.H6([html.I(className="bi bi-shop me-2"), "By Dealer"], className="mb-0")]),
+                    dbc.CardBody([
+                        html.Div([
+                            *[dbc.Row([
+                                dbc.Col(html.Span(row['Dealer Name'][:30]), width=8, className="small"),
+                                dbc.Col(dbc.Badge(f"{row['Product Name']}", color="warning", pill=True), width=4, className="text-end")
+                            ], className="mb-2") for _, row in top_dealer.iterrows()]
+                        ])
+                    ])
+                ], className="shadow-sm h-100")
+            ], width=6)
+        )
+    
+    if breakdown_cols:
+        summary_components.append(dbc.Row(breakdown_cols, className="mb-4 g-3"))
+    
+    return summary_components
 
 # Main content callback
 @app.callback(
     Output('main-content', 'children'),
     Output('data-status', 'children'),
     Output('chart-data-store', 'data'),
-    Input('username-input', 'value'),
-    Input('password-input', 'value'),
+    Input('refresh-btn', 'n_clicks'),
     Input('date-range-picker', 'start_date'),
     Input('date-range-picker', 'end_date'),
-    Input('refresh-btn', 'n_clicks'),
     Input('hide-innovative-check', 'value'),
+    State('username-input', 'value'),
+    State('password-input', 'value'),
     prevent_initial_call=False
 )
-def update_dashboard(username, password, start_date, end_date, refresh_clicks, hide_innovative):
+def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, username, password):
     """Update entire dashboard when dates change or refresh is clicked"""
+    
+    # Prevent unnecessary callbacks
+    if not ctx.triggered:
+        raise dash.exceptions.PreventUpdate
     
     if not start_date or not end_date:
         return dbc.Alert("Please select date range", color="warning"), "No date range", None
@@ -317,91 +516,24 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
         start_date_str = start_date_obj.strftime("%d-%m-%Y")
         end_date_str = end_date_obj.strftime("%d-%m-%Y")
         
-        print(f"\nDASH UPDATE TRIGGERED")
+        # Check which input triggered the callback
+        trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        print(f"\n🔄 DASH UPDATE TRIGGERED by: {trigger_id}")
         print(f"   Range: {start_date_str} to {end_date_str}")
         print(f"   Hide Innovative: {hide_innovative}")
         print(f"   Refresh clicks: {refresh_clicks}")
         
-        # Fetch data from API
-        print("   Fetching from API...")
-        try:
-            api_client = APIClient(username=username, password=password)
-            response = api_client.get_sales_report(
-                start_date=start_date_str,
-                end_date=end_date_str
-            )
-            
-            if not response.get('success'):
-                status_text = f"API Error: {response.get('message', 'Unknown error')} | {datetime.now().strftime('%H:%M:%S')}"
-                return dbc.Alert(f"Failed to fetch data: {response.get('message')}", color="danger"), status_text, None
-            
-            # Extract data from response
-            api_response = response.get('data', {})
-            report_data = api_response.get('report_data', [])
-            
-            if not report_data:
-                status_text = f"No data | {datetime.now().strftime('%H:%M:%S')}"
-                return dbc.Alert("No data available for this date range", color="warning"), status_text, None
-            
-            # Convert to DataFrame
-            df = pd.DataFrame(report_data)
-        except Exception as e:
-            print(f"   Error: {str(e)}")
-            status_text = f"Error: {str(e)} | {datetime.now().strftime('%H:%M:%S')}"
-            return dbc.Alert(f"Error fetching data: {str(e)}", color="danger"), status_text, None
+        # Use cached data fetch (only calls API if not cached)
+        df = fetch_sales_data_cached(username, password, start_date_str, end_date_str, hide_innovative)
         
         if df is None or df.empty:
             status_text = f"No data | {datetime.now().strftime('%H:%M:%S')}"
             return dbc.Alert("No data available for this date range", color="warning"), status_text, None
         
-        print(f"   Data fetched: {len(df)} rows")
+        print(f"   Data fetched: {len(df)} rows (cached)")
         print(f"   Available columns: {list(df.columns)}")
         
-        # Map API column names to standard names
-        column_mapping = {
-            'SV': 'Value',              # Sales Value -> Value
-            'SQ': 'Qty',                # Sales Quantity -> Qty
-            'comp_nm': 'Dealer Name',   # Company Name -> Dealer Name
-            'category_name': 'Category',
-            'state': 'State',
-            'city': 'City',
-            'meta_keyword': 'Product Name',
-            'parent_category': 'Sub Category',
-            'cust_id': 'Customer ID',
-            'id': 'Order ID',
-            'date': 'Date',             # Date field
-            'order_date': 'Date',       # Alternative date field
-            'created_at': 'Date',       # Alternative date field
-            'sale_date': 'Date'         # Alternative date field
-        }
-        
-        # Rename columns that exist in the dataframe
-        rename_dict = {old: new for old, new in column_mapping.items() if old in df.columns}
-        if rename_dict:
-            df = df.rename(columns=rename_dict)
-            print(f"   Column mapping applied: {rename_dict}")
-            # Check if any date field was mapped
-            date_fields = ['date', 'order_date', 'created_at', 'sale_date']
-            mapped_date_fields = [field for field in date_fields if field in rename_dict.keys()]
-            if mapped_date_fields:
-                print(f"   Date field(s) found and mapped: {mapped_date_fields}")
-            else:
-                print(f"   ⚠️  No date field found in API response!")
-        else:
-            print(f"   ⚠️  No columns matched for mapping!")
-        
-        # Convert numeric columns to float
-        if 'Value' in df.columns:
-            df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
-        if 'Qty' in df.columns:
-            df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
-        
-        # Apply filter
-        if hide_innovative and 'Dealer Name' in df.columns:
-            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
-            print(f"   Filtered: {len(df)} rows")
-        
-        # Detect columns
+        # Data is already cleaned by cached function, just detect columns
         VALUE_COLS = [c for c in df.columns if c.startswith('Value') and c != 'Value']
         QTY_COLS = [c for c in df.columns if c.startswith('Qty') and c != 'Qty']
         
@@ -429,46 +561,28 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
         prev_start_date = start_date_obj - pd.Timedelta(days=period_duration + 1)
         prev_end_date = start_date_obj - pd.Timedelta(days=1)
         
+        # Initialize prev_df as empty DataFrame
+        prev_df = pd.DataFrame()
+        prev_revenue = 0
+        prev_quantity = 0
+        prev_orders = 0
+        
         # Fetch previous period data for comparison
         try:
             prev_start_str = prev_start_date.strftime("%d-%m-%Y")
             prev_end_str = prev_end_date.strftime("%d-%m-%Y")
             
-            prev_response = api_client.get_sales_report(
-                start_date=prev_start_str,
-                end_date=prev_end_str
-            )
+            # Use cached fetch for previous period too
+            prev_df_temp = fetch_sales_data_cached(username, password, prev_start_str, prev_end_str, hide_innovative)
             
-            if prev_response.get('success'):
-                prev_report_data = prev_response.get('data', {}).get('report_data', [])
-                prev_df = pd.DataFrame(prev_report_data)
-                
-                if not prev_df.empty:
-                    # Rename columns
-                    prev_df = prev_df.rename(columns={old: new for old, new in column_mapping.items() if old in prev_df.columns})
-                    
-                    # Convert numeric columns
-                    if 'Value' in prev_df.columns:
-                        prev_df['Value'] = pd.to_numeric(prev_df['Value'], errors='coerce')
-                    if 'Qty' in prev_df.columns:
-                        prev_df['Qty'] = pd.to_numeric(prev_df['Qty'], errors='coerce')
-                    
-                    # Apply filter
-                    if hide_innovative and 'Dealer Name' in prev_df.columns:
-                        prev_df = prev_df[~prev_df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
-                    
-                    prev_revenue = prev_df[VALUE_COL].sum() if VALUE_COL else 0
-                    prev_quantity = prev_df[QTY_COL].sum() if QTY_COL else 0
-                    prev_orders = len(prev_df)
-                else:
-                    prev_revenue = 0
-                    prev_quantity = 0
-                    prev_orders = 0
-            else:
-                prev_revenue = 0
-                prev_quantity = 0
-                prev_orders = 0
-        except:
+            if prev_df_temp is not None and not prev_df_temp.empty:
+                prev_df = prev_df_temp
+                prev_revenue = prev_df[VALUE_COL].sum() if VALUE_COL and VALUE_COL in prev_df.columns else 0
+                prev_quantity = prev_df[QTY_COL].sum() if QTY_COL and QTY_COL in prev_df.columns else 0
+                prev_orders = len(prev_df)
+        except Exception as e:
+            print(f"⚠️ Could not fetch previous period data: {str(e)}")
+            prev_df = pd.DataFrame()
             prev_revenue = 0
             prev_quantity = 0
             prev_orders = 0
@@ -950,7 +1064,7 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
             # Activity Patterns Section - Only show if date data available
             *([] if not has_date_data else [
                 html.Hr(className="my-4"),
-                html.H4("� Activity Patterns", className="mb-4 fw-bold"),
+                html.H4("🕐 Activity Patterns", className="mb-4 fw-bold"),
                 html.P("Analyze sales patterns across time dimensions to identify peak activity periods", className="text-muted mb-4"),
                 
                 dbc.Row([
@@ -1021,6 +1135,9 @@ def update_dashboard(username, password, start_date, end_date, refresh_clicks, h
             html.Hr(className="my-4"),
             html.H4("📦 Slow-Moving Items Tracker", className="mb-3 fw-bold"),
             html.P("Identify products with low sales velocity to optimize inventory management", className="text-muted mb-4"),
+            
+            # Calculate this month's slow-moving items summary
+            *(_create_monthly_slow_moving_summary(df, VALUE_COL, QTY_COL, end_date_obj) if has_date_data and 'Date' in df.columns else []),
                 
                 dbc.Row([
                     dbc.Col([
@@ -1633,6 +1750,45 @@ def toggle_custom_builder(n, is_open):
         return not is_open
     return is_open
 
+# Toggle Sidebar Collapse Callback
+@app.callback(
+    Output("sidebar-col", "style"),
+    Output("sidebar-col", "width"),
+    Output("main-col", "width"),
+    Input("sidebar-toggle", "n_clicks"),
+    State("sidebar-col", "style"),
+    prevent_initial_call=True
+)
+def toggle_sidebar(n_clicks, current_style):
+    """Toggle sidebar visibility with horizontal slide animation"""
+    if n_clicks:
+        # Check if sidebar is currently visible
+        if current_style and current_style.get('marginLeft') == '-100%':
+            # Sidebar is hidden, show it
+            new_style = {
+                'transition': 'all 0.3s ease-in-out',
+                'marginLeft': '0',
+                'opacity': '1'
+            }
+            return new_style, 3, 9
+        else:
+            # Sidebar is visible, hide it
+            new_style = {
+                'transition': 'all 0.3s ease-in-out',
+                'marginLeft': '-100%',
+                'opacity': '0',
+                'position': 'absolute',
+                'zIndex': '-1'
+            }
+            return new_style, 0, 12
+    
+    # Default state (sidebar visible)
+    return {
+        'transition': 'all 0.3s ease-in-out',
+        'marginLeft': '0',
+        'opacity': '1'
+    }, 3, 9
+
 # Populate dropdown options from chart data
 @app.callback(
     Output('dealer-filter', 'options'),
@@ -1703,7 +1859,7 @@ def update_filtered_charts(dealer_filter, state_filter, category_filter, city_fi
             text="No data available",
             xref="paper", yref="paper",
             x=0.5, y=0.5, showarrow=False,
-            font={'size': 16, 'color': 'gray'}
+            font=dict(size=16, color='gray')
         )
         return empty_fig, empty_fig, empty_fig, empty_fig, empty_fig, empty_fig, empty_fig
     
@@ -1811,8 +1967,6 @@ def update_revenue_comparison(username, password, start_date, end_date, hide_inn
         # Convert numeric
         if 'Value' in df.columns:
             df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
-        if 'Qty' in df.columns:
-            df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
         
         # Apply filter
         if hide_innovative and 'Dealer Name' in df.columns:
@@ -1969,10 +2123,10 @@ def update_comparison_chart(daily_clicks, weekly_clicks, monthly_clicks, compari
             df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
         
         VALUE_COLS = [c for c in df.columns if c.startswith('Value') and c != 'Value']
-        VALUE_COL = VALUE_COLS[0] if VALUE_COLS else ('Value' if 'Value' in df.columns else None)
+        QTY_COLS = [c for c in df.columns if c.startswith('Qty') and c != 'Qty']
         
-        if not VALUE_COL:
-            return go.Figure()
+        VALUE_COL = VALUE_COLS[0] if VALUE_COLS else None
+        QTY_COL = QTY_COLS[0] if QTY_COLS else None
         
         # Create updated chart
         fig, _ = _create_revenue_comparison_chart(df, VALUE_COL, period_view, comparison_type)
@@ -2069,6 +2223,8 @@ def generate_custom_chart(n_clicks, x_axis, y_axis, chart_type, agg_type, top_n,
             grouped = df.groupby(x_axis).size().reset_index(name='Count')
             sort_col = 'Count'
         else:
+            if not agg_col or agg_col not in df.columns:
+                return dbc.Alert("Invalid aggregation column", color="danger")
             grouped = df.groupby(x_axis)[agg_col].agg(agg_func).reset_index(name='Value')
             sort_col = 'Value'
         
@@ -2100,7 +2256,8 @@ def generate_custom_chart(n_clicks, x_axis, y_axis, chart_type, agg_type, top_n,
                            tickvals=[1e5, 1e6, 1e7, 1e8, 1e9], ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"])
         
         fig.update_layout(height=500, font=dict(size=12, family="Arial, sans-serif"),
-                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                         margin=dict(t=40, b=10, l=10, r=10))
         
         return dbc.Card([
             dbc.CardHeader(title),
@@ -2332,6 +2489,7 @@ def update_my_charts(username, password, start_date, end_date, hide_innovative, 
         # Detect columns
         VALUE_COLS = [c for c in df.columns if c.startswith('Value') and c != 'Value']
         QTY_COLS = [c for c in df.columns if c.startswith('Qty') and c != 'Qty']
+        
         VALUE_COL = VALUE_COLS[0] if VALUE_COLS else ('Value' if 'Value' in df.columns else None)
         QTY_COL = QTY_COLS[0] if QTY_COLS else ('Qty' if 'Qty' in df.columns else None)
         
@@ -2408,11 +2566,11 @@ def update_my_charts(username, password, start_date, end_date, hide_innovative, 
                     continue
                 
                 # Format axes
-                if 'Value' in sort_col or 'revenue' in y_axis.lower():
+                if 'Value' in sort_col.lower() or 'revenue' in y_axis.lower():
                     fig.update_yaxes(tickformat=".2f", tickprefix="Rs. ", ticksuffix="", 
                                    tickvals=[1e5, 1e6, 1e7, 1e8, 1e9], ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"])
                 
-                fig.update_layout(height=400, font=dict(size=12, family="Arial, sans-serif"),
+                fig.update_layout(height=500, font=dict(size=12, family="Arial, sans-serif"),
                                  paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                                  margin=dict(t=40, b=10, l=10, r=10))
                 
@@ -2550,22 +2708,12 @@ def update_slow_moving_items(days_filter, category_filter, dealer_filter, sort_b
         if 'Date' not in df.columns or 'Product Name' not in df.columns:
             return dbc.Alert("Date or Product Name data not available", color="warning"), category_options, dealer_options
         
+        if len(df) == 0:
+            return dbc.Alert("No data available with current filters", color="warning"), category_options, dealer_options
+        
         # Convert Date column
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date'])
-        
-        if df.empty:
-            return dbc.Alert("No valid date data available", color="warning"), category_options, dealer_options
-        
-        VALUE_COL = 'Value' if 'Value' in df.columns else None
-        QTY_COL = 'Qty' if 'Qty' in df.columns else None
-        
-        if not VALUE_COL or not QTY_COL:
-            return dbc.Alert("Revenue or Quantity data not available", color="warning"), category_options, dealer_options
-        
-        # Apply category filter
-        if category_filter and 'Category' in df.columns:
-            df = df[df['Category'].isin(category_filter)]
         
         # Apply dealer filter
         if dealer_filter and 'Dealer Name' in df.columns:
@@ -2667,7 +2815,7 @@ def update_slow_moving_items(days_filter, category_filter, dealer_filter, sort_b
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
-                        html.I(className="bi bi-graph-down", style={'fontSize': '24px', 'color': '#6366f1'}),
+                        html.I(className="bi bi-graph-down", style={'fontSize': '24px'}),
                         html.H3(f"{slow_moving['Total Quantity'].sum():,.0f}", className="text-secondary mb-0 mt-2"),
                         html.P("Total Units", className="text-muted small mb-0")
                     ])
@@ -3737,6 +3885,37 @@ app.clientside_callback(
     Input('period-daily-btn', 'n_clicks'),
     Input('period-weekly-btn', 'n_clicks'),
     Input('period-monthly-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+
+# Clientside callback for sidebar toggle icon animation
+app.clientside_callback(
+    """
+    function(n_clicks, current_style) {
+        if (!n_clicks) return window.dash_clientside.no_update;
+        
+        const toggleBtn = document.getElementById('sidebar-toggle');
+        
+        if (toggleBtn) {
+            // Check if sidebar is currently hidden
+            const isHidden = current_style && current_style.marginLeft === '-100%';
+            
+            // Toggle arrow direction
+            if (isHidden) {
+                // Sidebar is hidden, will show - use left arrow
+                toggleBtn.textContent = '◀';
+            } else {
+                // Sidebar is visible, will hide - use right arrow
+                toggleBtn.textContent = '▶';
+            }
+        }
+        
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output('sidebar-toggle', 'n_clicks', allow_duplicate=True),
+    Input('sidebar-toggle', 'n_clicks'),
+    State('sidebar-col', 'style'),
     prevent_initial_call=True
 )
 

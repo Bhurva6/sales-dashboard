@@ -256,9 +256,10 @@ h5 { font-size: 16px; }
 
 /* Dropdown Styling */
 .Select-control {
-    border-radius: 6px !important;
+    border-radius: 8px !important;
     border-color: #e5e7eb !important;
-    min-height: 38px !important;
+    min-height: 42px !important;
+    padding: 4px 8px !important;
 }
 
 .Select-control:hover {
@@ -279,6 +280,8 @@ div[class*="singleValue"],
 div[class*="placeholder"],
 div[class*="Input"] input {
     color: #000000 !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
 }
 
 /* Dash dcc.Dropdown styling - ensure all text is black */
@@ -292,33 +295,88 @@ div[class*="Input"] input {
     color: #000000 !important;
 }
 
+/* Multi-select dropdown improvements */
 .Select--multi .Select-value {
     background-color: #6366f1 !important;
     border-color: #6366f1 !important;
     color: white !important;
-    border-radius: 4px;
-    padding: 2px 8px;
-    margin: 2px;
+    border-radius: 6px !important;
+    padding: 4px 10px !important;
+    margin: 3px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    max-width: 100% !important;
+    line-height: 1.4 !important;
+}
+
+.Select--multi .Select-value-label {
+    color: white !important;
+    padding-right: 6px !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    max-width: 200px !important;
+    display: inline-block !important;
 }
 
 .Select--multi .Select-value-icon {
     border-right-color: rgba(255, 255, 255, 0.5) !important;
+    padding: 0 6px !important;
+    display: inline-flex !important;
+    align-items: center !important;
 }
 
 .Select--multi .Select-value-icon:hover {
-    background-color: rgba(0, 0, 0, 0.1) !important;
+    background-color: rgba(0, 0, 0, 0.15) !important;
     color: white !important;
 }
 
+/* Multi-select input area */
+.Select--multi .Select-input {
+    min-width: 150px !important;
+    padding: 4px !important;
+}
+
+/* Allow multi-line in dropdown control for better visibility */
+.Select--multi .Select-control {
+    min-height: 42px !important;
+    height: auto !important;
+    padding: 6px 8px !important;
+}
+
+.Select--multi .Select-value-wrapper {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 4px !important;
+}
+
+/* Dropdown menu styling */
 .Select-menu-outer {
-    border-radius: 6px !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-    border-color: #e5e7eb !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    border: 1px solid #e5e7eb !important;
+    margin-top: 4px !important;
+    z-index: 1000 !important;
+    max-height: 300px !important;
+}
+
+.Select-menu {
+    max-height: 280px !important;
+    border-radius: 8px !important;
 }
 
 .Select-option {
-    padding: 8px 12px !important;
+    padding: 10px 14px !important;
     color: #000000 !important;
+    font-size: 14px !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    line-height: 1.5 !important;
+    transition: all 0.15s ease !important;
 }
 
 .Select-option.is-focused {
@@ -329,6 +387,42 @@ div[class*="Input"] input {
 .Select-option.is-selected {
     background-color: #6366f1 !important;
     color: white !important;
+    font-weight: 500 !important;
+}
+
+.Select-option:hover {
+    background-color: #e5e7eb !important;
+}
+
+/* Specific styling for Cross-Selling Analysis dropdowns */
+#cross-sell-category-filter .Select-control,
+#cross-sell-dealer-filter .Select-control {
+    min-height: 44px !important;
+    font-size: 14px !important;
+}
+
+#cross-sell-category-filter .Select--multi .Select-value,
+#cross-sell-dealer-filter .Select--multi .Select-value {
+    max-width: 180px !important;
+}
+
+/* Scrollbar for dropdown menu */
+.Select-menu::-webkit-scrollbar {
+    width: 8px;
+}
+
+.Select-menu::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.Select-menu::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.Select-menu::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 /* Card Header Styling for Chart Filters */
@@ -486,4 +580,151 @@ text.hovertext {
 /* Plotly hover background */
 .hoverlayer .hovertext path {
     fill: white !important;
+}
+
+/* Dropdown text ellipsis - for all dropdown types */
+/* React Select dropdowns (dcc.Dropdown) */
+.Select-value-label,
+.Select-placeholder,
+.Select-input > input,
+.css-1uccc91-singleValue,
+.css-1wa3eu0-placeholder,
+div[class*="singleValue"],
+div[class*="placeholder"] {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    max-width: 100% !important;
+    display: block !important;
+}
+
+/* Multi-select values */
+.Select--multi .Select-value {
+    max-width: 200px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.Select--multi .Select-value-label {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    max-width: 160px !important;
+}
+
+/* Dropdown menu items */
+.Select-option,
+.VirtualizedSelectOption,
+.css-1n7v3ny-option,
+div[class*="option"] {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+/* Bootstrap select dropdowns (dbc.Select) */
+.form-select,
+select.form-control,
+select.form-select {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+.form-select option,
+select.form-control option,
+select.form-select option {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+/* Input groups with dropdowns */
+.input-group .Select-control,
+.input-group .form-select {
+    overflow: hidden !important;
+}
+
+/* Ensure dropdown containers don't expand beyond their bounds */
+.Select-control,
+.css-2b097c-container,
+div[class*="control"] {
+    overflow: hidden !important;
+}
+
+/* Filter dropdowns in cards */
+.card-header .Select-value-label,
+.card-header .Select-placeholder {
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+/* Sidebar Toggle Animation */
+#sidebar-col {
+    transition: all 0.3s ease-in-out !important;
+    overflow: hidden !important;
+}
+
+#main-col {
+    transition: all 0.3s ease-in-out !important;
+}
+
+#sidebar-toggle {
+    transition: all 0.2s ease !important;
+    cursor: pointer;
+    background-color: #ffffff !important;
+    border: 2px solid #000000 !important;
+    box-shadow: none !important;
+}
+
+#sidebar-toggle:hover {
+    background-color: #f5f5f5 !important;
+    transform: scale(1.1);
+    box-shadow: none !important;
+    border: 2px solid #000000 !important;
+}
+
+#sidebar-toggle:active {
+    transform: scale(0.95);
+    background-color: #ffffff !important;
+    border: 2px solid #000000 !important;
+}
+
+#sidebar-toggle:focus {
+    background-color: #ffffff !important;
+    box-shadow: none !important;
+    outline: none !important;
+    border: 2px solid #000000 !important;
+}
+
+#sidebar-toggle i {
+    color: #000000 !important;
+    font-weight: 900 !important;
+}
+
+
+/* Smooth width transitions for responsive columns */
+.row > [class*="col-"] {
+    transition: all 0.3s ease-in-out !important;
+}
+
+/* Ensure content scales smoothly */
+.container-fluid {
+    transition: max-width 0.3s ease-in-out !important;
+}
+
+/* Prevent sidebar content from overflowing during animation */
+.sidebar-card {
+    transition: opacity 0.2s ease-in-out !important;
+}
+
+/* Hide scrollbar during sidebar animation */
+#sidebar-col:has([style*="marginLeft: -100%"]) {
+    overflow: hidden !important;
+    width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
