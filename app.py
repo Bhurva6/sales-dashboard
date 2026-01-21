@@ -18,6 +18,27 @@ import traceback
 import logging
 from flask_caching import Cache
 import hashlib
+import redis
+
+# Get Redis URL from environment
+REDIS_URL = os.getenv('redis://default:fsbcDoltdNjkWfvDwuLWQiEdhoXcBuNO@redis.railway.internal:6379')
+
+if REDIS_URL:
+    cache_config = {
+        'CACHE_TYPE': 'RedisCache',
+        'CACHE_REDIS_URL': REDIS_URL,
+        'CACHE_DEFAULT_TIMEOUT': 300
+    }
+    print("✅ Redis cache enabled")
+else:
+    cache_config = {
+        'CACHE_TYPE': 'SimpleCache',
+        'CACHE_DEFAULT_TIMEOUT': 300,
+        'CACHE_THRESHOLD': 100
+    }
+    print("⚠️ Using simple cache (no Redis)")
+
+cache = Cache(app.server, config=cache_config)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
