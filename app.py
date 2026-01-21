@@ -517,10 +517,6 @@ def _create_monthly_slow_moving_summary(df, value_col, qty_col, end_date):
 def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, username, password):
     """Update entire dashboard when dates change or refresh is clicked"""
     
-    # Prevent unnecessary callbacks
-    if not ctx.triggered:
-        raise dash.exceptions.PreventUpdate
-    
     if not start_date or not end_date:
         return dbc.Alert("Please select date range", color="warning"), "No date range", None
     
@@ -4422,7 +4418,7 @@ def apply_modern_chart_style(fig, title="", height=400):
         ),
         title=dict(
             text=title,
-            font=dict(size=16, weight=600, color='#1f2937'),
+            font=dict(size=16, color='#1f2937'),
             x=0.5,
             xanchor='center'
         ),
@@ -5691,7 +5687,7 @@ def _create_day_part_analysis(df, value_col='Value'):
             marker=dict(color=colors[idx % len(colors)]),
             text=f"{row['Percentage']:.1f}%",
             textposition='inside',
-            textfont=dict(size=14, color='white', weight='bold'),
+            textfont=dict(size=14, color='white'),
             hovertemplate=(
                 f"<b>{row['DayPart']}</b><br>" +
                 f"Revenue: Rs. {row[metric_col]:,.0f}<br>" +
