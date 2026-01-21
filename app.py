@@ -20,8 +20,23 @@ from flask_caching import Cache
 import hashlib
 import redis
 
-# Get Redis URL from environment
-REDIS_URL = os.getenv('redis://default:fsbcDoltdNjkWfvDwuLWQiEdhoXcBuNO@redis.railway.internal:6379')
+# Set up logging (before everything else)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize Dash app with modern theme (MUST be defined before cache)
+app = dash.Dash(
+    __name__,
+    external_stylesheets=[dbc.themes.LUX],
+    assets_folder='assets',
+    suppress_callback_exceptions=True,
+    meta_tags=[
+        {"name": "viewport", "content": "width=device-width, initial-scale=1"}
+    ]
+)
+
+# Get Redis URL from environment (Railway provides this automatically)
+REDIS_URL = os.getenv('REDIS_URL')  # Railway sets this when you add Redis
 
 if REDIS_URL:
     cache_config = {
@@ -38,29 +53,8 @@ else:
     }
     print("⚠️ Using simple cache (no Redis)")
 
+# Configure Flask-Caching (after app is defined)
 cache = Cache(app.server, config=cache_config)
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Initialize Dash app with modern theme
-app = dash.Dash(
-    __name__,
-    external_stylesheets=[dbc.themes.LUX],
-    assets_folder='assets',
-    suppress_callback_exceptions=True,
-    meta_tags=[
-        {"name": "viewport", "content": "width=device-width, initial-scale=1"}
-    ]
-)
-
-# Configure Flask-Caching for performance
-cache = Cache(app.server, config={
-    'CACHE_TYPE': 'SimpleCache',  # Use filesystem for better persistence
-    'CACHE_DEFAULT_TIMEOUT': 300,  # 5 minutes cache
-    'CACHE_THRESHOLD': 100  # Maximum number of items
-})
 
 # App title
 app.title = "Orthopedic Implant Analytics Dashboard"
