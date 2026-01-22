@@ -188,6 +188,39 @@ h5 { font-size: 16px; }
     color: #6366f1 !important;
 }
 
+/* Loading Spinner Optimizations - Prevent Page Jumps */
+._dash-loading {
+    position: absolute !important;
+    z-index: 100 !important;
+}
+
+._dash-loading-callback {
+    position: relative !important;
+    min-height: auto !important;
+}
+
+/* Prevent loading overlay from covering entire viewport */
+._dash-loading._dash-loading-is-fullscreen {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: auto !important;
+    height: auto !important;
+}
+
+/* Keep card body stable during loading */
+.card-body {
+    min-height: 400px;
+    position: relative;
+}
+
+/* Loading wrapper for better positioning */
+.loading-wrapper {
+    position: relative !important;
+    min-height: 300px !important;
+}
+
 /* Alert Styling */
 .alert {
     border-radius: 12px !important;
@@ -728,3 +761,84 @@ div[class*="control"] {
     padding: 0 !important;
     margin: 0 !important;
 }
+
+/* Fullscreen Chart Button Styles */
+.fullscreen-chart-btn {
+    transition: all 0.3s ease !important;
+    background-color: #ffffff !important;
+    border: 1px solid #dee2e6 !important;
+    color: #495057 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    opacity: 0.7 !important;
+}
+
+.fullscreen-chart-btn:hover {
+    opacity: 1 !important;
+    background-color: #f8f9fa !important;
+    border-color: #6366f1 !important;
+    color: #6366f1 !important;
+    transform: scale(1.1);
+    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.2) !important;
+}
+
+.fullscreen-chart-btn:active {
+    transform: scale(0.95);
+}
+
+.fullscreen-chart-btn i {
+    font-size: 14px;
+}
+
+/* Fullscreen Modal Styles */
+#fullscreen-chart-modal .modal-xl {
+    max-width: 95vw !important;
+}
+
+#fullscreen-chart-modal .modal-dialog {
+    max-width: 95vw !important;
+    margin: 1.75rem auto !important;
+}
+
+#fullscreen-chart-modal .modal-content {
+    min-height: 85vh !important;
+    background: white !important;
+}
+
+#fullscreen-chart-modal .modal-body {
+    min-height: 70vh !important;
+    padding: 20px !important;
+    overflow: visible !important;
+}
+
+#fullscreen-chart-modal .modal-header {
+    border-bottom: 2px solid #e5e7eb;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+}
+
+#fullscreen-chart-modal .modal-title {
+    font-weight: 600;
+    font-size: 20px;
+    color: white !important;
+}
+
+#fullscreen-chart-modal .btn-close {
+    filter: brightness(0) invert(1);
+}
+
+/* Fullscreen Chart Container */
+#fullscreen-chart-container {
+    width: 100% !important;
+    min-height: 70vh !important;
+    display: block !important;
+    position: relative !important;
+    background: white !important;
+}
+
+#fullscreen-plotly-chart {
+    width: 100% !important;
+    height: 70vh !important;
+    min-height: 70vh !important;
+    display: block !important;
+}
+

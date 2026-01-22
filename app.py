@@ -27,7 +27,10 @@ logger = logging.getLogger(__name__)
 # Initialize Dash app with modern theme (MUST be defined before cache)
 app = dash.Dash(
     __name__,
-    external_stylesheets=[dbc.themes.LUX],
+    external_stylesheets=[
+        dbc.themes.LUX,
+        'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css'
+    ],
     assets_folder='assets',
     suppress_callback_exceptions=True,
     meta_tags=[
@@ -101,6 +104,43 @@ def format_qty(value):
         return f"{value/1e3:.2f} K"
     else:
         return f"{value:,.0f}"
+
+def create_chart_with_fullscreen(chart_component, chart_id, chart_title="Chart"):
+    """
+    Wrap a chart component with a fullscreen button
+    
+    Args:
+        chart_component: The dcc.Graph component
+        chart_id: Unique identifier for the chart
+        chart_title: Title to display in fullscreen modal
+    
+    Returns:
+        html.Div containing the chart with fullscreen button overlay
+    """
+    return html.Div([
+        chart_component,
+        html.Div([
+            dbc.Button(
+                html.I(className="bi bi-arrows-fullscreen"),
+                id={'type': 'fullscreen-btn', 'index': chart_id},
+                color="light",
+                size="sm",
+                className="fullscreen-chart-btn",
+                style={
+                    'position': 'absolute',
+                    'top': '10px',
+                    'right': '10px',
+                    'zIndex': 1000,
+                    'opacity': 0.7,
+                    'border': '1px solid #dee2e6',
+                    'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                    'padding': '4px 8px',
+                },
+                title="View fullscreen",
+                n_clicks=0
+            )
+        ]),
+    ], id=f'{chart_id}-wrapper', style={'position': 'relative'}, **{'data-chart-title': chart_title, 'data-chart-id': chart_id})
 
 def get_week_start():
     today = datetime.now()
@@ -251,6 +291,40 @@ app.layout = dbc.Container([
     dcc.Store(id='selected-location-store', storage_type='session'),  # Store for map selection
     dcc.Store(id='chart-data-store', storage_type='memory'),  # Store for chart data
     html.Div(id='saved-charts-data', style={'display': 'none'}),  # Hidden div for saved charts data
+    dcc.Store(id='fullscreen-chart-store', storage_type='memory'),  # Store for fullscreen chart data
+    
+    # Fullscreen Chart Modal
+    dbc.Modal([
+        dbc.ModalHeader(
+            dbc.ModalTitle(id='fullscreen-modal-title'),
+            close_button=True
+        ),
+        dbc.ModalBody(
+            html.Div(
+                id='fullscreen-chart-container',
+                style={
+                    'width': '100%',
+                    'minHeight': '70vh',
+                    'display': 'block',
+                    'position': 'relative',
+                    'background': 'white'
+                }
+            ),
+            style={
+                'padding': '20px',
+                'minHeight': '70vh',
+                'overflow': 'visible'
+            }
+        ),
+    ], 
+    id='fullscreen-chart-modal', 
+    size='xl', 
+    is_open=False, 
+    centered=True,
+    style={'maxWidth': '95vw'},
+    backdrop=True,
+    scrollable=False
+    ),
     
     # Modern Header with gradient and toggle button
     dbc.Row([
@@ -564,13 +638,21 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
         print(f"   Revenue: {format_inr(revenue)}")
         print(f"   Quantity: {format_qty(quantity)}")
         
-        # Calculate previous period for comparison (same duration before current period)
+        # Calculate previous period for comparison (default: previous month)
         start_date_obj = pd.to_datetime(start_date)
         end_date_obj = pd.to_datetime(end_date)
-        period_duration = (end_date_obj - start_date_obj).days
         
-        prev_start_date = start_date_obj - pd.Timedelta(days=period_duration + 1)
-        prev_end_date = start_date_obj - pd.Timedelta(days=1)
+        # Calculate previous month date range
+        # Go back to the same day in the previous month
+        # Handle month boundaries properly
+        try:
+            # Try to get the same day in previous month
+            prev_start_date = start_date_obj - pd.DateOffset(months=1)
+            prev_end_date = end_date_obj - pd.DateOffset(months=1)
+        except:
+            # Fallback: use 30 days ago if month offset fails
+            prev_start_date = start_date_obj - pd.Timedelta(days=30)
+            prev_end_date = end_date_obj - pd.Timedelta(days=30)
         
         # Initialize prev_df as empty DataFrame
         prev_df = pd.DataFrame()
@@ -699,7 +781,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                         color='#2ECC71',
                         gradient_start='rgba(46, 204, 113, 0.1)',
                         gradient_end='rgba(46, 204, 113, 0.02)',
-                        date_range_text=f"{start_date_str} → {end_date_str}"
+                        date_range_text=f"{start_date_str} → {end_date_str} (vs prev month)"
                     )
                 ], width=3, className="d-flex"),
                 
@@ -713,7 +795,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                         color='#3498DB',
                         gradient_start='rgba(52, 152, 219, 0.1)',
                         gradient_end='rgba(52, 152, 219, 0.02)',
-                        date_range_text=f"{start_date_str} → {end_date_str}"
+                        date_range_text=f"{start_date_str} → {end_date_str} (vs prev month)"
                     )
                 ], width=3, className="d-flex"),
                 
@@ -741,7 +823,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                         color='#E74C3C',
                         gradient_start='rgba(231, 76, 60, 0.1)',
                         gradient_end='rgba(231, 76, 60, 0.02)',
-                        date_range_text=f"{start_date_str} → {end_date_str}"
+                        date_range_text=f"{start_date_str} → {end_date_str} (vs prev month)"
                     )
                 ], width=3, className="d-flex"),
             ], className="mb-4 g-2"),
@@ -758,7 +840,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                         color='#9B59B6',
                         gradient_start='rgba(155, 89, 182, 0.1)',
                         gradient_end='rgba(155, 89, 182, 0.02)',
-                        date_range_text=f"{start_date_str} → {end_date_str}"
+                        date_range_text=f"{start_date_str} → {end_date_str} (vs prev month)"
                     )
                 ], width=3, className="d-flex"),
                 
@@ -772,7 +854,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                         color='#1ABC9C',
                         gradient_start='rgba(26, 188, 156, 0.1)',
                         gradient_end='rgba(26, 188, 156, 0.02)',
-                        date_range_text=f"{start_date_str} → {end_date_str}"
+                        date_range_text=f"{start_date_str} → {end_date_str} (vs prev month)"
                     )
                 ], width=3, className="d-flex"),
                 
@@ -786,7 +868,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                         color='#E67E22',
                         gradient_start='rgba(230, 126, 34, 0.1)',
                         gradient_end='rgba(230, 126, 34, 0.02)',
-                        date_range_text=f"{start_date_str} → {end_date_str}"
+                        date_range_text=f"{start_date_str} → {end_date_str} (vs prev month)"
                     )
                 ], width=3, className="d-flex"),
                 
@@ -867,12 +949,16 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                             # Selected Location Display
                             html.Div(id='selected-location-display', className="mb-2"),
                             
-                            # Map
+                            # Map with fullscreen button
                             dcc.Loading(
-                                dcc.Graph(
-                                    id='geographic-map',
-                                    config={'displayModeBar': True, 'scrollZoom': True},
-                                    style={'height': '600px'}
+                                create_chart_with_fullscreen(
+                                    dcc.Graph(
+                                        id='geographic-map',
+                                        config={'displayModeBar': True, 'scrollZoom': True},
+                                        style={'height': '600px'}
+                                    ),
+                                    'geographic-map',
+                                    'Geographic Sales Distribution'
                                 ),
                                 type='default'
                             )
@@ -896,14 +982,26 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                                 html.H6("Top Dealers by Revenue", className="mb-2"),
                                 dcc.Dropdown(
                                     id='dealer-filter',
-                                    placeholder='Select dealers...',
+                                    placeholder='Select dealers... (multi-select)',
                                     multi=True,
-                                    className='mb-2'
+                                    className='mb-2',
+                                    clearable=True,
+                                    searchable=True
                                 )
                             ])
                         ]),
                         dbc.CardBody([
-                            dcc.Graph(id='dealer-pie-chart', config={'displayModeBar': True})
+                            dcc.Loading(
+                                id="loading-dealer-pie",
+                                type="default",
+                                children=[
+                                    create_chart_with_fullscreen(
+                                        dcc.Graph(id='dealer-pie-chart', config={'displayModeBar': True}),
+                                        'dealer-pie-chart',
+                                        'Top Dealers by Revenue'
+                                    )
+                                ]
+                            )
                         ])
                     ])
                 ], width=6),
@@ -916,14 +1014,26 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                                 html.H6("Revenue by State", className="mb-2"),
                                 dcc.Dropdown(
                                     id='state-filter',
-                                    placeholder='Select states...',
+                                    placeholder='Select states... (multi-select)',
                                     multi=True,
-                                    className='mb-2'
+                                    className='mb-2',
+                                    clearable=True,
+                                    searchable=True
                                 )
                             ])
                         ]),
                         dbc.CardBody([
-                            dcc.Graph(id='state-pie-chart', config={'displayModeBar': True})
+                            dcc.Loading(
+                                id="loading-state-pie",
+                                type="default",
+                                children=[
+                                    create_chart_with_fullscreen(
+                                        dcc.Graph(id='state-pie-chart', config={'displayModeBar': True}),
+                                        'state-pie-chart',
+                                        'Revenue by State'
+                                    )
+                                ]
+                            )
                         ])
                     ])
                 ], width=6),
@@ -939,14 +1049,28 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                                 html.H6("Revenue by Category", className="mb-2"),
                                 dcc.Dropdown(
                                     id='category-filter',
-                                    placeholder='Select categories...',
+                                    placeholder='Select categories... (multi-select)',
                                     multi=True,
-                                    className='mb-2'
+                                    className='mb-2',
+                                    clearable=True,
+                                    searchable=True
                                 )
                             ])
                         ]),
                         dbc.CardBody([
-                            dcc.Graph(id='category-bar-chart', config={'displayModeBar': True})
+                            dcc.Loading(
+                                id="loading-category-bar",
+                                type="circle",
+                                color=COLORS['primary'],
+                                children=[
+                                    create_chart_with_fullscreen(
+                                        dcc.Graph(id='category-bar-chart', config={'displayModeBar': True}),
+                                        'category-bar-chart',
+                                        'Revenue by Category'
+                                    )
+                                ],
+                                parent_className='loading-wrapper'
+                            )
                         ])
                     ])
                 ], width=6),
@@ -959,14 +1083,26 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                                 html.H6("Top Cities by Revenue", className="mb-2"),
                                 dcc.Dropdown(
                                     id='city-filter',
-                                    placeholder='Select cities...',
+                                    placeholder='Select cities... (multi-select)',
                                     multi=True,
-                                    className='mb-2'
+                                    className='mb-2',
+                                    clearable=True,
+                                    searchable=True
                                 )
                             ])
                         ]),
                         dbc.CardBody([
-                            dcc.Graph(id='city-bar-chart', config={'displayModeBar': True})
+                            dcc.Loading(
+                                id="loading-city-bar",
+                                type="default",
+                                children=[
+                                    create_chart_with_fullscreen(
+                                        dcc.Graph(id='city-bar-chart', config={'displayModeBar': True}),
+                                        'city-bar-chart',
+                                        'Top Cities by Revenue'
+                                    )
+                                ]
+                            )
                         ])
                     ])
                 ], width=6),
@@ -977,7 +1113,11 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                 dbc.Col([
                     dbc.Card([
                         dbc.CardBody([
-                            dcc.Graph(figure=_create_revenue_trend(df, VALUE_COL), config={'displayModeBar': True})
+                            create_chart_with_fullscreen(
+                                dcc.Graph(figure=_create_revenue_trend(df, VALUE_COL), config={'displayModeBar': True}),
+                                'revenue-trend',
+                                'Revenue Trend Over Time'
+                            )
                         ])
                     ])
                 ], width=12),
@@ -992,7 +1132,11 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                 *(dbc.Col([
                     dbc.Card([
                         dbc.CardBody([
-                            dcc.Graph(figure=_create_weekday_pattern(df, VALUE_COL), config={'displayModeBar': True})
+                            create_chart_with_fullscreen(
+                                dcc.Graph(figure=_create_weekday_pattern(df, VALUE_COL), config={'displayModeBar': True}),
+                                'weekday-pattern',
+                                'Revenue by Day of Week'
+                            )
                         ])
                     ])
                 ], width=4) if has_date_data else []),
@@ -1007,14 +1151,26 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                                 html.H6("Dealer Comparison", className="mb-2"),
                                 dcc.Dropdown(
                                     id='dealer-comp-filter',
-                                    placeholder='Select dealers...',
+                                    placeholder='Select dealers... (multi-select)',
                                     multi=True,
-                                    className='mb-2'
+                                    className='mb-2',
+                                    clearable=True,
+                                    searchable=True
                                 )
                             ])
                         ]),
                         dbc.CardBody([
-                            dcc.Graph(id='dealer-comparison-chart', config={'displayModeBar': True})
+                            dcc.Loading(
+                                id="loading-dealer-comp",
+                                type="default",
+                                children=[
+                                    create_chart_with_fullscreen(
+                                        dcc.Graph(id='dealer-comparison-chart', config={'displayModeBar': True}),
+                                        'dealer-comparison-chart',
+                                        'Dealer Comparison - Revenue vs Quantity'
+                                    )
+                                ]
+                            )
                         ])
                     ])
                 ], width=4),
@@ -1027,14 +1183,26 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                                 html.H6("Cities by Revenue", className="mb-2"),
                                 dcc.Dropdown(
                                     id='city-filter-2',
-                                    placeholder='Select cities...',
+                                    placeholder='Select cities... (multi-select)',
                                     multi=True,
-                                    className='mb-2'
+                                    className='mb-2',
+                                    clearable=True,
+                                    searchable=True
                                 )
                             ])
                         ]),
                         dbc.CardBody([
-                            dcc.Graph(id='city-bar-chart-2', config={'displayModeBar': True})
+                            dcc.Loading(
+                                id="loading-city-bar-2",
+                                type="default",
+                                children=[
+                                    create_chart_with_fullscreen(
+                                        dcc.Graph(id='city-bar-chart-2', config={'displayModeBar': True}),
+                                        'city-bar-chart-2',
+                                        'Cities by Revenue'
+                                    )
+                                ]
+                            )
                         ])
                     ])
                 ], width=4),
@@ -1047,14 +1215,26 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                                 html.H6("Category Hierarchy", className="mb-2"),
                                 dcc.Dropdown(
                                     id='category-sunburst-filter',
-                                    placeholder='Select categories...',
+                                    placeholder='Select categories... (multi-select)',
                                     multi=True,
-                                    className='mb-2'
+                                    className='mb-2',
+                                    clearable=True,
+                                    searchable=True
                                 )
                             ])
                         ]),
                         dbc.CardBody([
-                            dcc.Graph(id='category-sunburst-chart', config={'displayModeBar': True})
+                            dcc.Loading(
+                                id="loading-category-sunburst",
+                                type="default",
+                                children=[
+                                    create_chart_with_fullscreen(
+                                        dcc.Graph(id='category-sunburst-chart', config={'displayModeBar': True}),
+                                        'category-sunburst-chart',
+                                        'Category & Sub-Category Breakdown'
+                                    )
+                                ]
+                            )
                         ])
                     ])
                 ], width=4),
@@ -1082,9 +1262,10 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                     dbc.Col([
                         dbc.Card([
                             dbc.CardBody([
-                                dcc.Graph(
-                                    figure=_create_activity_heatmap(df, VALUE_COL),
-                                    config={'displayModeBar': True}
+                                create_chart_with_fullscreen(
+                                    dcc.Graph(figure=_create_activity_heatmap(df, VALUE_COL), config={'displayModeBar': True}),
+                                    'activity-heatmap',
+                                    'Activity Heatmap'
                                 )
                             ])
                         ], className="shadow-sm")
@@ -1093,7 +1274,11 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                     dbc.Col([
                         dbc.Card([
                             dbc.CardBody([
-                                dcc.Graph(figure=_create_hourly_heatmap(df, VALUE_COL), config={'displayModeBar': True})
+                                create_chart_with_fullscreen(
+                                    dcc.Graph(figure=_create_hourly_heatmap(df, VALUE_COL), config={'displayModeBar': True}),
+                                    'hourly-heatmap',
+                                    'Hourly Activity Pattern'
+                                )
                             ])
                         ])
                     ], width=4),
@@ -1101,7 +1286,11 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                     dbc.Col([
                         dbc.Card([
                             dbc.CardBody([
-                                dcc.Graph(figure=_create_day_part_analysis(df, VALUE_COL), config={'displayModeBar': True})
+                                create_chart_with_fullscreen(
+                                    dcc.Graph(figure=_create_day_part_analysis(df, VALUE_COL), config={'displayModeBar': True}),
+                                    'day-part-analysis',
+                                    'Sales by Time of Day'
+                                )
                             ])
                         ])
                     ], width=4),
@@ -1114,7 +1303,11 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                 dbc.Col([
                     dbc.Card([
                         dbc.CardBody([
-                            dcc.Graph(figure=_create_sales_funnel(df), config={'displayModeBar': True})
+                            create_chart_with_fullscreen(
+                                dcc.Graph(figure=_create_sales_funnel(df), config={'displayModeBar': True}),
+                                'sales-funnel',
+                                'Sales Funnel'
+                            )
                         ])
                     ])
                 ], width=6),
@@ -1123,7 +1316,11 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                 *(dbc.Col([
                     dbc.Card([
                         dbc.CardBody([
-                            dcc.Graph(figure=_create_conversion_timeline(df), config={'displayModeBar': True})
+                            create_chart_with_fullscreen(
+                                dcc.Graph(figure=_create_conversion_timeline(df), config={'displayModeBar': True}),
+                                'conversion-timeline',
+                                'Conversion Timeline'
+                            )
                         ])
                     ])
                 ], width=6) if has_date_data else []),
@@ -1185,18 +1382,22 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                                         dbc.Label("Filter by Category", className="fw-bold small"),
                                         dcc.Dropdown(
                                             id='slow-moving-category-filter',
-                                            placeholder='All Categories',
+                                            placeholder='All Categories (multi-select)',
                                             multi=True,
-                                            className='mb-2'
+                                            className='mb-2',
+                                            clearable=True,
+                                            searchable=True
                                         )
                                     ], width=4),
                                     dbc.Col([
                                         dbc.Label("Filter by Dealer", className="fw-bold small"),
                                         dcc.Dropdown(
                                             id='slow-moving-dealer-filter',
-                                            placeholder='All Dealers',
+                                            placeholder='All Dealers (multi-select)',
                                             multi=True,
-                                            className='mb-2'
+                                            className='mb-2',
+                                            clearable=True,
+                                            searchable=True
                                         )
                                     ], width=4),
                                     dbc.Col([
@@ -1303,18 +1504,22 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                                     dbc.Label("Filter by Category", className="fw-bold small"),
                                     dcc.Dropdown(
                                         id='cross-sell-category-filter',
-                                        placeholder='All Categories',
+                                        placeholder='All Categories (multi-select)',
                                         multi=True,
-                                        className='mb-2'
+                                        className='mb-2',
+                                        clearable=True,
+                                        searchable=True
                                     )
                                 ], width=4),
                                 dbc.Col([
                                     dbc.Label("Filter by Dealer", className="fw-bold small"),
                                     dcc.Dropdown(
                                         id='cross-sell-dealer-filter',
-                                        placeholder='All Dealers',
+                                        placeholder='All Dealers (multi-select)',
                                         multi=True,
-                                        className='mb-2'
+                                        className='mb-2',
+                                        clearable=True,
+                                        searchable=True
                                     )
                                 ], width=4),
                                 dbc.Col([
@@ -1406,27 +1611,33 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                                     dbc.Label("Filter by Dealer", className="fw-bold small"),
                                     dcc.Dropdown(
                                         id='crm-dealer-filter',
-                                        placeholder='All Dealers',
+                                        placeholder='All Dealers (multi-select)',
                                         multi=True,
-                                        className='mb-2'
+                                        className='mb-2',
+                                        clearable=True,
+                                        searchable=True
                                     )
                                 ], width=3),
                                 dbc.Col([
                                     dbc.Label("Filter by State", className="fw-bold small"),
                                     dcc.Dropdown(
                                         id='crm-state-filter',
-                                        placeholder='All States',
+                                        placeholder='All States (multi-select)',
                                         multi=True,
-                                        className='mb-2'
+                                        className='mb-2',
+                                        clearable=True,
+                                        searchable=True
                                     )
                                 ], width=3),
                                 dbc.Col([
                                     dbc.Label("Filter by Product Family", className="fw-bold small"),
                                     dcc.Dropdown(
                                         id='crm-product-family-filter',
-                                        placeholder='All Product Families',
+                                        placeholder='All Product Families (multi-select)',
                                         multi=True,
-                                        className='mb-2'
+                                        className='mb-2',
+                                        clearable=True,
+                                        searchable=True
                                     )
                                 ], width=3),
                                 dbc.Col([
@@ -1803,41 +2014,34 @@ def toggle_sidebar(n_clicks, current_style):
 # Populate dropdown options from chart data
 @app.callback(
     Output('dealer-filter', 'options'),
-    Output('dealer-filter', 'value'),
     Output('state-filter', 'options'),
-    Output('state-filter', 'value'),
     Output('category-filter', 'options'),
-    Output('category-filter', 'value'),
     Output('city-filter', 'options'),
-    Output('city-filter', 'value'),
     Output('dealer-comp-filter', 'options'),
-    Output('dealer-comp-filter', 'value'),
     Output('city-filter-2', 'options'),
-    Output('city-filter-2', 'value'),
     Output('category-sunburst-filter', 'options'),
-    Output('category-sunburst-filter', 'value'),
     Input('chart-data-store', 'data'),
     prevent_initial_call=True
 )
 def populate_filter_options(chart_data):
     """Populate all dropdown filters with available options"""
     if not chart_data:
-        return [], [], [], [], [], [], [], [], [], [], [], [], [], []
+        return [], [], [], [], [], [], []
     
     dealer_options = [{'label': d, 'value': d} for d in chart_data.get('dealers', [])]
     state_options = [{'label': s, 'value': s} for s in chart_data.get('states', [])]
     city_options = [{'label': c, 'value': c} for c in chart_data.get('cities', [])]
     category_options = [{'label': cat, 'value': cat} for cat in chart_data.get('categories', [])]
     
-    # Return options and None for values (all selected by default)
+    # Return only options, don't reset values - this prevents refresh loops
     return (
-        dealer_options, None,  # dealer-filter
-        state_options, None,   # state-filter
-        category_options, None,  # category-filter
-        city_options, None,    # city-filter
-        dealer_options, None,  # dealer-comp-filter
-        city_options, None,    # city-filter-2
-        category_options, None  # category-sunburst-filter
+        dealer_options,  # dealer-filter options
+        state_options,   # state-filter options
+        category_options,  # category-filter options
+        city_options,    # city-filter options
+        dealer_options,  # dealer-comp-filter options
+        city_options,    # city-filter-2 options
+        category_options  # category-sunburst-filter options
     )
 
 # Update charts based on filter selections
@@ -1857,7 +2061,8 @@ def populate_filter_options(chart_data):
     Input('city-filter-2', 'value'),
     Input('category-sunburst-filter', 'value'),
     State('chart-data-store', 'data'),
-    prevent_initial_call=True
+    prevent_initial_call=True,
+    suppress_callback_exceptions=True
 )
 def update_filtered_charts(dealer_filter, state_filter, category_filter, city_filter,
                            dealer_comp_filter, city_filter_2, category_sunburst_filter,
@@ -6233,6 +6438,65 @@ def update_column_visibility(visible_columns, username, password, start_date, en
     ]
     
     return all_columns
+
+# Fullscreen Chart Modal Callback
+@app.callback(
+    Output('fullscreen-chart-modal', 'is_open'),
+    Output('fullscreen-modal-title', 'children'),
+    Output('fullscreen-chart-store', 'data'),
+    Input({'type': 'fullscreen-btn', 'index': ALL}, 'n_clicks'),
+    State('fullscreen-chart-modal', 'is_open'),
+    prevent_initial_call=True
+)
+def toggle_fullscreen_modal(n_clicks, is_open):
+    """Handle fullscreen button clicks to show charts in modal"""
+    if not any(n_clicks):
+        return no_update, no_update, no_update
+    
+    ctx = callback_context
+    if not ctx.triggered:
+        return no_update, no_update, no_update
+    
+    # Get which button was clicked
+    button_id = ctx.triggered[0]['prop_id']
+    
+    # If modal close button was clicked, close it
+    if not any(n_clicks):
+        return False, "", None
+    
+    try:
+        # Parse the button ID to get chart info
+        import json
+        button_data = json.loads(button_id.split('.')[0])
+        chart_id = button_data['index']
+        
+        # Get the chart title from the chart_id
+        chart_titles = {
+            'dealer-pie-chart': '🏪 Top Dealers by Revenue',
+            'state-pie-chart': '🗺️ Revenue by State',
+            'category-bar-chart': '📂 Revenue by Category',
+            'city-bar-chart': '🏙️ Top Cities by Revenue',
+            'dealer-comparison-chart': '🏪 Dealer Comparison - Revenue vs Quantity',
+            'city-bar-chart-2': '🏙️ Cities by Revenue',
+            'category-sunburst-chart': '📊 Category & Sub-Category Breakdown',
+            'geographic-map': '🗺️ Geographic Sales Distribution',
+            'revenue-trend': '📈 Revenue Trend Over Time',
+            'weekday-pattern': '📅 Revenue by Day of Week',
+            'activity-heatmap': '📅 Activity Heatmap',
+            'hourly-heatmap': '⏰ Hourly Activity Pattern',
+            'day-part-analysis': '🕐 Day Part Analysis',
+            'sales-funnel': '🎯 Sales Funnel Analysis',
+            'conversion-timeline': '📊 Conversion Metrics Timeline',
+        }
+        
+        chart_title = chart_titles.get(chart_id, 'Chart View')
+        
+        # Store the chart_id - JavaScript will read from the store and populate the container
+        return True, chart_title, chart_id
+        
+    except Exception as e:
+        print(f"Error in fullscreen modal: {str(e)}")
+        return False, "", None
 
 if __name__ == '__main__':
     print("\n" + "="*60)
