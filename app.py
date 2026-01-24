@@ -80,6 +80,27 @@ COLORS = {
     'sidebar_bg': '#f8fafc'    # Sidebar background
 }
 
+# Global Chart Font Configuration - INCREASED SIZES
+CHART_FONT_CONFIG = {
+    'title_size': 20,          # Chart titles
+    'axis_title_size': 16,     # Axis titles
+    'axis_tick_size': 14,      # Axis tick labels
+    'legend_size': 14,         # Legend text
+    'annotation_size': 14,     # Annotations
+    'general_size': 14,        # General chart text
+    'family': 'Arial, sans-serif'
+}
+
+# Text truncation helper
+def truncate_text(text, max_length=30):
+    """Truncate text with ellipsis if it exceeds max_length"""
+    if pd.isna(text):
+        return ""
+    text_str = str(text)
+    if len(text_str) > max_length:
+        return text_str[:max_length-3] + "..."
+    return text_str
+
 # Helper functions for formatting
 def format_inr(value):
     """Format value in Indian currency format (Lakhs/Crores)"""
@@ -107,7 +128,7 @@ def format_qty(value):
 
 def create_chart_with_fullscreen(chart_component, chart_id, chart_title="Chart"):
     """
-    Wrap a chart component with a fullscreen button
+    Wrap a chart component with fullscreen and save buttons
     
     Args:
         chart_component: The dcc.Graph component
@@ -115,30 +136,48 @@ def create_chart_with_fullscreen(chart_component, chart_id, chart_title="Chart")
         chart_title: Title to display in fullscreen modal
     
     Returns:
-        html.Div containing the chart with fullscreen button overlay
+        html.Div containing the chart with fullscreen and save button overlay
     """
     return html.Div([
         chart_component,
         html.Div([
-            dbc.Button(
-                html.I(className="bi bi-arrows-fullscreen"),
-                id={'type': 'fullscreen-btn', 'index': chart_id},
-                color="light",
-                size="sm",
-                className="fullscreen-chart-btn",
-                style={
-                    'position': 'absolute',
-                    'top': '10px',
-                    'right': '10px',
-                    'zIndex': 1000,
-                    'opacity': 0.7,
-                    'border': '1px solid #dee2e6',
-                    'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
-                    'padding': '4px 8px',
-                },
-                title="View fullscreen",
-                n_clicks=0
-            )
+            dbc.ButtonGroup([
+                dbc.Button(
+                    html.I(className="bi bi-bookmark"),
+                    id={'type': 'save-chart-btn', 'index': chart_id},
+                    color="success",
+                    size="sm",
+                    className="save-chart-btn",
+                    style={
+                        'opacity': 0.7,
+                        'border': '1px solid #dee2e6',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                        'padding': '4px 8px',
+                    },
+                    title="Save chart",
+                    n_clicks=0
+                ),
+                dbc.Button(
+                    html.I(className="bi bi-arrows-fullscreen"),
+                    id={'type': 'fullscreen-btn', 'index': chart_id},
+                    color="light",
+                    size="sm",
+                    className="fullscreen-chart-btn",
+                    style={
+                        'opacity': 0.7,
+                        'border': '1px solid #dee2e6',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)',
+                        'padding': '4px 8px',
+                    },
+                    title="View fullscreen",
+                    n_clicks=0
+                )
+            ], style={
+                'position': 'absolute',
+                'top': '10px',
+                'right': '10px',
+                'zIndex': 1000,
+            })
         ]),
     ], id=f'{chart_id}-wrapper', style={'position': 'relative'}, **{'data-chart-title': chart_title, 'data-chart-id': chart_id})
 
@@ -292,6 +331,18 @@ app.layout = dbc.Container([
     dcc.Store(id='chart-data-store', storage_type='memory'),  # Store for chart data
     html.Div(id='saved-charts-data', style={'display': 'none'}),  # Hidden div for saved charts data
     dcc.Store(id='fullscreen-chart-store', storage_type='memory'),  # Store for fullscreen chart data
+    
+    # Toast notification container (positioned at top right)
+    html.Div(
+        id='toast-container',
+        style={
+            'position': 'fixed',
+            'top': '20px',
+            'right': '20px',
+            'zIndex': 9999,
+            'maxWidth': '350px'
+        }
+    ),
     
     # Fullscreen Chart Modal
     dbc.Modal([
@@ -2471,9 +2522,19 @@ def generate_custom_chart(n_clicks, x_axis, y_axis, chart_type, agg_type, top_n,
             fig.update_yaxes(tickformat=".2f", tickprefix="Rs. ", ticksuffix="", 
                            tickvals=[1e5, 1e6, 1e7, 1e8, 1e9], ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"])
         
-        fig.update_layout(height=500, font=dict(size=12, family="Arial, sans-serif"),
-                         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                         margin=dict(t=40, b=10, l=10, r=10))
+        fig.update_layout(
+            height=500, 
+            font=dict(size=CHART_FONT_CONFIG['general_size'], family=CHART_FONT_CONFIG['family']),
+            paper_bgcolor='rgba(0,0,0,0)', 
+            plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(t=40, b=10, l=10, r=10),
+            title_font_size=CHART_FONT_CONFIG['title_size'],
+            xaxis=dict(title_font_size=CHART_FONT_CONFIG['axis_title_size'], 
+                      tickfont_size=CHART_FONT_CONFIG['axis_tick_size']),
+            yaxis=dict(title_font_size=CHART_FONT_CONFIG['axis_title_size'],
+                      tickfont_size=CHART_FONT_CONFIG['axis_tick_size']),
+            legend=dict(font_size=CHART_FONT_CONFIG['legend_size'])
+        )
         
         return dbc.Card([
             dbc.CardHeader(title),
@@ -2714,6 +2775,45 @@ def update_my_charts(username, password, start_date, end_date, hide_innovative, 
         
         for chart_config in saved_charts:
             try:
+                # Check if this is a saved dashboard chart (has 'figure' field) or custom chart (has 'x_axis' field)
+                if 'figure' in chart_config:
+                    # This is a saved dashboard chart with pre-rendered figure
+                    chart_name = chart_config.get('title', 'Untitled Chart')
+                    timestamp = chart_config.get('timestamp')
+                    unique_id = chart_config.get('unique_id')
+                    figure_data = chart_config.get('figure')
+                    
+                    # Format timestamp
+                    try:
+                        timestamp_obj = datetime.fromisoformat(timestamp)
+                        formatted_timestamp = timestamp_obj.strftime("%d-%m-%Y %H:%M")
+                    except (ValueError, TypeError, AttributeError):
+                        formatted_timestamp = "Unknown date"
+                    
+                    # Create card with the saved figure
+                    card = dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6(chart_name, className="mb-0 fw-bold"),
+                                html.Small(f"Saved on {formatted_timestamp}", className="text-muted")
+                            ], style={'flex': '1'}),
+                        ], className="d-flex justify-content-between align-items-center"),
+                        dbc.CardBody([
+                            dcc.Graph(figure=figure_data, config={'displayModeBar': True}),
+                            dbc.Button(
+                                "Delete",
+                                id={'type': 'delete-chart-btn', 'index': unique_id},
+                                color='danger',
+                                size='sm',
+                                className="mt-2"
+                            )
+                        ])
+                    ], className="mb-3")
+                    
+                    chart_cards.append(card)
+                    continue
+                
+                # Otherwise, this is a custom-built chart - regenerate it
                 # Extract config
                 x_axis = chart_config.get('x_axis')
                 y_axis = chart_config.get('y_axis')
@@ -2786,9 +2886,19 @@ def update_my_charts(username, password, start_date, end_date, hide_innovative, 
                     fig.update_yaxes(tickformat=".2f", tickprefix="Rs. ", ticksuffix="", 
                                    tickvals=[1e5, 1e6, 1e7, 1e8, 1e9], ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"])
                 
-                fig.update_layout(height=500, font=dict(size=12, family="Arial, sans-serif"),
-                                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                                 margin=dict(t=40, b=10, l=10, r=10))
+                fig.update_layout(
+                    height=500, 
+                    font=dict(size=CHART_FONT_CONFIG['general_size'], family=CHART_FONT_CONFIG['family']),
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(t=40, b=10, l=10, r=10),
+                    title_font_size=CHART_FONT_CONFIG['title_size'],
+                    xaxis=dict(title_font_size=CHART_FONT_CONFIG['axis_title_size'], 
+                              tickfont_size=CHART_FONT_CONFIG['axis_tick_size']),
+                    yaxis=dict(title_font_size=CHART_FONT_CONFIG['axis_title_size'],
+                              tickfont_size=CHART_FONT_CONFIG['axis_tick_size']),
+                    legend=dict(font_size=CHART_FONT_CONFIG['legend_size'])
+                )
                 
                 # Format timestamp
                 try:
@@ -4617,13 +4727,13 @@ def apply_modern_chart_style(fig, title="", height=400):
     fig.update_layout(
         template='plotly_white',
         font=dict(
-            family='Inter, -apple-system, BlinkMacSystemFont, sans-serif',
-            size=12,
+            family=CHART_FONT_CONFIG['family'],
+            size=CHART_FONT_CONFIG['general_size'],
             color='#1f2937'
         ),
         title=dict(
             text=title,
-            font=dict(size=16, color='#1f2937'),
+            font=dict(size=CHART_FONT_CONFIG['title_size'], color='#1f2937'),
             x=0.5,
             xanchor='center'
         ),
@@ -4633,8 +4743,8 @@ def apply_modern_chart_style(fig, title="", height=400):
         height=height,
         hoverlabel=dict(
             bgcolor='white',
-            font_size=12,
-            font_family='Inter, sans-serif',
+            font_size=CHART_FONT_CONFIG['general_size'],
+            font_family=CHART_FONT_CONFIG['family'],
             font_color='black',
             bordercolor='#e5e7eb'
         ),
@@ -4642,13 +4752,20 @@ def apply_modern_chart_style(fig, title="", height=400):
             gridcolor='#f3f4f6',
             showgrid=False,
             zeroline=False,
-            linecolor='#e5e7eb'
+            linecolor='#e5e7eb',
+            title_font_size=CHART_FONT_CONFIG['axis_title_size'],
+            tickfont_size=CHART_FONT_CONFIG['axis_tick_size'],
+            tickmode='auto',
+            tickangle=-45  # Angle labels to prevent overlap
         ),
         yaxis=dict(
             gridcolor='#f3f4f6',
             showgrid=True,
             zeroline=False,
-            linecolor='#e5e7eb'
+            linecolor='#e5e7eb',
+            title_font_size=CHART_FONT_CONFIG['axis_title_size'],
+            tickfont_size=CHART_FONT_CONFIG['axis_tick_size'],
+            automargin=True  # Auto-adjust margins for long labels
         ),
         legend=dict(
             orientation='h',
@@ -4658,7 +4775,10 @@ def apply_modern_chart_style(fig, title="", height=400):
             x=0.5,
             bgcolor='rgba(255,255,255,0.9)',
             bordercolor='#e5e7eb',
-            borderwidth=1
+            borderwidth=1,
+            font_size=CHART_FONT_CONFIG['legend_size'],
+            traceorder='normal',
+            itemsizing='constant'
         )
     )
     return fig
@@ -4674,6 +4794,9 @@ def _create_dealer_pie(df, value_col, limit=10):
     dealer_data = df.groupby('Dealer Name')[value_col].sum().reset_index()
     dealer_data = dealer_data.sort_values(value_col, ascending=False).head(limit)
     
+    # Truncate long dealer names for display
+    dealer_data['Display Name'] = dealer_data['Dealer Name'].apply(lambda x: truncate_text(x, 25))
+    
     # Modern color palette - Magenta inspired
     colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', 
               '#3b82f6', '#ef4444', '#14b8a6', '#f97316', '#a855f7']
@@ -4681,13 +4804,15 @@ def _create_dealer_pie(df, value_col, limit=10):
     fig = px.pie(
         dealer_data,
         values=value_col,
-        names='Dealer Name',
-        color_discrete_sequence=colors[:len(dealer_data)]
+        names='Display Name',
+        color_discrete_sequence=colors[:len(dealer_data)],
+        custom_data=['Dealer Name']  # Keep full name for hover
     )
     fig.update_traces(
         textposition='inside',
         textinfo='percent+label',
-        hovertemplate='<b>%{label}</b><br>Revenue: ₹%{value:,.0f}<br>Share: %{percent}<extra></extra>',
+        textfont_size=CHART_FONT_CONFIG['general_size'],
+        hovertemplate='<b>%{customdata[0]}</b><br>Revenue: ₹%{value:,.0f}<br>Share: %{percent}<extra></extra>',
         marker=dict(line=dict(color='white', width=3)),
         pull=[0.05 if i == 0 else 0 for i in range(len(dealer_data))]
     )
@@ -4702,6 +4827,9 @@ def _create_state_pie(df, value_col):
     state_data = df.groupby('State')[value_col].sum().reset_index()
     state_data = state_data.sort_values(value_col, ascending=False).head(10)
     
+    # Truncate long state names for display
+    state_data['Display Name'] = state_data['State'].apply(lambda x: truncate_text(x, 20))
+    
     # Modern color palette
     colors = [COLORS['primary'], COLORS['secondary'], COLORS['success'], COLORS['warning'], 
               COLORS['info'], '#ec4899', '#f97316', '#06b6d4', '#8b5cf6', '#10b981']
@@ -4709,14 +4837,16 @@ def _create_state_pie(df, value_col):
     fig = px.pie(
         state_data,
         values=value_col,
-        names='State',
+        names='Display Name',
         title="🗺️ Top 10 States by Revenue",
-        color_discrete_sequence=colors[:len(state_data)]
+        color_discrete_sequence=colors[:len(state_data)],
+        custom_data=['State']  # Keep full name for hover
     )
     fig.update_traces(
         textposition='inside',
         textinfo='percent+label',
-        hovertemplate='<b>%{label}</b><br>Revenue: Rs. %{value:,.0f}<br>Share: %{percent}<extra></extra>',
+        textfont_size=CHART_FONT_CONFIG['general_size'],
+        hovertemplate='<b>%{customdata[0]}</b><br>Revenue: Rs. %{value:,.0f}<br>Share: %{percent}<extra></extra>',
         marker=dict(line=dict(color='white', width=2)),
         pull=[0.03 if i < 3 else 0 for i in range(len(state_data))]
     )
@@ -4744,20 +4874,24 @@ def _create_category_bar(df, value_col):
     cat_data = df.groupby('Category')[value_col].sum().reset_index()
     cat_data = cat_data.sort_values(value_col, ascending=True)
     
+    # Truncate long category names for Y-axis
+    cat_data['Display Name'] = cat_data['Category'].apply(lambda x: truncate_text(x, 35))
+    
     fig = px.bar(
         cat_data,
         x=value_col,
-        y='Category',
+        y='Display Name',
         orientation='h',
         title="📂 Revenue by Category",
         color=value_col,
-        color_continuous_scale=[[0, COLORS['primary']], [1, COLORS['secondary']]]
+        color_continuous_scale=[[0, COLORS['primary']], [1, COLORS['secondary']]],
+        custom_data=['Category']  # Keep full name for hover
     )
     fig.update_traces(
         text=[f"Rs. {x/1e5:.1f}L" for x in cat_data[value_col]],
         textposition='outside',
-        textfont=dict(size=10),
-        hovertemplate='<b>%{y}</b><br>Revenue: Rs. %{x:,.0f}<extra></extra>',
+        textfont=dict(size=CHART_FONT_CONFIG['general_size']),
+        hovertemplate='<b>%{customdata[0]}</b><br>Revenue: Rs. %{x:,.0f}<extra></extra>',
         marker=dict(
             line=dict(color='white', width=1),
             opacity=0.9
@@ -4767,7 +4901,7 @@ def _create_category_bar(df, value_col):
     # Apply modern styling
     apply_modern_chart_style(fig, "📂 Revenue by Category", height=450)
     fig.update_xaxes(tickformat=',.0f')
-    fig.update_yaxes(tickfont=dict(size=11))
+    fig.update_yaxes(tickfont=dict(size=CHART_FONT_CONFIG['axis_tick_size']))
     fig.update_layout(
         showlegend=False,
         coloraxis_showscale=False,
@@ -5005,25 +5139,29 @@ def _create_city_bar(df, value_col):
     # Sort descending and take top 12
     city_data = city_data.sort_values(value_col, ascending=False).head(12)
     
+    # Truncate long city names for X-axis
+    city_data['Display Name'] = city_data['City'].apply(lambda x: truncate_text(x, 15))
+    
     # Format text for bars
     text_values = [f"Rs. {x/1e5:.1f}L" for x in city_data[value_col]]
     
     # Create bar chart with gradient colors
     fig = px.bar(
         city_data,
-        x='City',
+        x='Display Name',
         y=value_col,
         title="🏙️ Top 12 Cities by Revenue",
         color=value_col,
-        color_continuous_scale=[[0, COLORS['light']], [1, COLORS['info']]]
+        color_continuous_scale=[[0, COLORS['light']], [1, COLORS['info']]],
+        custom_data=['City']  # Keep full name for hover
     )
     
     # Update traces
     fig.update_traces(
         text=text_values,
         textposition='outside',
-        textfont=dict(size=9),
-        hovertemplate='<b>%{x}</b><br>Revenue: Rs. %{y:,.0f}<extra></extra>',
+        textfont=dict(size=CHART_FONT_CONFIG['general_size']),
+        hovertemplate='<b>%{customdata[0]}</b><br>Revenue: Rs. %{y:,.0f}<extra></extra>',
         marker=dict(
             line=dict(color='white', width=1),
             opacity=0.9
@@ -5118,7 +5256,7 @@ def _create_weekday_pattern(df, value_col):
     fig.update_traces(
         text=[f"Rs. {x/1e5:.1f}L" for x in weekday_data[value_col]],
         textposition='outside',
-        textfont=dict(size=9),
+        textfont=dict(size=CHART_FONT_CONFIG['general_size']),
         hovertemplate='<b>%{x}</b><br>Revenue: Rs. %{y:,.0f}<extra></extra>',
         marker=dict(
             line=dict(color='white', width=1),
@@ -6439,8 +6577,67 @@ def update_column_visibility(visible_columns, username, password, start_date, en
     
     return all_columns
 
-# Fullscreen Chart Modal Callback
-@app.callback(
+# Fullscreen Chart Modal Callback (Clientside for better performance)
+app.clientside_callback(
+    """
+    function(n_clicks, is_open) {
+        if (!n_clicks || !Array.isArray(n_clicks) || n_clicks.every(c => !c)) {
+            return [window.dash_clientside.no_update, window.dash_clientside.no_update, window.dash_clientside.no_update];
+        }
+        
+        const ctx = window.dash_clientside.callback_context;
+        if (!ctx.triggered || ctx.triggered.length === 0) {
+            return [window.dash_clientside.no_update, window.dash_clientside.no_update, window.dash_clientside.no_update];
+        }
+        
+        try {
+            const triggerId = ctx.triggered[0].prop_id;
+            const buttonData = JSON.parse(triggerId.split('.')[0]);
+            const chartId = buttonData.index;
+            
+            console.log('🔵 Fullscreen button clicked for chart:', chartId);
+            
+            // Chart titles mapping
+            const chartTitles = {
+                'dealer-pie-chart': '🏪 Top Dealers by Revenue',
+                'state-pie-chart': '🗺️ Revenue by State',
+                'category-bar-chart': '📂 Revenue by Category',
+                'city-bar-chart': '🏙️ Top Cities by Revenue',
+                'dealer-comparison-chart': '🏪 Dealer Comparison - Revenue vs Quantity',
+                'city-bar-chart-2': '🏙️ Cities by Revenue',
+                'category-sunburst-chart': '📊 Category & Sub-Category Breakdown',
+                'geographic-map': '🗺️ Geographic Sales Distribution',
+                'revenue-trend': '📈 Revenue Trend Over Time',
+                'weekday-pattern': '📅 Revenue by Day of Week',
+                'activity-heatmap': '📅 Activity Heatmap',
+                'hourly-heatmap': '⏰ Hourly Activity Pattern',
+                'day-part-analysis': '🕐 Day Part Analysis',
+                'sales-funnel': '🎯 Sales Funnel Analysis',
+                'conversion-timeline': '📊 Conversion Metrics Timeline',
+            };
+            
+            const chartTitle = chartTitles[chartId] || 'Chart View';
+            
+            // Set the global variable for the JS file to use
+            window.currentFullscreenChartId = chartId;
+            
+            // Wait a bit then trigger the chart copy
+            setTimeout(function() {
+                if (typeof copyChartToModal === 'function') {
+                    copyChartToModal(chartId);
+                } else {
+                    console.error('copyChartToModal function not found');
+                }
+            }, 500);
+            
+            return [true, chartTitle, chartId];
+            
+        } catch (e) {
+            console.error('Error in fullscreen callback:', e);
+            return [false, '', null];
+        }
+    }
+    """,
     Output('fullscreen-chart-modal', 'is_open'),
     Output('fullscreen-modal-title', 'children'),
     Output('fullscreen-chart-store', 'data'),
@@ -6448,55 +6645,6 @@ def update_column_visibility(visible_columns, username, password, start_date, en
     State('fullscreen-chart-modal', 'is_open'),
     prevent_initial_call=True
 )
-def toggle_fullscreen_modal(n_clicks, is_open):
-    """Handle fullscreen button clicks to show charts in modal"""
-    if not any(n_clicks):
-        return no_update, no_update, no_update
-    
-    ctx = callback_context
-    if not ctx.triggered:
-        return no_update, no_update, no_update
-    
-    # Get which button was clicked
-    button_id = ctx.triggered[0]['prop_id']
-    
-    # If modal close button was clicked, close it
-    if not any(n_clicks):
-        return False, "", None
-    
-    try:
-        # Parse the button ID to get chart info
-        import json
-        button_data = json.loads(button_id.split('.')[0])
-        chart_id = button_data['index']
-        
-        # Get the chart title from the chart_id
-        chart_titles = {
-            'dealer-pie-chart': '🏪 Top Dealers by Revenue',
-            'state-pie-chart': '🗺️ Revenue by State',
-            'category-bar-chart': '📂 Revenue by Category',
-            'city-bar-chart': '🏙️ Top Cities by Revenue',
-            'dealer-comparison-chart': '🏪 Dealer Comparison - Revenue vs Quantity',
-            'city-bar-chart-2': '🏙️ Cities by Revenue',
-            'category-sunburst-chart': '📊 Category & Sub-Category Breakdown',
-            'geographic-map': '🗺️ Geographic Sales Distribution',
-            'revenue-trend': '📈 Revenue Trend Over Time',
-            'weekday-pattern': '📅 Revenue by Day of Week',
-            'activity-heatmap': '📅 Activity Heatmap',
-            'hourly-heatmap': '⏰ Hourly Activity Pattern',
-            'day-part-analysis': '🕐 Day Part Analysis',
-            'sales-funnel': '🎯 Sales Funnel Analysis',
-            'conversion-timeline': '📊 Conversion Metrics Timeline',
-        }
-        
-        chart_title = chart_titles.get(chart_id, 'Chart View')
-        
-        # Store the chart_id - JavaScript will read from the store and populate the container
-        return True, chart_title, chart_id
-        
-    except Exception as e:
-        print(f"Error in fullscreen modal: {str(e)}")
-        return False, "", None
 
 if __name__ == '__main__':
     print("\n" + "="*60)
