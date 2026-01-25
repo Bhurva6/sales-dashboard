@@ -335,6 +335,16 @@ app.layout = dbc.Container([
     # Toast notification container (positioned at top right)
     html.Div(
         id='toast-container',
+        children=[
+            dbc.Toast(
+                id='toast-notification',
+                is_open=False,
+                dismissable=True,
+                duration=3000,
+                icon="success",
+                style={'minWidth': '300px'}
+            )
+        ],
         style={
             'position': 'fixed',
             'top': '20px',
@@ -451,13 +461,13 @@ app.layout = dbc.Container([
                     html.P("Quick Select:", className='small fw-bold mb-2', style={'color': COLORS['dark']}),
                     dbc.Stack([
                         dbc.ButtonGroup([
-                            dbc.Button("Today", id='quick-today', color='primary', outline=True, size='sm', className='w-100 mb-1'),
-                            dbc.Button("Yesterday", id='quick-yesterday', color='primary', outline=True, size='sm', className='w-100 mb-1'),
-                        ], className='d-grid gap-1 mb-1'),
-                        dbc.ButtonGroup([
                             dbc.Button("This Week", id='quick-week', color='primary', outline=True, size='sm', className='w-100 mb-1'),
                             dbc.Button("This Month", id='quick-month', color='primary', outline=True, size='sm', className='w-100 mb-1'),
-                            dbc.Button("Last 3 Months", id='quick-3months', color='primary', outline=True, size='sm', className='w-100 mb-1'),
+                        ], className='d-grid gap-1 mb-1'),
+                        dbc.ButtonGroup([
+                            dbc.Button("This Quarter", id='quick-quarter', color='primary', outline=True, size='sm', className='w-100 mb-1'),
+                            dbc.Button("This Year", id='quick-year', color='primary', outline=True, size='sm', className='w-100 mb-1'),
+                            dbc.Button("Last Year", id='quick-last-year', color='primary', outline=True, size='sm', className='w-100 mb-1'),
                         ], className='d-grid gap-1 mb-1'),
                     ], gap=1, className='mb-3'),
                     
@@ -1640,6 +1650,129 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                 ], width=12)
             ], className="mb-4"),
             
+            # Inactive Dealers Tracker Section - Always visible
+            html.Hr(className="my-4"),
+            html.H4("👤 Inactive Dealers Tracker", className="mb-3 fw-bold"),
+            html.P("Identify dealers who haven't placed orders recently and analyze their historical purchasing patterns", className="text-muted mb-4"),
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Inactive Dealer Analysis", className="mb-2 d-inline-block"),
+                                dbc.Badge(f"{start_date_str} → {end_date_str}", color="info", className="ms-2")
+                            ])
+                        ]),
+                        dbc.CardBody([
+                            # Enhanced Filters Row
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Label("Inactivity Period", className="fw-bold small"),
+                                    dbc.RadioItems(
+                                        id='inactive-dealers-period-filter',
+                                        options=[
+                                            {'label': 'Last Month (30 days)', 'value': 30},
+                                            {'label': 'Last Quarter (90 days)', 'value': 90},
+                                            {'label': 'Last 6 Months (180 days)', 'value': 180},
+                                            {'label': 'Last Year (365 days)', 'value': 365}
+                                        ],
+                                        value=30,
+                                        inline=True,
+                                        className="mb-2"
+                                    )
+                                ], width=12)
+                            ], className="mb-3"),
+                            
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Label("Filter by State", className="fw-bold small"),
+                                    dcc.Dropdown(
+                                        id='inactive-dealers-state-filter',
+                                        placeholder='All States (multi-select)',
+                                        multi=True,
+                                        className='mb-2',
+                                        clearable=True,
+                                        searchable=True
+                                    )
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Label("Filter by City", className="fw-bold small"),
+                                    dcc.Dropdown(
+                                        id='inactive-dealers-city-filter',
+                                        placeholder='All Cities (multi-select)',
+                                        multi=True,
+                                        className='mb-2',
+                                        clearable=True,
+                                        searchable=True
+                                    )
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Label("Sort By", className="fw-bold small"),
+                                    dbc.Select(
+                                        id='inactive-dealers-sort-by',
+                                        options=[
+                                            {'label': 'Days Since Last Order', 'value': 'days'},
+                                            {'label': 'Historical Revenue', 'value': 'revenue'},
+                                            {'label': 'Historical Quantity', 'value': 'quantity'},
+                                            {'label': 'Number of Products', 'value': 'products'}
+                                        ],
+                                        value='days',
+                                        className='mb-2'
+                                    )
+                                ], width=4),
+                            ], className="mb-3"),
+                            
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Label("Show Top N Dealers", className="fw-bold small"),
+                                    dbc.Input(
+                                        id='inactive-dealers-top-n',
+                                        type='number',
+                                        min=10,
+                                        max=100,
+                                        step=10,
+                                        value=20,
+                                        className='mb-2'
+                                    )
+                                ], width=3),
+                                dbc.Col([
+                                    dbc.Label("Min Historical Revenue", className="fw-bold small"),
+                                    dbc.Input(
+                                        id='inactive-dealers-min-revenue',
+                                        type='number',
+                                        placeholder='Optional',
+                                        className='mb-2'
+                                    )
+                                ], width=3),
+                                dbc.Col([
+                                    dbc.Button(
+                                        "Download Report",
+                                        id='inactive-dealers-download-btn',
+                                        color='success',
+                                        size='sm',
+                                        className='mt-4'
+                                    ),
+                                    dcc.Download(id='inactive-dealers-download')
+                                ], width=3),
+                                dbc.Col([
+                                    dbc.Button(
+                                        "Reset Filters",
+                                        id='inactive-dealers-reset-btn',
+                                        color='secondary',
+                                        outline=True,
+                                        size='sm',
+                                        className='mt-4'
+                                    )
+                                ], width=3),
+                            ], className="mb-3"),
+                            
+                            html.Div(id='inactive-dealers-content')
+                        ])
+                    ], className="shadow-sm")
+                ], width=12)
+            ], className="mb-4"),
+            
             # Sales CRM Section
             html.Hr(className="my-4"),
             html.H4("💼 Sales CRM", className="mb-3 fw-bold"),
@@ -2778,7 +2911,7 @@ def update_my_charts(username, password, start_date, end_date, hide_innovative, 
                 # Check if this is a saved dashboard chart (has 'figure' field) or custom chart (has 'x_axis' field)
                 if 'figure' in chart_config:
                     # This is a saved dashboard chart with pre-rendered figure
-                    chart_name = chart_config.get('title', 'Untitled Chart')
+                    chart_name = chart_config.get('name') or chart_config.get('title', 'Untitled Chart')
                     timestamp = chart_config.get('timestamp')
                     unique_id = chart_config.get('unique_id')
                     figure_data = chart_config.get('figure')
@@ -3819,6 +3952,468 @@ def download_cross_sell_report(n_clicks, chart_data, analysis_type, start_date, 
         print(f"Error downloading cross-sell report: {str(e)}")
         return no_update
 
+# Inactive Dealers Tracker Callback
+@app.callback(
+    Output('inactive-dealers-content', 'children'),
+    Output('inactive-dealers-state-filter', 'options'),
+    Output('inactive-dealers-city-filter', 'options'),
+    Input('inactive-dealers-period-filter', 'value'),
+    Input('inactive-dealers-state-filter', 'value'),
+    Input('inactive-dealers-city-filter', 'value'),
+    Input('inactive-dealers-sort-by', 'value'),
+    Input('inactive-dealers-top-n', 'value'),
+    Input('inactive-dealers-min-revenue', 'value'),
+    Input('username-input', 'value'),
+    Input('password-input', 'value'),
+    Input('date-range-picker', 'start_date'),
+    Input('date-range-picker', 'end_date'),
+    Input('hide-innovative-check', 'value'),
+    prevent_initial_call=False
+)
+def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, top_n, 
+                           min_revenue, username, password, start_date, end_date, hide_innovative):
+    """Analyze inactive dealers who haven't placed orders recently"""
+    
+    if not start_date or not end_date:
+        return dbc.Alert("Please select date range", color="warning"), [], []
+    
+    try:
+        # Convert dates
+        start_date_obj = pd.to_datetime(start_date)
+        end_date_obj = pd.to_datetime(end_date)
+        start_date_str = start_date_obj.strftime("%d-%m-%Y")
+        end_date_str = end_date_obj.strftime("%d-%m-%Y")
+        
+        # Fetch data from API - need extended historical data
+        # Calculate historical period (2x the inactivity period to get historical data)
+        historical_start = end_date_obj - pd.Timedelta(days=period_filter * 2)
+        historical_start_str = historical_start.strftime("%d-%m-%Y")
+        
+        api_client = APIClient(username=username, password=password)
+        response = api_client.get_sales_report(
+            start_date=historical_start_str,
+            end_date=end_date_str
+        )
+        
+        if not response.get('success'):
+            return dbc.Alert(f"API Error: {response.get('message')}", color="danger"), [], []
+        
+        api_response = response.get('data', {})
+        report_data = api_response.get('report_data', [])
+        
+        if not report_data:
+            return dbc.Alert("No data available for this date range", color="warning"), [], []
+        
+        df = pd.DataFrame(report_data)
+        
+        # Map columns
+        column_mapping = {
+            'SV': 'Value', 'SQ': 'Qty', 'comp_nm': 'Dealer Name',
+            'category_name': 'Category', 'state': 'State', 'city': 'City',
+            'meta_keyword': 'Product Name', 'parent_category': 'Sub Category',
+            'date': 'Date', 'order_date': 'Date', 'created_at': 'Date', 'sale_date': 'Date'
+        }
+        df = df.rename(columns={old: new for old, new in column_mapping.items() if old in df.columns})
+        
+        # Convert numeric columns
+        if 'Value' in df.columns:
+            df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+        if 'Qty' in df.columns:
+            df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
+        
+        # Apply filter
+        if hide_innovative and 'Dealer Name' in df.columns:
+            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Get filter options
+        state_options = []
+        city_options = []
+        if 'State' in df.columns:
+            state_options = [{'label': state, 'value': state} for state in sorted(df['State'].dropna().unique())]
+        if 'City' in df.columns:
+            city_options = [{'label': city, 'value': city} for city in sorted(df['City'].dropna().unique())]
+        
+        # Check for required columns
+        if 'Date' not in df.columns or 'Dealer Name' not in df.columns:
+            return dbc.Alert("Date or Dealer Name data not available", color="warning"), state_options, city_options
+        
+        # Convert Date column
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df = df.dropna(subset=['Date'])
+        
+        if df.empty:
+            return dbc.Alert("No valid data available", color="warning"), state_options, city_options
+        
+        # Define cutoff date for inactivity
+        cutoff_date = end_date_obj - pd.Timedelta(days=period_filter)
+        
+        # Get all dealers and their data
+        all_dealers = df.groupby('Dealer Name').agg({
+            'Date': ['min', 'max'],
+            'Value': 'sum',
+            'Qty': 'sum',
+            'Product Name': lambda x: list(x.unique()),
+            'State': 'first',
+            'City': 'first'
+        }).reset_index()
+        
+        all_dealers.columns = ['Dealer Name', 'First Order', 'Last Order', 'Total Revenue', 
+                               'Total Quantity', 'Products', 'State', 'City']
+        
+        # Calculate days since last order
+        all_dealers['Days Since Last Order'] = (end_date_obj - all_dealers['Last Order']).dt.days
+        
+        # Filter inactive dealers (no orders in the specified period)
+        inactive_dealers = all_dealers[all_dealers['Days Since Last Order'] >= period_filter].copy()
+        
+        # Apply location filters
+        if state_filter:
+            inactive_dealers = inactive_dealers[inactive_dealers['State'].isin(state_filter)]
+        if city_filter:
+            inactive_dealers = inactive_dealers[inactive_dealers['City'].isin(city_filter)]
+        
+        # Apply minimum revenue filter
+        if min_revenue:
+            try:
+                inactive_dealers = inactive_dealers[inactive_dealers['Total Revenue'] >= float(min_revenue)]
+            except:
+                pass
+        
+        # Calculate number of unique products
+        inactive_dealers['Product Count'] = inactive_dealers['Products'].apply(len)
+        
+        # Get top 5 products for each dealer
+        inactive_dealers['Top Products'] = inactive_dealers['Products'].apply(
+            lambda x: ', '.join(x[:5]) if len(x) > 0 else 'N/A'
+        )
+        
+        # Sort based on selected criteria
+        sort_column_map = {
+            'days': 'Days Since Last Order',
+            'revenue': 'Total Revenue',
+            'quantity': 'Total Quantity',
+            'products': 'Product Count'
+        }
+        sort_column = sort_column_map.get(sort_by, 'Days Since Last Order')
+        ascending = True if sort_by == 'days' else False
+        inactive_dealers = inactive_dealers.sort_values(sort_column, ascending=ascending)
+        
+        # Limit to top N
+        top_n = top_n or 20
+        inactive_dealers_display = inactive_dealers.head(top_n)
+        
+        if inactive_dealers.empty:
+            return dbc.Alert(
+                f"✅ Great! No inactive dealers found in the last {period_filter} days",
+                color="success"
+            ), state_options, city_options
+        
+        # Create visualizations
+        # 1. Summary cards
+        summary_cards = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-person-x", style={'fontSize': '24px', 'color': '#ef4444'}),
+                        html.H3(f"{len(inactive_dealers)}", className="text-danger mb-0 mt-2"),
+                        html.P("Inactive Dealers", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-calendar-x", style={'fontSize': '24px', 'color': '#f59e0b'}),
+                        html.H3(f"{inactive_dealers['Days Since Last Order'].mean():.0f}", className="text-warning mb-0 mt-2"),
+                        html.P("Avg Days Since Order", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-currency-rupee", style={'fontSize': '24px', 'color': '#3b82f6'}),
+                        html.H3(format_inr(inactive_dealers['Total Revenue'].sum()), className="text-info mb-0 mt-2"),
+                        html.P("Historical Revenue", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-box-seam", style={'fontSize': '24px', 'color': '#8b5cf6'}),
+                        html.H3(f"{inactive_dealers['Product Count'].sum():,.0f}", className="text-secondary mb-0 mt-2"),
+                        html.P("Total Products", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+        ], className="mb-4 g-2")
+        
+        # 2. Chart showing inactive dealers
+        fig_bar = go.Figure()
+        
+        # Determine what to display based on sort_by
+        if sort_by == 'revenue':
+            y_values = inactive_dealers_display['Total Revenue']
+            y_label = "Historical Revenue (₹)"
+            color_values = inactive_dealers_display['Total Revenue']
+            text_format = lambda x: format_inr(x)
+        elif sort_by == 'quantity':
+            y_values = inactive_dealers_display['Total Quantity']
+            y_label = "Historical Quantity"
+            color_values = inactive_dealers_display['Total Quantity']
+            text_format = lambda x: f"{x:,.0f}"
+        elif sort_by == 'products':
+            y_values = inactive_dealers_display['Product Count']
+            y_label = "Number of Products"
+            color_values = inactive_dealers_display['Product Count']
+            text_format = lambda x: f"{x:.0f}"
+        else:
+            y_values = inactive_dealers_display['Days Since Last Order']
+            y_label = "Days Since Last Order"
+            color_values = inactive_dealers_display['Days Since Last Order']
+            text_format = lambda x: f"{x:.0f} days"
+        
+        fig_bar.add_trace(go.Bar(
+            x=y_values,
+            y=inactive_dealers_display['Dealer Name'],
+            orientation='h',
+            marker=dict(
+                color=color_values,
+                colorscale=[[0, '#10b981'], [0.5, '#f59e0b'], [1, '#ef4444']],
+                showscale=True,
+                colorbar=dict(title=y_label, thickness=15)
+            ),
+            text=[text_format(v) for v in y_values],
+            textposition='outside',
+            hovertemplate='<b>%{y}</b><br>' + y_label + ': %{x}<br><extra></extra>'
+        ))
+        
+        apply_modern_chart_style(fig_bar, f"Top {len(inactive_dealers_display)} Inactive Dealers by {y_label}", height=500)
+        fig_bar.update_layout(
+            xaxis_title=y_label,
+            yaxis_title="Dealer Name",
+            margin=dict(l=200, r=40, t=60, b=40),
+            yaxis=dict(tickfont=dict(size=10))
+        )
+        
+        # 3. Location distribution pie chart
+        location_counts = inactive_dealers['State'].value_counts().head(10)
+        if len(location_counts) > 0:
+            fig_pie = px.pie(
+                values=location_counts.values,
+                names=location_counts.index,
+                title="Inactive Dealers by State"
+            )
+            apply_modern_chart_style(fig_pie, "Inactive Dealers by State", height=450)
+        else:
+            fig_pie = None
+        
+        # 4. Detailed data table
+        table_data = inactive_dealers_display.copy()
+        
+        # Create detailed table rows
+        table_rows = []
+        for idx, row in table_data.iterrows():
+            serial_number = len(table_rows) + 1
+            
+            # Format values
+            revenue_fmt = f"₹ {row['Total Revenue']:,.0f}"
+            qty_fmt = f"{row['Total Quantity']:,.0f}"
+            first_order_fmt = row['First Order'].strftime('%d-%b-%Y')
+            last_order_fmt = row['Last Order'].strftime('%d-%b-%Y')
+            
+            table_rows.append(html.Tr([
+                html.Td(serial_number),  # Serial Number
+                html.Td(row['Dealer Name']),
+                html.Td(row['State']),
+                html.Td(row['City']),
+                html.Td(f"{row['Days Since Last Order']:.0f}"),
+                html.Td(last_order_fmt),
+                html.Td(revenue_fmt),
+                html.Td(qty_fmt),
+                html.Td(f"{row['Product Count']}"),
+                html.Td(
+                    html.Div(
+                        row['Top Products'][:100] + '...' if len(row['Top Products']) > 100 else row['Top Products'],
+                        title=row['Top Products'],  # Full list on hover
+                        style={'fontSize': '10px', 'maxWidth': '200px', 'whiteSpace': 'nowrap', 'overflow': 'hidden', 'textOverflow': 'ellipsis'}
+                    )
+                )
+            ]))
+        
+        table = dbc.Table([
+            html.Thead(html.Tr([
+                html.Th("S.No", style={'width': '50px'}),
+                html.Th("Dealer Name", style={'width': '150px'}),
+                html.Th("State", style={'width': '100px'}),
+                html.Th("City", style={'width': '100px'}),
+                html.Th("Days Inactive", style={'width': '80px'}),
+                html.Th("Last Order", style={'width': '100px'}),
+                html.Th("Total Revenue", style={'width': '120px'}),
+                html.Th("Total Qty", style={'width': '100px'}),
+                html.Th("Products", style={'width': '80px'}),
+                html.Th("Top Products Ordered", style={'width': '250px'})
+            ])),
+            html.Tbody(table_rows)
+        ], striped=True, bordered=True, hover=True, size='sm', style={'fontSize': '11px'})
+        
+        # Return layout
+        content = html.Div([
+            summary_cards,
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            dcc.Graph(figure=fig_bar, config={'displayModeBar': True})
+                        ])
+                    ], className="shadow-sm")
+                ], width=8 if fig_pie else 12),
+                
+                # Location pie chart
+                *([] if not fig_pie else [dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            dcc.Graph(figure=fig_pie, config={'displayModeBar': True})
+                        ])
+                    ], className="shadow-sm")
+                ], width=4)])
+            ], className="mb-3 g-2"),
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.H6(f"Detailed Inactive Dealers Report (Showing {len(inactive_dealers_display)} of {len(inactive_dealers)})", className="mb-0")
+                        ]),
+                        dbc.CardBody([
+                            html.Div(table, style={'maxHeight': '500px', 'overflowY': 'auto'})
+                        ])
+                    ], className="shadow-sm")
+                ], width=12)
+            ])
+        ])
+        
+        return content, state_options, city_options
+        
+    except Exception as e:
+        print(f"Error in inactive dealers analysis: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return dbc.Alert(f"Error analyzing inactive dealers: {str(e)}", color="danger"), [], []
+
+# Reset Inactive Dealers Filters Callback
+@app.callback(
+    Output('inactive-dealers-state-filter', 'value'),
+    Output('inactive-dealers-city-filter', 'value'),
+    Output('inactive-dealers-sort-by', 'value'),
+    Output('inactive-dealers-top-n', 'value'),
+    Output('inactive-dealers-min-revenue', 'value'),
+    Output('inactive-dealers-period-filter', 'value'),
+    Input('inactive-dealers-reset-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def reset_inactive_dealers_filters(n_clicks):
+    """Reset all inactive dealers filters to default values"""
+    if n_clicks:
+        return None, None, 'days', 20, None, 30
+    return no_update, no_update, no_update, no_update, no_update, no_update
+
+# Download Inactive Dealers Report Callback
+@app.callback(
+    Output('inactive-dealers-download', 'data'),
+    Input('inactive-dealers-download-btn', 'n_clicks'),
+    State('inactive-dealers-period-filter', 'value'),
+    State('date-range-picker', 'start_date'),
+    State('date-range-picker', 'end_date'),
+    State('username-input', 'value'),
+    State('password-input', 'value'),
+    State('hide-innovative-check', 'value'),
+    prevent_initial_call=True
+)
+def download_inactive_dealers_report(n_clicks, period_filter, start_date, end_date, username, password, hide_innovative):
+    """Download inactive dealers report as CSV"""
+    if not n_clicks:
+        return no_update
+    
+    try:
+        # Re-fetch and process data
+        start_date_obj = pd.to_datetime(start_date)
+        end_date_obj = pd.to_datetime(end_date)
+        
+        # Get historical data
+        historical_start = end_date_obj - pd.Timedelta(days=period_filter * 2)
+        historical_start_str = historical_start.strftime("%d-%m-%Y")
+        end_date_str = end_date_obj.strftime("%d-%m-%Y")
+        
+        api_client = APIClient(username=username, password=password)
+        response = api_client.get_sales_report(
+            start_date=historical_start_str,
+            end_date=end_date_str
+        )
+        
+        if not response.get('success'):
+            return no_update
+        
+        api_response = response.get('data', {})
+        report_data = api_response.get('report_data', [])
+        
+        if not report_data:
+            return no_update
+        
+        df = pd.DataFrame(report_data)
+        
+        # Map columns
+        column_mapping = {
+            'SV': 'Value', 'SQ': 'Qty', 'comp_nm': 'Dealer Name',
+            'category_name': 'Category', 'state': 'State', 'city': 'City',
+            'meta_keyword': 'Product Name', 'date': 'Date'
+        }
+        df = df.rename(columns={old: new for old, new in column_mapping.items() if old in df.columns})
+        
+        # Convert columns
+        if 'Value' in df.columns:
+            df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+        if 'Qty' in df.columns:
+            df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Apply filter
+        if hide_innovative and 'Dealer Name' in df.columns:
+            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        df = df.dropna(subset=['Date'])
+        
+        # Calculate inactive dealers
+        cutoff_date = end_date_obj - pd.Timedelta(days=period_filter)
+        
+        all_dealers = df.groupby('Dealer Name').agg({
+            'Date': ['min', 'max'],
+            'Value': 'sum',
+            'Qty': 'sum',
+            'Product Name': lambda x: ', '.join(x.unique()),
+            'State': 'first',
+            'City': 'first'
+        }).reset_index()
+        
+        all_dealers.columns = ['Dealer Name', 'First Order', 'Last Order', 'Total Revenue', 
+                               'Total Quantity', 'Products', 'State', 'City']
+        
+        all_dealers['Days Since Last Order'] = (end_date_obj - all_dealers['Last Order']).dt.days
+        inactive_dealers = all_dealers[all_dealers['Days Since Last Order'] >= period_filter]
+        
+        # Format for export
+        export_df = inactive_dealers[['Dealer Name', 'State', 'City', 'Days Since Last Order', 
+                                      'Last Order', 'Total Revenue', 'Total Quantity', 'Products']].copy()
+        export_df['Last Order'] = export_df['Last Order'].dt.strftime('%d-%m-%Y')
+        
+        return dcc.send_data_frame(export_df.to_csv, f"inactive_dealers_{period_filter}days_{start_date}_{end_date}.csv", index=False)
+    
+    except Exception as e:
+        print(f"Error downloading inactive dealers report: {str(e)}")
+        return no_update
+
 # Sales CRM Callback
 @app.callback(
     Output('crm-table-container', 'children'),
@@ -4115,46 +4710,57 @@ def export_crm_data(n_clicks, row_data, start_date, end_date):
 @app.callback(
     Output('date-range-picker', 'start_date'),
     Output('date-range-picker', 'end_date'),
-    Input('quick-today', 'n_clicks'),
-    Input('quick-yesterday', 'n_clicks'),
     Input('quick-week', 'n_clicks'),
     Input('quick-month', 'n_clicks'),
-    Input('quick-3months', 'n_clicks'),
+    Input('quick-quarter', 'n_clicks'),
+    Input('quick-year', 'n_clicks'),
+    Input('quick-last-year', 'n_clicks'),
     prevent_initial_call=True
 )
-def quick_date_select(today_click, yest_click, week_click, month_click, three_month_click):
+def quick_date_select(week_click, month_click, quarter_click, year_click, last_year_click):
     triggered = ctx.triggered_id
     now = datetime.now()
-    if triggered == 'quick-today':
-        start = end = now
-    elif triggered == 'quick-yesterday':
-        start = end = now - timedelta(days=1)
-    elif triggered == 'quick-week':
+    
+    if triggered == 'quick-week':
+        # This week (Monday to today)
         start = get_week_start()
         end = now
     elif triggered == 'quick-month':
+        # This month (1st to today)
         start = now.replace(day=1)
         end = now
-    elif triggered == 'quick-3months':
-        start = now - timedelta(days=90)
+    elif triggered == 'quick-quarter':
+        # This quarter
+        current_quarter = (now.month - 1) // 3
+        quarter_start_month = current_quarter * 3 + 1
+        start = now.replace(month=quarter_start_month, day=1)
         end = now
+    elif triggered == 'quick-year':
+        # This year (Jan 1st to today)
+        start = now.replace(month=1, day=1)
+        end = now
+    elif triggered == 'quick-last-year':
+        # Last year (full year)
+        start = now.replace(year=now.year - 1, month=1, day=1)
+        end = now.replace(year=now.year - 1, month=12, day=31)
     else:
         return no_update, no_update
+    
     # Format as yyyy-mm-dd for DatePickerRange
     return start.strftime('%Y-%m-%d'), end.strftime('%Y-%m-%d')
 
 # Clientside callback for button feedback
 app.clientside_callback(
     """
-    function(t, y, w, m, threem) {
-        const ids = ['quick-today', 'quick-yesterday', 'quick-week', 'quick-month', 'quick-3months'];
+    function(w, m, q, y, ly) {
+        const ids = ['quick-week', 'quick-month', 'quick-quarter', 'quick-year', 'quick-last-year'];
         const btns = ids.map(id => document.getElementById(id));
         let idx = -1;
-        if (t) idx = 0;
-        else if (y) idx = 1;
-        else if (w) idx = 2;
-        else if (m) idx = 3;
-        else if (threem) idx = 4;
+        if (w) idx = 0;
+        else if (m) idx = 1;
+        else if (q) idx = 2;
+        else if (y) idx = 3;
+        else if (ly) idx = 4;
         if (idx >= 0 && btns[idx]) {
             btns[idx].classList.remove('btn-outline-primary');
             btns[idx].classList.add('btn-primary');
@@ -4166,12 +4772,12 @@ app.clientside_callback(
         return window.dash_clientside.no_update;
     }
     """,
-    Output('quick-today', 'n_clicks'),
-    Input('quick-today', 'n_clicks'),
-    Input('quick-yesterday', 'n_clicks'),
+    Output('quick-week', 'n_clicks'),
     Input('quick-week', 'n_clicks'),
     Input('quick-month', 'n_clicks'),
-    Input('quick-3months', 'n_clicks'),
+    Input('quick-quarter', 'n_clicks'),
+    Input('quick-year', 'n_clicks'),
+    Input('quick-last-year', 'n_clicks'),
     prevent_initial_call=True
 )
 
@@ -5004,7 +5610,7 @@ def _create_top_products_table(df, value_col, qty_col):
     # Create table rows
     table_rows = []
     for idx, row in product_data.iterrows():
-        rank = idx + 1
+        serial_number = len(table_rows) + 1
         product_name = row['Product Name']
         revenue = row[value_col]
         quantity = row[qty_col]
@@ -5019,7 +5625,7 @@ def _create_top_products_table(df, value_col, qty_col):
         formatted_quantity = format_qty(quantity)
         
         table_rows.append(html.Tr([
-            html.Td(rank),
+            html.Td(serial_number),
             html.Td(product_name),
             html.Td(formatted_revenue),
             html.Td(formatted_quantity)
@@ -5028,7 +5634,7 @@ def _create_top_products_table(df, value_col, qty_col):
     # Create table
     table = dbc.Table([
         html.Thead(html.Tr([
-            html.Th("Rank"),
+            html.Th("S.No"),
             html.Th("Product Name"),
             html.Th("Revenue"),
             html.Th("Quantity")
@@ -5374,20 +5980,39 @@ def _create_enhanced_metric_card(
         dbc.Card component with enhanced styling
     """
     # Calculate percentage change
-    # Extract numeric value from formatted string for comparison
+    # Handle both numeric and string values for current_value
+    pct_change = 0
+    
     if previous_value and previous_value > 0:
         try:
-            # Try to extract numeric value from current_value string
-            current_numeric = float(str(current_value).replace('Rs. ', '').replace('L', '').replace('K', '').replace(',', '').replace('\n', ' ').split()[0])
-            
-            # Adjust for K/L suffixes
-            if 'L' in str(current_value):
-                current_numeric *= 100000
-            elif 'K' in str(current_value):
-                current_numeric *= 1000
-            
-            pct_change = ((current_numeric - previous_value) / previous_value) * 100
-        except:
+            # If current_value is already a string, try to extract numeric value
+            if isinstance(current_value, str):
+                # Remove common formatting and extract the first number
+                clean_str = str(current_value).replace('Rs. ', '').replace(',', '').replace('\n', ' ')
+                
+                # Extract numeric part
+                import re
+                numbers = re.findall(r'[\d.]+', clean_str)
+                if numbers:
+                    current_numeric = float(numbers[0])
+                    
+                    # Check for multiplier suffixes
+                    if 'Cr' in current_value or 'Crore' in current_value:
+                        current_numeric *= 1e7
+                    elif 'Lakh' in current_value or 'L' in current_value.replace('Lakh', ''):
+                        current_numeric *= 1e5
+                    elif 'K' in current_value and 'Lakh' not in current_value:
+                        current_numeric *= 1e3
+                    
+                    pct_change = ((current_numeric - previous_value) / previous_value) * 100
+                else:
+                    pct_change = 0
+            else:
+                # current_value is numeric
+                current_numeric = float(current_value)
+                pct_change = ((current_numeric - previous_value) / previous_value) * 100
+        except Exception as e:
+            print(f"Warning: Could not calculate percentage change: {e}")
             pct_change = 0
     else:
         pct_change = 0
@@ -6643,6 +7268,134 @@ app.clientside_callback(
     Output('fullscreen-chart-store', 'data'),
     Input({'type': 'fullscreen-btn', 'index': ALL}, 'n_clicks'),
     State('fullscreen-chart-modal', 'is_open'),
+    prevent_initial_call=True
+)
+
+# Clientside callback for saving dashboard charts
+app.clientside_callback(
+    """
+    function(n_clicks) {
+        if (!n_clicks || !Array.isArray(n_clicks) || n_clicks.every(c => !c)) {
+            return [window.dash_clientside.no_update, window.dash_clientside.no_update];
+        }
+        
+        const ctx = window.dash_clientside.callback_context;
+        if (!ctx.triggered || ctx.triggered.length === 0) {
+            return [window.dash_clientside.no_update, window.dash_clientside.no_update];
+        }
+        
+        try {
+            const triggerId = ctx.triggered[0].prop_id;
+            const buttonData = JSON.parse(triggerId.split('.')[0]);
+            const chartId = buttonData.index;
+            
+            console.log('💾 Save button clicked for chart:', chartId);
+            
+            // Find the chart element
+            const chartWrapper = document.getElementById(chartId + '-wrapper');
+            if (!chartWrapper) {
+                console.error('Chart wrapper not found:', chartId);
+                return [window.dash_clientside.no_update, {
+                    is_open: true,
+                    color: 'danger',
+                    children: 'Chart not found'
+                }];
+            }
+            
+            // Get chart title from data attribute
+            const chartTitle = chartWrapper.getAttribute('data-chart-title') || 'Saved Chart';
+            
+            // Find the actual Plotly chart
+            const graphDiv = chartWrapper.querySelector('.js-plotly-plot');
+            if (!graphDiv) {
+                console.error('Plotly graph not found in wrapper');
+                return [window.dash_clientside.no_update, {
+                    is_open: true,
+                    color: 'danger',
+                    children: 'Chart data not found'
+                }];
+            }
+            
+            // Get the Plotly figure data
+            let figureData = null;
+            if (graphDiv && graphDiv.data && graphDiv.layout) {
+                figureData = {
+                    data: graphDiv.data,
+                    layout: graphDiv.layout,
+                    config: graphDiv._context ? {
+                        displayModeBar: graphDiv._context.displayModeBar,
+                        responsive: true
+                    } : {responsive: true}
+                };
+            }
+            
+            if (!figureData) {
+                console.error('Could not extract figure data');
+                return [window.dash_clientside.no_update, {
+                    is_open: true,
+                    color: 'danger',
+                    children: 'Could not save chart data'
+                }];
+            }
+            
+            // Create chart configuration object
+            const chartConfig = {
+                chart_id: chartId,
+                name: chartTitle,
+                figure: figureData,
+                timestamp: new Date().toISOString(),
+                unique_id: 'saved_' + chartId + '_' + Date.now(),
+                is_dashboard_chart: true
+            };
+            
+            // Load existing charts from storage
+            let savedCharts = [];
+            try {
+                const chartsStr = window.storage.get('my-saved-charts', false);
+                if (chartsStr) {
+                    savedCharts = JSON.parse(chartsStr);
+                }
+            } catch (parseError) {
+                console.warn('Error parsing existing charts, starting fresh:', parseError);
+                savedCharts = [];
+            }
+            
+            if (!Array.isArray(savedCharts)) {
+                savedCharts = [];
+            }
+            
+            // Check if this chart is already saved (avoid duplicates)
+            const existingIndex = savedCharts.findIndex(c => c.chart_id === chartId);
+            if (existingIndex !== -1) {
+                // Update existing chart
+                savedCharts[existingIndex] = chartConfig;
+                console.log('Updated existing chart:', chartTitle);
+            } else {
+                // Add new chart
+                savedCharts.push(chartConfig);
+                console.log('Added new chart:', chartTitle);
+            }
+            
+            // Save back to storage
+            window.storage.set('my-saved-charts', JSON.stringify(savedCharts), false);
+            
+            // Update the hidden div to trigger My Charts refresh
+            const updatedData = JSON.stringify(savedCharts);
+            
+            // Return toast notification properties
+            return [updatedData, true, 'success', '✓ Chart "' + chartTitle + '" saved successfully!'];
+            
+        } catch (e) {
+            console.error('Error saving chart:', e);
+            return [window.dash_clientside.no_update, true, 'danger', 'Error saving chart: ' + e.message];
+        }
+    }
+    """,
+    Output('saved-charts-data', 'children', allow_duplicate=True),
+    Output('toast-notification', 'is_open', allow_duplicate=True),
+    Output('toast-notification', 'icon', allow_duplicate=True),
+    Output('toast-notification', 'children', allow_duplicate=True),
+    Input({'type': 'save-chart-btn', 'index': ALL}, 'n_clicks'),
     prevent_initial_call=True
 )
 
