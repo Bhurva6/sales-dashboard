@@ -212,6 +212,15 @@ function copyChartToModal(chartId) {
                     console.log('✅ Chart resized');
                 }
             }, 100);
+            
+            // Setup drill-down click handlers based on chart type
+            if (chartId === 'dealer-pie-chart') {
+                console.log('🎯 Setting up dealer drill-down click handler');
+                setupDealerDrillDown(newPlotlyDiv);
+            } else if (chartId === 'state-pie-chart') {
+                console.log('🎯 Setting up state drill-down click handler');
+                setupStateDrillDown(newPlotlyDiv);
+            }
         }).catch(function(err) {
             console.error('❌ Error creating Plotly chart:', err);
             console.error('   Stack trace:', err.stack);
@@ -227,3 +236,397 @@ function copyChartToModal(chartId) {
         }
     }
 }
+
+// Check if we're currently in a drill-down view (to prevent click handler on initial load)
+function isInDrillDownView(type) {
+    if (type === 'dealer') {
+        const metricButtons = document.getElementById('dealer-metric-revenue-btn');
+        return metricButtons && metricButtons.style.display !== 'none';
+    } else if (type === 'state') {
+        const metricButtons = document.getElementById('state-metric-revenue-btn');
+        return metricButtons && metricButtons.style.display !== 'none';
+    }
+    return false;
+}
+
+// Setup dealer drill-down click handler
+function setupDealerDrillDown(plotlyDiv) {
+    if (!plotlyDiv) {
+        console.error('❌ No plotly div provided for drill-down');
+        return;
+    }
+    
+    console.log('🔧 Configuring dealer pie chart for drill-down...');
+    
+    // Check if we're in a drill-down view already (back button visible)
+    if (isInDrillDownView('dealer')) {
+        console.log('ℹ️ Already in drill-down view, skipping click handler setup');
+        return;
+    }
+    
+    // Remove any existing click handlers
+    if (plotlyDiv.removeAllListeners) {
+        plotlyDiv.removeAllListeners('plotly_click');
+    }
+    
+    // Add click event listener
+    plotlyDiv.on('plotly_click', function(data) {
+        console.log('═══════════════════════════════════════');
+        console.log('🖱️ DEALER PIE CHART CLICKED!');
+        console.log('📊 Click data:', data);
+        console.log('═══════════════════════════════════════');
+        
+        // Prevent default action and stop propagation
+        if (data && data.event) {
+            data.event.preventDefault();
+            data.event.stopPropagation();
+        }
+        
+        if (!data.points || data.points.length === 0) {
+            console.warn('⚠️ No points data in click event');
+            return false;
+        }
+        
+        const point = data.points[0];
+        console.log('📍 Clicked point:', point);
+        
+        // Get dealer name from customdata (full name) or label (display name)
+        const dealerName = point.customdata && point.customdata[0] 
+            ? point.customdata[0] 
+            : point.label;
+        
+        console.log('🏪 Selected dealer:', dealerName);
+        
+        if (!dealerName) {
+            console.error('❌ Could not extract dealer name from click data');
+            return false;
+        }
+        
+        // Update the dealer-drilldown-store using Dash's setProps
+        try {
+            const storeElement = document.querySelector('[id="dealer-drilldown-store"]');
+            
+            if (window.dash_clientside && window.dash_clientside.set_props) {
+                console.log('📦 Updating dealer-drilldown-store with:', { dealer_name: dealerName });
+                window.dash_clientside.set_props('dealer-drilldown-store', {
+                    data: { dealer_name: dealerName }
+                });
+                console.log('✅ Store updated successfully!');
+            } else if (storeElement) {
+                // Fallback method - directly modify the store element
+                console.log('📦 Using fallback method to update store');
+                storeElement.textContent = JSON.stringify({ dealer_name: dealerName });
+                
+                // Trigger a change event to notify Dash
+                const event = new Event('change', { bubbles: true });
+                storeElement.dispatchEvent(event);
+                console.log('✅ Store updated via fallback method');
+            } else {
+                console.error('❌ Could not find dealer-drilldown-store element');
+            }
+            
+            // Visual feedback - add a subtle animation to the clicked slice
+            const clickedSliceIndex = point.pointIndex;
+            const update = {
+                'pull': plotlyDiv.data[0].pull.map((val, idx) => 
+                    idx === clickedSliceIndex ? 0.1 : val
+                )
+            };
+            
+            Plotly.restyle(plotlyDiv, update, 0).then(function() {
+                console.log('✅ Visual feedback applied');
+            }).catch(function(err) {
+                console.warn('⚠️ Could not apply visual feedback:', err);
+            });
+            
+        } catch (error) {
+            console.error('❌ Error updating drill-down store:', error);
+            console.error('   Stack trace:', error.stack);
+        }
+        
+        return false; // Prevent any default behavior
+    });
+    
+    // Add hover effect to indicate clickability
+    plotlyDiv.on('plotly_hover', function(data) {
+        plotlyDiv.style.cursor = 'pointer';
+    });
+    
+    plotlyDiv.on('plotly_unhover', function(data) {
+        plotlyDiv.style.cursor = 'default';
+    });
+    
+    console.log('✅ Dealer drill-down handler configured successfully!');
+    console.log('💡 Click on any dealer slice to see product breakdown');
+}
+
+// Setup state drill-down click handler
+function setupStateDrillDown(plotlyDiv) {
+    if (!plotlyDiv) {
+        console.error('❌ No plotly div provided for state drill-down');
+        return;
+    }
+    
+    console.log('🔧 Configuring state pie chart for drill-down...');
+    
+    // Check if we're in a drill-down view already
+    if (isInDrillDownView('state')) {
+        console.log('ℹ️ Already in state drill-down view, skipping click handler setup');
+        return;
+    }
+    
+    // Remove any existing click handlers
+    if (plotlyDiv.removeAllListeners) {
+        plotlyDiv.removeAllListeners('plotly_click');
+    }
+    
+    // Add click event listener
+    plotlyDiv.on('plotly_click', function(data) {
+        console.log('═══════════════════════════════════════');
+        console.log('🖱️ STATE PIE CHART CLICKED!');
+        console.log('📊 Click data:', data);
+        console.log('═══════════════════════════════════════');
+        
+        // Prevent default action and stop propagation
+        if (data && data.event) {
+            data.event.preventDefault();
+            data.event.stopPropagation();
+        }
+        
+        if (!data.points || data.points.length === 0) {
+            console.warn('⚠️ No points data in click event');
+            return false;
+        }
+        
+        const point = data.points[0];
+        console.log('📍 Clicked point:', point);
+        
+        // Get state name from customdata (full name) or label (display name)
+        const stateName = point.customdata && point.customdata[0] 
+            ? point.customdata[0] 
+            : point.label;
+        
+        console.log('🗺️ Selected state:', stateName);
+        
+        if (!stateName) {
+            console.error('❌ Could not extract state name from click data');
+            return false;
+        }
+        
+        // Update the state-drilldown-store using Dash's setProps
+        try {
+            const storeElement = document.querySelector('[id="state-drilldown-store"]');
+            
+            if (window.dash_clientside && window.dash_clientside.set_props) {
+                console.log('📦 Updating state-drilldown-store with:', { state_name: stateName });
+                window.dash_clientside.set_props('state-drilldown-store', {
+                    data: { state_name: stateName }
+                });
+                console.log('✅ Store updated successfully!');
+            } else if (storeElement) {
+                // Fallback method - directly modify the store element
+                console.log('📦 Using fallback method to update store');
+                storeElement.textContent = JSON.stringify({ state_name: stateName });
+                
+                // Trigger a change event to notify Dash
+                const event = new Event('change', { bubbles: true });
+                storeElement.dispatchEvent(event);
+                console.log('✅ Store updated via fallback method');
+            } else {
+                console.error('❌ Could not find state-drilldown-store element');
+            }
+            
+            // Visual feedback - add a subtle animation to the clicked slice
+            const clickedSliceIndex = point.pointIndex;
+            const update = {
+                'pull': plotlyDiv.data[0].pull.map((val, idx) => 
+                    idx === clickedSliceIndex ? 0.1 : val
+                )
+            };
+            
+            Plotly.restyle(plotlyDiv, update, 0).then(function() {
+                console.log('✅ Visual feedback applied');
+            }).catch(function(err) {
+                console.warn('⚠️ Could not apply visual feedback:', err);
+            });
+            
+        } catch (error) {
+            console.error('❌ Error updating state drill-down store:', error);
+            console.error('   Stack trace:', error.stack);
+        }
+        
+        return false; // Prevent any default behavior
+    });
+    
+    // Add hover effect to indicate clickability
+    plotlyDiv.on('plotly_hover', function(data) {
+        plotlyDiv.style.cursor = 'pointer';
+    });
+    
+    plotlyDiv.on('plotly_unhover', function(data) {
+        plotlyDiv.style.cursor = 'default';
+    });
+    
+    console.log('✅ State drill-down handler configured successfully!');
+    console.log('💡 Click on any state slice to see dealer breakdown');
+}
+
+// Setup state-dealer drill-down click handler (second level: dealer → products within a state)
+function setupStateDealerDrillDown(plotlyDiv, stateName) {
+    if (!plotlyDiv) {
+        console.error('❌ No plotly div provided for state-dealer drill-down');
+        return;
+    }
+    
+    console.log('🔧 Configuring dealer pie chart for state drill-down (second level)...');
+    console.log('🗺️ State context:', stateName);
+    
+    // Remove any existing click handlers
+    if (plotlyDiv.removeAllListeners) {
+        plotlyDiv.removeAllListeners('plotly_click');
+    }
+    
+    // Add click event listener
+    plotlyDiv.on('plotly_click', function(data) {
+        console.log('═══════════════════════════════════════');
+        console.log('🖱️ DEALER PIE CHART CLICKED (IN STATE VIEW)!');
+        console.log('📊 Click data:', data);
+        console.log('🗺️ State context:', stateName);
+        console.log('═══════════════════════════════════════');
+        
+        // Prevent default action and stop propagation
+        if (data && data.event) {
+            data.event.preventDefault();
+            data.event.stopPropagation();
+        }
+        
+        if (!data.points || data.points.length === 0) {
+            console.warn('⚠️ No points data in click event');
+            return false;
+        }
+        
+        const point = data.points[0];
+        console.log('📍 Clicked point:', point);
+        
+        // Get dealer name from customdata (full name) or label (display name)
+        const dealerName = point.customdata && point.customdata[0] 
+            ? point.customdata[0] 
+            : point.label;
+        
+        console.log('🏪 Selected dealer:', dealerName);
+        
+        if (!dealerName) {
+            console.error('❌ Could not extract dealer name from click data');
+            return false;
+        }
+        
+        // Update the state-dealer-drilldown-store using Dash's setProps
+        try {
+            const storeElement = document.querySelector('[id="state-dealer-drilldown-store"]');
+            
+            if (window.dash_clientside && window.dash_clientside.set_props) {
+                console.log('📦 Updating state-dealer-drilldown-store with:', { dealer_name: dealerName });
+                window.dash_clientside.set_props('state-dealer-drilldown-store', {
+                    data: { dealer_name: dealerName }
+                });
+                console.log('✅ Store updated successfully!');
+            } else if (storeElement) {
+                // Fallback method - directly modify the store element
+                console.log('📦 Using fallback method to update store');
+                storeElement.textContent = JSON.stringify({ dealer_name: dealerName });
+                
+                // Trigger a change event to notify Dash
+                const event = new Event('change', { bubbles: true });
+                storeElement.dispatchEvent(event);
+                console.log('✅ Store updated via fallback method');
+            } else {
+                console.error('❌ Could not find state-dealer-drilldown-store element');
+            }
+            
+            // Visual feedback - add a subtle animation to the clicked slice
+            const clickedSliceIndex = point.pointIndex;
+            const update = {
+                'pull': plotlyDiv.data[0].pull.map((val, idx) => 
+                    idx === clickedSliceIndex ? 0.1 : val
+                )
+            };
+            
+            Plotly.restyle(plotlyDiv, update, 0).then(function() {
+                console.log('✅ Visual feedback applied');
+            }).catch(function(err) {
+                console.warn('⚠️ Could not apply visual feedback:', err);
+            });
+            
+        } catch (error) {
+            console.error('❌ Error updating state-dealer drill-down store:', error);
+            console.error('   Stack trace:', error.stack);
+        }
+        
+        return false; // Prevent any default behavior
+    });
+    
+    // Add hover effect to indicate clickability
+    plotlyDiv.on('plotly_hover', function(data) {
+        plotlyDiv.style.cursor = 'pointer';
+    });
+    
+    plotlyDiv.on('plotly_unhover', function(data) {
+        plotlyDiv.style.cursor = 'default';
+    });
+    
+    console.log('✅ State-dealer drill-down handler configured successfully!');
+    console.log('💡 Click on any dealer slice to see products sold in ' + stateName);
+}
+
+// Watch for state-dealer chart being created in the fullscreen container
+document.addEventListener('DOMContentLoaded', function() {
+    const fullscreenContainer = document.getElementById('fullscreen-chart-container');
+    if (fullscreenContainer) {
+        const chartObserver = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1) {  // Element node
+                        // Check if the state-dealer-chart was added
+                        let stateDealerChart = null;
+                        if (node.id === 'state-dealer-chart') {
+                            stateDealerChart = node;
+                        } else {
+                            stateDealerChart = node.querySelector('#state-dealer-chart');
+                        }
+                        
+                        if (stateDealerChart) {
+                            console.log('🔍 Detected state-dealer-chart being created!');
+                            
+                            // Get the state name from the data attribute
+                            const stateName = stateDealerChart.getAttribute('data-state-name');
+                            
+                            // Wait for Plotly to initialize the chart
+                            setTimeout(function() {
+                                const plotlyDiv = stateDealerChart.querySelector('.js-plotly-plot') || stateDealerChart;
+                                if (plotlyDiv && plotlyDiv.data) {
+                                    console.log('✅ Found Plotly chart in state-dealer view');
+                                    setupStateDealerDrillDown(plotlyDiv, stateName);
+                                } else {
+                                    console.warn('⚠️ Plotly chart not ready yet, retrying...');
+                                    setTimeout(function() {
+                                        const retryDiv = stateDealerChart.querySelector('.js-plotly-plot') || stateDealerChart;
+                                        if (retryDiv && retryDiv.data) {
+                                            setupStateDealerDrillDown(retryDiv, stateName);
+                                        }
+                                    }, 500);
+                                }
+                            }, 300);
+                        }
+                    }
+                });
+            });
+        });
+        
+        chartObserver.observe(fullscreenContainer, {
+            childList: true,
+            subtree: true
+        });
+        
+        console.log('✅ State-dealer chart observer set up');
+    }
+});

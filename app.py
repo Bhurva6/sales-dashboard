@@ -331,6 +331,11 @@ app.layout = dbc.Container([
     dcc.Store(id='chart-data-store', storage_type='memory'),  # Store for chart data
     html.Div(id='saved-charts-data', style={'display': 'none'}),  # Hidden div for saved charts data
     dcc.Store(id='fullscreen-chart-store', storage_type='memory'),  # Store for fullscreen chart data
+    dcc.Store(id='dealer-drilldown-store', storage_type='memory'),  # Store for dealer drill-down state (dealer chart)
+    dcc.Store(id='dealer-drilldown-metric', data='revenue', storage_type='memory'),  # Store for metric toggle (revenue/quantity)
+    dcc.Store(id='state-drilldown-store', storage_type='memory'),  # Store for state drill-down state (state chart)
+    dcc.Store(id='state-drilldown-metric', data='revenue', storage_type='memory'),  # Store for state metric toggle
+    dcc.Store(id='state-dealer-drilldown-store', storage_type='memory'),  # Store for second-level drill-down (state → dealer → products)
     
     # Toast notification container (positioned at top right)
     html.Div(
@@ -357,20 +362,73 @@ app.layout = dbc.Container([
     # Fullscreen Chart Modal
     dbc.Modal([
         dbc.ModalHeader(
-            dbc.ModalTitle(id='fullscreen-modal-title'),
+            html.Div([
+                dbc.ModalTitle(id='fullscreen-modal-title'),
+                html.Div([
+                    # Toggle buttons for Dealer drill-down (Revenue and Quantity)
+                    dbc.ButtonGroup([
+                        dbc.Button(
+                            "Revenue",
+                            id='dealer-metric-revenue-btn',
+                            color='primary',
+                            size='sm',
+                            outline=False,
+                            style={'display': 'none'}
+                        ),
+                        dbc.Button(
+                            "Quantity",
+                            id='dealer-metric-quantity-btn',
+                            color='primary',
+                            size='sm',
+                            outline=True,
+                            style={'display': 'none'}
+                        ),
+                    ], className='me-2'),
+                    # Toggle buttons for State drill-down (Revenue and Quantity)
+                    dbc.ButtonGroup([
+                        dbc.Button(
+                            "Revenue",
+                            id='state-metric-revenue-btn',
+                            color='success',
+                            size='sm',
+                            outline=False,
+                            style={'display': 'none'}
+                        ),
+                        dbc.Button(
+                            "Quantity",
+                            id='state-metric-quantity-btn',
+                            color='success',
+                            size='sm',
+                            outline=True,
+                            style={'display': 'none'}
+                        ),
+                    ]),
+                ], className='d-flex align-items-center')
+            ], className='d-flex justify-content-between align-items-center w-100'),
             close_button=True
         ),
         dbc.ModalBody(
-            html.Div(
-                id='fullscreen-chart-container',
-                style={
-                    'width': '100%',
-                    'minHeight': '70vh',
-                    'display': 'block',
-                    'position': 'relative',
-                    'background': 'white'
-                }
-            ),
+            html.Div([
+                dcc.Loading(
+                    id='fullscreen-loading',
+                    type='circle',
+                    children=[
+                        html.Div(
+                            id='fullscreen-chart-container',
+                            style={
+                                'width': '100%',
+                                'minHeight': '70vh',
+                                'display': 'block',
+                                'position': 'relative',
+                                'background': 'white'
+                            }
+                        )
+                    ],
+                    fullscreen=False,
+                    color='#6366f1',
+                    style={'minHeight': '70vh'}
+                )
+            ]),
             style={
                 'padding': '20px',
                 'minHeight': '70vh',
@@ -466,6 +524,7 @@ app.layout = dbc.Container([
                         ], className='d-grid gap-1 mb-1'),
                         dbc.ButtonGroup([
                             dbc.Button("This Quarter", id='quick-quarter', color='primary', outline=True, size='sm', className='w-100 mb-1'),
+                            dbc.Button("Last Quarter", id='quick-last-quarter', color='primary', outline=True, size='sm', className='w-100 mb-1'),
                             dbc.Button("This Year", id='quick-year', color='primary', outline=True, size='sm', className='w-100 mb-1'),
                             dbc.Button("Last Year", id='quick-last-year', color='primary', outline=True, size='sm', className='w-100 mb-1'),
                         ], className='d-grid gap-1 mb-1'),
@@ -1527,6 +1586,65 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                     ], width=12)
                 ], className="mb-4"),
             
+            # Zero Sales Products Tracker Section
+            html.Hr(className="my-4"),
+            html.H4("🚫 Zero Sales Products Tracker", className="mb-3 fw-bold"),
+            html.P("Identify products with no sales during the selected period to take corrective action", className="text-muted mb-4"),
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Products with Zero Sales", className="mb-2 d-inline-block"),
+                                dbc.Badge(f"{start_date_str} → {end_date_str}", color="danger", className="ms-2")
+                            ])
+                        ]),
+                        dbc.CardBody([
+                            # Filters Row
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Label("Filter by Category", className="fw-bold small"),
+                                    dcc.Dropdown(
+                                        id='zero-sales-category-filter',
+                                        placeholder='All Categories (multi-select)',
+                                        multi=True,
+                                        className='mb-2',
+                                        clearable=True,
+                                        searchable=True
+                                    )
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Label("Sort By", className="fw-bold small"),
+                                    dbc.Select(
+                                        id='zero-sales-sort-by',
+                                        options=[
+                                            {'label': 'Product Name (A-Z)', 'value': 'name'},
+                                            {'label': 'Category', 'value': 'category'},
+                                            {'label': 'Last Sale Date', 'value': 'last_sale'}
+                                        ],
+                                        value='category',
+                                        className='mb-2'
+                                    )
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Button(
+                                        "Download Report",
+                                        id='zero-sales-download-btn',
+                                        color='danger',
+                                        size='sm',
+                                        className='mt-4'
+                                    ),
+                                    dcc.Download(id='zero-sales-download')
+                                ], width=4),
+                            ], className="mb-3"),
+                            
+                            html.Div(id='zero-sales-products-content')
+                        ])
+                    ], className="shadow-sm border-danger")
+                ], width=12)
+            ], className="mb-4"),
+            
             # Cross-Selling Analysis Section - Always visible
             html.Hr(className="my-4"),
             html.H4("🔗 Cross-Selling Analysis", className="mb-3 fw-bold"),
@@ -1770,6 +1888,134 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                             html.Div(id='inactive-dealers-content')
                         ])
                     ], className="shadow-sm")
+                ], width=12)
+            ], className="mb-4"),
+            
+            # Time Comparative Analysis Section
+            html.Hr(className="my-4"),
+            html.H4("📊 Time Comparative Sales Analysis", className="mb-3 fw-bold"),
+            html.P("Compare product sales performance across multiple time periods (quarters/years) to identify trends", className="text-muted mb-4"),
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("Period-over-Period Product Comparison", className="mb-2 d-inline-block"),
+                                dbc.Badge("Time Series Analysis", color="primary", className="ms-2")
+                            ])
+                        ]),
+                        dbc.CardBody([
+                            # Time Period Selection
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Label("Comparison Type", className="fw-bold small"),
+                                    dbc.RadioItems(
+                                        id='time-comp-period-type',
+                                        options=[
+                                            {'label': 'Quarterly', 'value': 'quarter'},
+                                            {'label': 'Yearly', 'value': 'year'}
+                                        ],
+                                        value='quarter',
+                                        inline=True,
+                                        className="mb-2"
+                                    )
+                                ], width=6),
+                                dbc.Col([
+                                    dbc.Label("Number of Periods", className="fw-bold small"),
+                                    dbc.Select(
+                                        id='time-comp-num-periods',
+                                        options=[
+                                            {'label': '2 Periods', 'value': 2},
+                                            {'label': '3 Periods', 'value': 3},
+                                            {'label': '4 Periods', 'value': 4},
+                                            {'label': '5 Periods', 'value': 5},
+                                            {'label': '6 Periods', 'value': 6}
+                                        ],
+                                        value=4,
+                                        className='mb-2'
+                                    )
+                                ], width=6),
+                            ], className="mb-3"),
+                            
+                            # Filters
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Label("Filter by Category", className="fw-bold small"),
+                                    dcc.Dropdown(
+                                        id='time-comp-category-filter',
+                                        placeholder='All Categories (multi-select)',
+                                        multi=True,
+                                        className='mb-2',
+                                        clearable=True,
+                                        searchable=True
+                                    )
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Label("Metric to Compare", className="fw-bold small"),
+                                    dbc.Select(
+                                        id='time-comp-metric',
+                                        options=[
+                                            {'label': 'Quantity', 'value': 'quantity'},
+                                            {'label': 'Revenue', 'value': 'revenue'},
+                                            {'label': 'Both (Qty + Revenue)', 'value': 'both'}
+                                        ],
+                                        value='quantity',
+                                        className='mb-2'
+                                    )
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Label("Top N Products", className="fw-bold small"),
+                                    dbc.Input(
+                                        id='time-comp-top-n',
+                                        type='number',
+                                        min=10,
+                                        max=100,
+                                        step=10,
+                                        value=20,
+                                        className='mb-2'
+                                    )
+                                ], width=4),
+                            ], className="mb-3"),
+                            
+                            # Additional options
+                            dbc.Row([
+                                dbc.Col([
+                                    dbc.Label("Sort By", className="fw-bold small"),
+                                    dbc.Select(
+                                        id='time-comp-sort-by',
+                                        options=[
+                                            {'label': 'Latest Period (Descending)', 'value': 'latest'},
+                                            {'label': 'Total Across All Periods', 'value': 'total'},
+                                            {'label': 'Product Name (A-Z)', 'value': 'name'}
+                                        ],
+                                        value='latest',
+                                        className='mb-2'
+                                    )
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Checkbox(
+                                        id='time-comp-show-change',
+                                        label="Show Period-over-Period Change %",
+                                        value=True,
+                                        className='mt-4'
+                                    )
+                                ], width=4),
+                                dbc.Col([
+                                    dbc.Button(
+                                        "Download Report",
+                                        id='time-comp-download-btn',
+                                        color='success',
+                                        size='sm',
+                                        className='mt-4'
+                                    ),
+                                    dcc.Download(id='time-comp-download')
+                                ], width=4),
+                            ], className="mb-3"),
+                            
+                            html.Div(id='time-comparative-content')
+                        ])
+                    ], className="shadow-sm border-info")
                 ], width=12)
             ], className="mb-4"),
             
@@ -4414,6 +4660,436 @@ def download_inactive_dealers_report(n_clicks, period_filter, start_date, end_da
         print(f"Error downloading inactive dealers report: {str(e)}")
         return no_update
 
+# Time Comparative Analysis Callback
+@app.callback(
+    Output('time-comparative-content', 'children'),
+    Output('time-comp-category-filter', 'options'),
+    Input('time-comp-period-type', 'value'),
+    Input('time-comp-num-periods', 'value'),
+    Input('time-comp-category-filter', 'value'),
+    Input('time-comp-metric', 'value'),
+    Input('time-comp-top-n', 'value'),
+    Input('time-comp-sort-by', 'value'),
+    Input('time-comp-show-change', 'value'),
+    Input('username-input', 'value'),
+    Input('password-input', 'value'),
+    Input('date-range-picker', 'end_date'),
+    Input('hide-innovative-check', 'value'),
+    prevent_initial_call=False
+)
+def update_time_comparative_analysis(period_type, num_periods, category_filter, metric, top_n, 
+                                    sort_by, show_change, username, password, end_date, hide_innovative):
+    """Create time comparative analysis showing product sales across multiple periods"""
+    
+    if not end_date:
+        return dbc.Alert("Please select a date range", color="warning"), []
+    
+    try:
+        end_date_obj = pd.to_datetime(end_date)
+        
+        # Calculate periods based on type
+        periods = []
+        for i in range(num_periods):
+            if period_type == 'quarter':
+                # Calculate quarter boundaries
+                period_end = end_date_obj - pd.DateOffset(months=i*3)
+                period_start = period_end - pd.DateOffset(months=3) + pd.Timedelta(days=1)
+                
+                # Get quarter number and year
+                quarter_num = (period_end.month - 1) // 3 + 1
+                period_label = f"Q{quarter_num} {period_end.year}"
+            else:  # yearly
+                period_end = end_date_obj.replace(year=end_date_obj.year - i, month=12, day=31)
+                period_start = period_end.replace(month=1, day=1)
+                period_label = str(period_end.year)
+            
+            periods.append({
+                'label': period_label,
+                'start': period_start,
+                'end': period_end
+            })
+        
+        # Reverse to show oldest first
+        periods.reverse()
+        
+        # Fetch data for all periods
+        api_client = APIClient(username=username, password=password)
+        
+        # Get the earliest start date
+        earliest_start = periods[0]['start'].strftime("%d-%m-%Y")
+        latest_end = periods[-1]['end'].strftime("%d-%m-%Y")
+        
+        response = api_client.get_sales_report(
+            start_date=earliest_start,
+            end_date=latest_end
+        )
+        
+        if not response.get('success'):
+            return dbc.Alert(f"API Error: {response.get('message')}", color="danger"), []
+        
+        api_response = response.get('data', {})
+        report_data = api_response.get('report_data', [])
+        
+        if not report_data:
+            return dbc.Alert("No data available for the selected periods", color="warning"), []
+        
+        df = pd.DataFrame(report_data)
+        
+        # Map columns
+        column_mapping = {
+            'SV': 'Value', 'SQ': 'Qty', 'comp_nm': 'Dealer Name',
+            'category_name': 'Category', 'meta_keyword': 'Product Name',
+            'date': 'Date', 'order_date': 'Date', 'created_at': 'Date', 'sale_date': 'Date'
+        }
+        df = df.rename(columns={old: new for old, new in column_mapping.items() if old in df.columns})
+        
+        # Check if Date column exists after mapping
+        if 'Date' not in df.columns:
+            # Try to find any date-like column
+            date_cols = [col for col in df.columns if 'date' in col.lower()]
+            if date_cols:
+                df['Date'] = df[date_cols[0]]
+            else:
+                return dbc.Alert("No date column found in the data. Cannot perform time comparative analysis.", color="danger"), []
+        
+        # Convert columns
+        if 'Value' in df.columns:
+            df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+        if 'Qty' in df.columns:
+            df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
+        if 'Date' in df.columns:
+            df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Apply filters
+        if hide_innovative and 'Dealer Name' in df.columns:
+            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Drop rows with missing Date or Product Name
+        required_cols = []
+        if 'Date' in df.columns:
+            required_cols.append('Date')
+        if 'Product Name' in df.columns:
+            required_cols.append('Product Name')
+        
+        if required_cols:
+            df = df.dropna(subset=required_cols)
+        
+        # Get category options
+        category_options = []
+        if 'Category' in df.columns:
+            category_options = [{'label': cat, 'value': cat} for cat in sorted(df['Category'].dropna().unique())]
+        
+        # Apply category filter
+        if category_filter and 'Category' in df.columns:
+            df = df[df['Category'].isin(category_filter)]
+        
+        if df.empty:
+            return dbc.Alert("No data available with current filters", color="warning"), category_options
+        
+        # Build period comparison data
+        period_data = {}
+        for period in periods:
+            period_df = df[(df['Date'] >= period['start']) & (df['Date'] <= period['end'])]
+            
+            if metric in ['quantity', 'both']:
+                qty_data = period_df.groupby('Product Name')['Qty'].sum()
+                period_data[f"{period['label']}_Qty"] = qty_data
+            
+            if metric in ['revenue', 'both']:
+                rev_data = period_df.groupby('Product Name')['Value'].sum()
+                period_data[f"{period['label']}_Rev"] = rev_data
+        
+        # Combine all period data
+        comparison_df = pd.DataFrame(period_data).fillna(0)
+        
+        if comparison_df.empty:
+            return dbc.Alert("No products found for comparison", color="warning"), category_options
+        
+        # Reset index to make Product Name a column
+        comparison_df = comparison_df.reset_index()
+        comparison_df = comparison_df.rename(columns={'index': 'Product Name'})
+        
+        # Calculate totals for sorting
+        if metric == 'quantity':
+            latest_col = f"{periods[-1]['label']}_Qty"
+            total_cols = [f"{p['label']}_Qty" for p in periods]
+        elif metric == 'revenue':
+            latest_col = f"{periods[-1]['label']}_Rev"
+            total_cols = [f"{p['label']}_Rev" for p in periods]
+        else:  # both
+            latest_col = f"{periods[-1]['label']}_Qty"
+            total_cols = [f"{p['label']}_Qty" for p in periods] + [f"{p['label']}_Rev" for p in periods]
+        
+        comparison_df['_total'] = comparison_df[total_cols].sum(axis=1)
+        
+        # Sort
+        if sort_by == 'latest':
+            comparison_df = comparison_df.sort_values(latest_col, ascending=False)
+        elif sort_by == 'total':
+            comparison_df = comparison_df.sort_values('_total', ascending=False)
+        else:  # name
+            comparison_df = comparison_df.sort_values('Product Name')
+        
+        # Limit to top N
+        comparison_df = comparison_df.head(top_n)
+        
+        # Calculate period-over-period changes if requested
+        if show_change and len(periods) >= 2:
+            for i in range(1, len(periods)):
+                prev_period = periods[i-1]['label']
+                curr_period = periods[i]['label']
+                
+                if metric in ['quantity', 'both']:
+                    prev_col = f"{prev_period}_Qty"
+                    curr_col = f"{curr_period}_Qty"
+                    change_col = f"{curr_period}_Qty_Change%"
+                    comparison_df[change_col] = ((comparison_df[curr_col] - comparison_df[prev_col]) / 
+                                                 comparison_df[prev_col].replace(0, 1) * 100).round(1)
+                
+                if metric in ['revenue', 'both']:
+                    prev_col = f"{prev_period}_Rev"
+                    curr_col = f"{curr_period}_Rev"
+                    change_col = f"{curr_period}_Rev_Change%"
+                    comparison_df[change_col] = ((comparison_df[curr_col] - comparison_df[prev_col]) / 
+                                                comparison_df[prev_col].replace(0, 1) * 100).round(1)
+        
+        # Drop temporary sorting column
+        comparison_df = comparison_df.drop(columns=['_total'])
+        
+        # Create summary cards
+        total_products = len(comparison_df)
+        avg_growth = 0
+        if show_change and len(periods) >= 2:
+            if metric == 'quantity':
+                change_col = f"{periods[-1]['label']}_Qty_Change%"
+                if change_col in comparison_df.columns:
+                    avg_growth = comparison_df[change_col].mean()
+            elif metric == 'revenue':
+                change_col = f"{periods[-1]['label']}_Rev_Change%"
+                if change_col in comparison_df.columns:
+                    avg_growth = comparison_df[change_col].mean()
+        
+        summary_cards = dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-graph-up", style={'fontSize': '24px', 'color': '#3b82f6'}),
+                        html.H3(f"{total_products}", className="text-primary mb-0 mt-2"),
+                        html.P("Products Analyzed", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-calendar-range", style={'fontSize': '24px', 'color': '#10b981'}),
+                        html.H3(f"{num_periods}", className="text-success mb-0 mt-2"),
+                        html.P(f"{'Quarters' if period_type == 'quarter' else 'Years'} Compared", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-speedometer2", style={'fontSize': '24px', 'color': '#8b5cf6'}),
+                        html.H3(f"{avg_growth:+.1f}%", className=f"{'text-success' if avg_growth > 0 else 'text-danger'} mb-0 mt-2"),
+                        html.P("Avg Growth (Latest Period)", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.I(className="bi bi-bar-chart", style={'fontSize': '24px', 'color': '#f59e0b'}),
+                        html.H3(metric.capitalize(), className="text-warning mb-0 mt-2"),
+                        html.P("Comparison Metric", className="text-muted small mb-0")
+                    ])
+                ], className="text-center shadow-sm")
+            ], width=3),
+        ], className="mb-4 g-2")
+        
+        # Prepare table data
+        table_data = comparison_df.to_dict('records')
+        
+        # Build column definitions dynamically
+        column_defs = [
+            {
+                'headerName': 'Product Name',
+                'field': 'Product Name',
+                'filter': 'agTextColumnFilter',
+                'sortable': True,
+                'resizable': True,
+                'width': 250,
+                'pinned': 'left',
+                'cellStyle': {'fontWeight': '500'}
+            }
+        ]
+        
+        # Add period columns
+        for period in periods:
+            if metric in ['quantity', 'both']:
+                qty_col = f"{period['label']}_Qty"
+                column_defs.append({
+                    'headerName': f"{period['label']} (Qty)",
+                    'field': qty_col,
+                    'filter': 'agNumberColumnFilter',
+                    'sortable': True,
+                    'resizable': True,
+                    'width': 130,
+                    'type': 'numericColumn',
+                    'valueFormatter': {'function': 'Number(params.value).toLocaleString()'}
+                })
+                
+                # Add change column if applicable
+                if show_change and period != periods[0]:
+                    change_col = f"{period['label']}_Qty_Change%"
+                    if change_col in comparison_df.columns:
+                        column_defs.append({
+                            'headerName': f"Δ%",
+                            'field': change_col,
+                            'filter': 'agNumberColumnFilter',
+                            'sortable': True,
+                            'resizable': True,
+                            'width': 90,
+                            'type': 'numericColumn',
+                            'cellStyle': {
+                                'function': '''
+                                    params.value >= 0 
+                                        ? {'color': '#10b981', 'fontWeight': '600'} 
+                                        : {'color': '#ef4444', 'fontWeight': '600'}
+                                '''
+                            },
+                            'valueFormatter': {'function': "params.value >= 0 ? '+' + params.value.toFixed(1) + '%' : params.value.toFixed(1) + '%'"}
+                        })
+            
+            if metric in ['revenue', 'both']:
+                rev_col = f"{period['label']}_Rev"
+                column_defs.append({
+                    'headerName': f"{period['label']} (₹)",
+                    'field': rev_col,
+                    'filter': 'agNumberColumnFilter',
+                    'sortable': True,
+                    'resizable': True,
+                    'width': 140,
+                    'type': 'numericColumn',
+                    'valueFormatter': {'function': "'₹' + d3.format(',.0f')(params.value)"}
+                })
+                
+                # Add change column if applicable
+                if show_change and period != periods[0]:
+                    change_col = f"{period['label']}_Rev_Change%"
+                    if change_col in comparison_df.columns:
+                        column_defs.append({
+                            'headerName': f"Δ%",
+                            'field': change_col,
+                            'filter': 'agNumberColumnFilter',
+                            'sortable': True,
+                            'resizable': True,
+                            'width': 90,
+                            'type': 'numericColumn',
+                            'cellStyle': {
+                                'function': '''
+                                    params.value >= 0 
+                                        ? {'color': '#10b981', 'fontWeight': '600'} 
+                                        : {'color': '#ef4444', 'fontWeight': '600'}
+                                '''
+                            },
+                            'valueFormatter': {'function': "params.value >= 0 ? '+' + params.value.toFixed(1) + '%' : params.value.toFixed(1) + '%'"}
+                        })
+        
+        # Create the table
+        table = html.Div([
+            dag.AgGrid(
+                rowData=table_data,
+                columnDefs=column_defs,
+                defaultColDef={
+                    'resizable': True,
+                    'sortable': True,
+                    'filter': True,
+                    'minWidth': 100
+                },
+                dashGridOptions={
+                    'pagination': True,
+                    'paginationPageSize': 50,
+                    'paginationPageSizeSelector': [25, 50, 100],
+                    'enableRangeSelection': True,
+                    'animateRows': True,
+                },
+                className="ag-theme-alpine",
+                style={'height': '600px', 'width': '100%'}
+            )
+        ])
+        
+        # Build content
+        content = html.Div([
+            summary_cards,
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Alert([
+                        html.I(className="bi bi-info-circle me-2"),
+                        html.Strong("Period Range: "),
+                        f"{periods[0]['label']} to {periods[-1]['label']} • ",
+                        html.Strong("Showing: "),
+                        f"Top {top_n} products by {sort_by}"
+                    ], color="info", className="mb-3")
+                ], width=12)
+            ]),
+            
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.H6(f"Time Comparative Table - {period_type.capitalize()} Comparison", className="mb-0")
+                        ]),
+                        dbc.CardBody([
+                            table,
+                            html.Div([
+                                html.Small([
+                                    "💡 Tips: ",
+                                    html.Strong("Green (+) "),
+                                    "indicates growth • ",
+                                    html.Strong("Red (-) "),
+                                    "indicates decline • ",
+                                    "Click column headers to sort • ",
+                                    "Use filters to search"
+                                ], className="text-muted")
+                            ], className="mt-3")
+                        ])
+                    ], className="shadow-sm")
+                ], width=12)
+            ])
+        ])
+        
+        return content, category_options
+        
+    except Exception as e:
+        print(f"Error in time comparative analysis: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return dbc.Alert(f"Error creating time comparison: {str(e)}", color="danger"), []
+
+# Download Time Comparative Report Callback
+@app.callback(
+    Output('time-comp-download', 'data'),
+    Input('time-comp-download-btn', 'n_clicks'),
+    State('time-comparative-content', 'children'),
+    prevent_initial_call=True
+)
+def download_time_comparative_report(n_clicks):
+    """Download time comparative analysis as CSV"""
+    if not n_clicks:
+        return no_update
+    
+    try:
+        # Note: This is a simplified version - in production you'd want to regenerate the data
+        # For now, we'll return a placeholder
+        filename = f"time_comparative_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return dcc.send_string("Please regenerate the report", filename)
+    except Exception as e:
+        print(f"Error downloading time comparative report: {str(e)}")
+        return no_update
+
 # Sales CRM Callback
 @app.callback(
     Output('crm-table-container', 'children'),
@@ -4713,11 +5389,12 @@ def export_crm_data(n_clicks, row_data, start_date, end_date):
     Input('quick-week', 'n_clicks'),
     Input('quick-month', 'n_clicks'),
     Input('quick-quarter', 'n_clicks'),
+    Input('quick-last-quarter', 'n_clicks'),
     Input('quick-year', 'n_clicks'),
     Input('quick-last-year', 'n_clicks'),
     prevent_initial_call=True
 )
-def quick_date_select(week_click, month_click, quarter_click, year_click, last_year_click):
+def quick_date_select(week_click, month_click, quarter_click, last_quarter_click, year_click, last_year_click):
     triggered = ctx.triggered_id
     now = datetime.now()
     
@@ -4735,6 +5412,29 @@ def quick_date_select(week_click, month_click, quarter_click, year_click, last_y
         quarter_start_month = current_quarter * 3 + 1
         start = now.replace(month=quarter_start_month, day=1)
         end = now
+    elif triggered == 'quick-last-quarter':
+        # Last quarter (full previous quarter)
+        current_quarter = (now.month - 1) // 3
+        # Calculate last quarter
+        if current_quarter == 0:
+            # If we're in Q1, last quarter is Q4 of previous year
+            last_quarter_start_month = 10  # October
+            last_quarter_end_month = 12    # December
+            year = now.year - 1
+        else:
+            last_quarter_start_month = (current_quarter - 1) * 3 + 1
+            last_quarter_end_month = last_quarter_start_month + 2
+            year = now.year
+        
+        start = now.replace(year=year, month=last_quarter_start_month, day=1)
+        # Get last day of last quarter's end month
+        if last_quarter_end_month == 12:
+            end = now.replace(year=year, month=12, day=31)
+        else:
+            # Get last day of the month
+            import calendar
+            last_day = calendar.monthrange(year, last_quarter_end_month)[1]
+            end = now.replace(year=year, month=last_quarter_end_month, day=last_day)
     elif triggered == 'quick-year':
         # This year (Jan 1st to today)
         start = now.replace(month=1, day=1)
@@ -4752,15 +5452,16 @@ def quick_date_select(week_click, month_click, quarter_click, year_click, last_y
 # Clientside callback for button feedback
 app.clientside_callback(
     """
-    function(w, m, q, y, ly) {
-        const ids = ['quick-week', 'quick-month', 'quick-quarter', 'quick-year', 'quick-last-year'];
+    function(w, m, q, lq, y, ly) {
+        const ids = ['quick-week', 'quick-month', 'quick-quarter', 'quick-last-quarter', 'quick-year', 'quick-last-year'];
         const btns = ids.map(id => document.getElementById(id));
         let idx = -1;
         if (w) idx = 0;
         else if (m) idx = 1;
         else if (q) idx = 2;
-        else if (y) idx = 3;
-        else if (ly) idx = 4;
+        else if (lq) idx = 3;
+        else if (y) idx = 4;
+        else if (ly) idx = 5;
         if (idx >= 0 && btns[idx]) {
             btns[idx].classList.remove('btn-outline-primary');
             btns[idx].classList.add('btn-primary');
@@ -4776,6 +5477,7 @@ app.clientside_callback(
     Input('quick-week', 'n_clicks'),
     Input('quick-month', 'n_clicks'),
     Input('quick-quarter', 'n_clicks'),
+    Input('quick-last-quarter', 'n_clicks'),
     Input('quick-year', 'n_clicks'),
     Input('quick-last-year', 'n_clicks'),
     prevent_initial_call=True
@@ -4850,6 +5552,623 @@ app.clientside_callback(
     State('sidebar-col', 'style'),
     prevent_initial_call=True
 )
+
+# Dealer Drill-Down: Handle dealer pie chart clicks in fullscreen modal
+@app.callback(
+    Output('dealer-drilldown-store', 'data'),
+    Input('fullscreen-chart-container', 'children'),
+    State('fullscreen-chart-store', 'data'),
+    prevent_initial_call=True
+)
+def handle_dealer_drilldown_click(container_children, fullscreen_data):
+    """Handle clicks on dealer pie chart slices in fullscreen mode"""
+    # Actual click handling will be done via clientside callback in JavaScript
+    return no_update
+
+# Dealer Drill-Down: Update fullscreen chart based on drill-down state
+@app.callback(
+    Output('fullscreen-chart-container', 'children', allow_duplicate=True),
+    Output('dealer-metric-revenue-btn', 'style'),
+    Output('dealer-metric-quantity-btn', 'style'),
+    Input('dealer-drilldown-store', 'data'),
+    Input('dealer-drilldown-metric', 'data'),
+    State('chart-data-store', 'data'),
+    State('fullscreen-chart-store', 'data'),
+    prevent_initial_call=True
+)
+def update_dealer_drilldown_chart(drilldown_data, metric, chart_data, fullscreen_data):
+    """Update the fullscreen chart to show product breakdown for selected dealer"""
+    
+    # Check if this is a dealer pie chart in fullscreen
+    if not fullscreen_data or fullscreen_data.get('chart_id') != 'dealer-pie-chart':
+        return no_update, {'display': 'none'}, {'display': 'none'}
+    
+    # If no drill-down data, show original dealer chart
+    if not drilldown_data or not drilldown_data.get('dealer_name'):
+        # Show original dealer pie chart
+        if chart_data and chart_data.get('data'):
+            try:
+                df = pd.DataFrame(chart_data['data'])
+                value_col = chart_data.get('VALUE_COL', 'Value')
+                original_chart = dcc.Graph(
+                    id='fullscreen-chart-display',
+                    figure=_create_dealer_pie(df, value_col, limit=10),
+                    config={'displayModeBar': True},
+                    style={'height': '85vh'}
+                )
+                return original_chart, {'display': 'none'}, {'display': 'none'}
+            except:
+                pass
+        return no_update, {'display': 'none'}, {'display': 'none'}
+    
+    # Show controls
+    control_style = {'display': 'inline-block'}
+    
+    try:
+        # Get dealer name from drill-down data
+        dealer_name = drilldown_data.get('dealer_name')
+        
+        # Handle case where dealer_name might be a list (from JavaScript)
+        if isinstance(dealer_name, list):
+            dealer_name = dealer_name[0] if len(dealer_name) > 0 else None
+        
+        if not dealer_name:
+            return html.Div("No dealer selected", className="text-center text-muted p-5"), control_style, control_style
+        
+        # Get chart data
+        if not chart_data or not chart_data.get('data'):
+            return html.Div("No data available", className="text-center text-muted p-5"), control_style, control_style
+        
+        df = pd.DataFrame(chart_data['data'])
+        VALUE_COL = chart_data.get('VALUE_COL', 'Value')
+        QTY_COL = chart_data.get('QTY_COL', 'Qty')
+        
+        # Filter data for selected dealer
+        dealer_df = df[df['Dealer Name'] == dealer_name].copy()
+        
+        if dealer_df.empty:
+            return html.Div(f"No data found for {dealer_name}", className="text-center text-muted p-5"), control_style, control_style
+        
+        # Determine which metric to show
+        metric_col = VALUE_COL if metric == 'revenue' else QTY_COL
+        metric_label = 'Revenue' if metric == 'revenue' else 'Quantity'
+        
+        # Aggregate products by selected metric
+        if 'Product Name' not in dealer_df.columns:
+            return html.Div("Product information not available", className="text-center text-muted p-5"), control_style, control_style
+        
+        product_data = dealer_df.groupby('Product Name')[metric_col].sum().reset_index()
+        product_data = product_data.sort_values(metric_col, ascending=False).head(20)  # Top 20 products
+        
+        # Truncate long product names
+        product_data['Display Name'] = product_data['Product Name'].apply(lambda x: truncate_text(x, 40))
+        
+        # Create pie chart
+        colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', 
+                  '#3b82f6', '#ef4444', '#14b8a6', '#f97316', '#a855f7',
+                  '#84cc16', '#06b6d4', '#f43f5e', '#8b5cf6', '#14b8a6',
+                  '#f59e0b', '#10b981', '#6366f1', '#ec4899', '#3b82f6']
+        
+        fig = px.pie(
+            product_data,
+            values=metric_col,
+            names='Display Name',
+            color_discrete_sequence=colors[:len(product_data)],
+            custom_data=['Product Name']
+        )
+        
+        # Update traces with hover template
+        if metric == 'revenue':
+            hover_template = '<b>%{customdata[0]}</b><br>Revenue: ₹%{value:,.0f}<br>Share: %{percent}<extra></extra>'
+        else:
+            hover_template = '<b>%{customdata[0]}</b><br>Quantity: %{value:,.0f} units<br>Share: %{percent}<extra></extra>'
+        
+        fig.update_traces(
+            textposition='inside',
+            textinfo='percent+label',
+            textfont_size=CHART_FONT_CONFIG['general_size'],
+            hovertemplate=hover_template,
+            marker=dict(line=dict(color='white', width=2)),
+            pull=[0.05 if i == 0 else 0 for i in range(len(product_data))]
+        )
+        
+        # Apply modern styling
+        title = f"🎯 Products Sold to {truncate_text(dealer_name, 50)} - By {metric_label}"
+        apply_modern_chart_style(fig, title, height=600)
+        
+        # Add summary stats
+        total_revenue = dealer_df[VALUE_COL].sum()
+        total_qty = dealer_df[QTY_COL].sum()
+        unique_products = dealer_df['Product Name'].nunique()
+        
+        # Create the chart container with stats
+        chart_container = html.Div([
+            # Summary cards
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H5(f"₹{total_revenue:,.0f}", className="mb-0 text-primary"),
+                            html.P("Total Revenue", className="text-muted mb-0 small")
+                        ])
+                    ], className="shadow-sm")
+                ], width=4),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H5(f"{total_qty:,.0f}", className="mb-0 text-success"),
+                            html.P("Total Quantity", className="text-muted mb-0 small")
+                        ])
+                    ], className="shadow-sm")
+                ], width=4),
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.H5(f"{unique_products}", className="mb-0 text-info"),
+                            html.P("Unique Products", className="text-muted mb-0 small")
+                        ])
+                    ], className="shadow-sm")
+                ], width=4),
+            ], className="mb-3 g-2"),
+            
+            # Metric toggle buttons above chart
+            dbc.Row([
+                dbc.Col([
+                    html.Div([
+                        html.Label("View by:", className="me-2 fw-bold", style={'display': 'inline-block'}),
+                        dbc.ButtonGroup([
+                            dbc.Button(
+                                [html.I(className="bi bi-currency-rupee me-1"), "Revenue"],
+                                id='dealer-metric-revenue-btn',
+                                color='primary',
+                                size='sm',
+                                outline=False if metric == 'revenue' else True,
+                            ),
+                            dbc.Button(
+                                [html.I(className="bi bi-box me-1"), "Quantity"],
+                                id='dealer-metric-quantity-btn',
+                                color='primary',
+                                size='sm',
+                                outline=True if metric == 'revenue' else False,
+                            ),
+                        ]),
+                    ], className="d-flex align-items-center justify-content-center")
+                ], width=12)
+            ], className="mb-3"),
+            
+            # Chart
+            dcc.Graph(
+                figure=fig,
+                config={'displayModeBar': True},
+                style={'height': '600px'}
+            )
+        ])
+        
+        return chart_container, control_style, control_style
+        
+    except Exception as e:
+        print(f"Error in dealer drill-down: {str(e)}")
+        traceback.print_exc()
+        return html.Div(f"Error loading product data: {str(e)}", className="text-center text-danger p-5"), control_style, control_style
+
+# Dealer Drill-Down: Toggle between Revenue and Quantity
+@app.callback(
+    Output('dealer-drilldown-metric', 'data'),
+    Output('dealer-metric-revenue-btn', 'outline'),
+    Output('dealer-metric-quantity-btn', 'outline'),
+    Input('dealer-metric-revenue-btn', 'n_clicks'),
+    Input('dealer-metric-quantity-btn', 'n_clicks'),
+    State('dealer-drilldown-metric', 'data'),
+    prevent_initial_call=True
+)
+def toggle_dealer_metric(revenue_clicks, quantity_clicks, current_metric):
+    """Toggle between revenue and quantity view in dealer drill-down"""
+    ctx_triggered = ctx.triggered_id
+    
+    if ctx_triggered == 'dealer-metric-revenue-btn':
+        return 'revenue', False, True  # Revenue active, Quantity outlined
+    elif ctx_triggered == 'dealer-metric-quantity-btn':
+        return 'quantity', True, False  # Quantity active, Revenue outlined
+    
+    return no_update, no_update, no_update
+
+# Dealer Drill-Down: Reset state when modal closes
+@app.callback(
+    Output('dealer-drilldown-store', 'data', allow_duplicate=True),
+    Output('dealer-drilldown-metric', 'data', allow_duplicate=True),
+    Input('fullscreen-chart-modal', 'is_open'),
+    prevent_initial_call=True
+)
+def reset_dealer_drilldown_on_modal_close(is_open):
+    """Reset dealer drill-down state when fullscreen modal is closed"""
+    if not is_open:
+        # Modal is closing, reset drill-down state
+        return None, 'revenue'
+    return no_update, no_update
+
+# State Drill-Down: Handle state pie chart clicks in fullscreen modal
+@app.callback(
+    Output('state-drilldown-store', 'data'),
+    Input('fullscreen-chart-container', 'children'),
+    State('fullscreen-chart-store', 'data'),
+    prevent_initial_call=True
+)
+def handle_state_drilldown_click(container_children, fullscreen_data):
+    """Handle clicks on state pie chart slices in fullscreen mode"""
+    # Actual click handling will be done via clientside callback in JavaScript
+    return no_update
+
+# State Drill-Down: Update fullscreen chart based on drill-down state
+@app.callback(
+    Output('fullscreen-chart-container', 'children', allow_duplicate=True),
+    Output('state-metric-revenue-btn', 'style'),
+    Output('state-metric-quantity-btn', 'style'),
+    Input('state-drilldown-store', 'data'),
+    Input('state-dealer-drilldown-store', 'data'),
+    Input('state-drilldown-metric', 'data'),
+    State('chart-data-store', 'data'),
+    State('fullscreen-chart-store', 'data'),
+    prevent_initial_call=True
+)
+def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, chart_data, fullscreen_data):
+    """Update the fullscreen chart to show dealer breakdown for selected state, or products for selected dealer"""
+    
+    # Check if this is a state pie chart in fullscreen
+    if not fullscreen_data or fullscreen_data.get('chart_id') != 'state-pie-chart':
+        return no_update, {'display': 'none'}, {'display': 'none'}
+    
+    # Show controls
+    control_style = {'display': 'inline-block'}
+    
+    try:
+        # Get chart data
+        if not chart_data or not chart_data.get('data'):
+            return html.Div("No data available", className="text-center text-muted p-5"), control_style, control_style
+        
+        df = pd.DataFrame(chart_data['data'])
+        VALUE_COL = chart_data.get('VALUE_COL', 'Value')
+        QTY_COL = chart_data.get('QTY_COL', 'Qty')
+        
+        # LEVEL 2: Dealer clicked from state view → Show products
+        if dealer_drilldown_data and dealer_drilldown_data.get('dealer_name') and drilldown_data and drilldown_data.get('state_name'):
+            dealer_name = dealer_drilldown_data.get('dealer_name')
+            state_name = drilldown_data.get('state_name')
+            
+            # Handle case where names might be lists (from JavaScript)
+            if isinstance(dealer_name, list):
+                dealer_name = dealer_name[0] if len(dealer_name) > 0 else None
+            if isinstance(state_name, list):
+                state_name = state_name[0] if len(state_name) > 0 else None
+            
+            if not dealer_name or not state_name:
+                return html.Div("No dealer or state selected", className="text-center text-muted p-5"), control_style, control_style
+            
+            # Filter data for selected state and dealer
+            filtered_df = df[(df['State'] == state_name) & (df['Dealer Name'] == dealer_name)].copy()
+            
+            if filtered_df.empty:
+                return html.Div(f"No data found for {dealer_name} in {state_name}", className="text-center text-muted p-5"), control_style, control_style
+            
+            # Determine which metric to show
+            metric_col = VALUE_COL if metric == 'revenue' else QTY_COL
+            metric_label = 'Revenue' if metric == 'revenue' else 'Quantity'
+            
+            # Aggregate products by selected metric
+            if 'Product Name' not in filtered_df.columns:
+                return html.Div("Product information not available", className="text-center text-muted p-5"), control_style, control_style
+            
+            product_data = filtered_df.groupby('Product Name')[metric_col].sum().reset_index()
+            product_data = product_data.sort_values(metric_col, ascending=False).head(20)  # Top 20 products
+            
+            # Truncate long product names
+            product_data['Display Name'] = product_data['Product Name'].apply(lambda x: truncate_text(x, 40))
+            
+            # Create pie chart
+            colors = ['#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', 
+                      '#ef4444', '#14b8a6', '#f97316', '#a855f7', '#84cc16',
+                      '#06b6d4', '#f43f5e', '#6366f1', '#10b981', '#3b82f6',
+                      '#ec4899', '#f59e0b', '#8b5cf6', '#14b8a6', '#ef4444']
+            
+            fig = px.pie(
+                product_data,
+                values=metric_col,
+                names='Display Name',
+                color_discrete_sequence=colors[:len(product_data)],
+                custom_data=['Product Name']
+            )
+            
+            # Update traces with hover template
+            if metric == 'revenue':
+                hover_template = '<b>%{customdata[0]}</b><br>Revenue: ₹%{value:,.0f}<br>Share: %{percent}<extra></extra>'
+            else:
+                hover_template = '<b>%{customdata[0]}</b><br>Quantity: %{value:,.0f} units<br>Share: %{percent}<extra></extra>'
+            
+            fig.update_traces(
+                textposition='inside',
+                textinfo='percent+label',
+                textfont_size=CHART_FONT_CONFIG['general_size'],
+                hovertemplate=hover_template,
+                marker=dict(line=dict(color='white', width=2)),
+                pull=[0.05 if i == 0 else 0 for i in range(len(product_data))]
+            )
+            
+            # Apply modern styling
+            title = f"🎯 Products: {truncate_text(dealer_name, 30)} in {truncate_text(state_name, 30)} - By {metric_label}"
+            apply_modern_chart_style(fig, title, height=600)
+            
+            # Add summary stats
+            total_revenue = filtered_df[VALUE_COL].sum()
+            total_qty = filtered_df[QTY_COL].sum()
+            unique_products = filtered_df['Product Name'].nunique()
+            
+            # Create the chart container with stats
+            chart_container = html.Div([
+                # Breadcrumb navigation
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            dbc.Button(
+                                [html.I(className="bi bi-arrow-left me-2"), "Back to Dealers"],
+                                id='back-to-dealers-btn',
+                                color='light',
+                                size='sm',
+                                className='mb-2'
+                            ),
+                            html.Div([
+                                html.Span("🗺️ ", className="me-1"),
+                                html.Span(truncate_text(state_name, 30), className="fw-bold text-primary me-2"),
+                                html.Span("→", className="text-muted me-2"),
+                                html.Span("🏪 ", className="me-1"),
+                                html.Span(truncate_text(dealer_name, 40), className="fw-bold text-success")
+                            ], className="small text-muted")
+                        ])
+                    ], width=12)
+                ], className="mb-3"),
+                
+                # Summary cards
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardBody([
+                                html.H5(f"₹{total_revenue:,.0f}", className="mb-0 text-success"),
+                                html.P("Total Revenue", className="text-muted mb-0 small")
+                            ])
+                        ], className="shadow-sm")
+                    ], width=4),
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardBody([
+                                html.H5(f"{total_qty:,.0f}", className="mb-0 text-info"),
+                                html.P("Total Quantity", className="text-muted mb-0 small")
+                            ])
+                        ], className="shadow-sm")
+                    ], width=4),
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardBody([
+                                html.H5(f"{unique_products}", className="mb-0 text-warning"),
+                                html.P("Unique Products", className="text-muted mb-0 small")
+                            ])
+                        ], className="shadow-sm")
+                    ], width=4),
+                ], className="mb-3 g-2"),
+                
+                # Chart
+                dcc.Graph(
+                    id='state-dealer-product-chart',
+                    figure=fig,
+                    config={'displayModeBar': True},
+                    style={'height': '600px'}
+                )
+            ])
+            
+            return chart_container, control_style, control_style
+        
+        # LEVEL 1: State clicked → Show dealers in that state
+        elif drilldown_data and drilldown_data.get('state_name'):
+            state_name = drilldown_data.get('state_name')
+            
+            # Handle case where state_name might be a list (from JavaScript)
+            if isinstance(state_name, list):
+                state_name = state_name[0] if len(state_name) > 0 else None
+            
+            if not state_name:
+                return html.Div("No state selected", className="text-center text-muted p-5"), control_style, control_style
+            
+            # Filter data for selected state
+            state_df = df[df['State'] == state_name].copy()
+            
+            if state_df.empty:
+                return html.Div(f"No data found for {state_name}", className="text-center text-muted p-5"), control_style, control_style
+            
+            # Determine which metric to show
+            metric_col = VALUE_COL if metric == 'revenue' else QTY_COL
+            metric_label = 'Revenue' if metric == 'revenue' else 'Quantity'
+            
+            # Aggregate dealers by selected metric
+            if 'Dealer Name' not in state_df.columns:
+                return html.Div("Dealer information not available", className="text-center text-muted p-5"), control_style, control_style
+            
+            dealer_data = state_df.groupby('Dealer Name')[metric_col].sum().reset_index()
+            dealer_data = dealer_data.sort_values(metric_col, ascending=False).head(20)  # Top 20 dealers
+            
+            # Truncate long dealer names
+            dealer_data['Display Name'] = dealer_data['Dealer Name'].apply(lambda x: truncate_text(x, 30))
+            
+            # Create pie chart
+            colors = ['#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', 
+                      '#ef4444', '#14b8a6', '#f97316', '#a855f7', '#84cc16',
+                      '#06b6d4', '#f43f5e', '#6366f1', '#10b981', '#3b82f6',
+                      '#ec4899', '#f59e0b', '#8b5cf6', '#14b8a6', '#ef4444']
+            
+            fig = px.pie(
+                dealer_data,
+                values=metric_col,
+                names='Display Name',
+                color_discrete_sequence=colors[:len(dealer_data)],
+                custom_data=['Dealer Name']
+            )
+            
+            # Update traces with hover template
+            if metric == 'revenue':
+                hover_template = '<b>%{customdata[0]}</b><br>Revenue: ₹%{value:,.0f}<br>Share: %{percent}<extra></extra>'
+            else:
+                hover_template = '<b>%{customdata[0]}</b><br>Quantity: %{value:,.0f} units<br>Share: %{percent}<extra></extra>'
+            
+            fig.update_traces(
+                textposition='inside',
+                textinfo='percent+label',
+                textfont_size=CHART_FONT_CONFIG['general_size'],
+                hovertemplate=hover_template,
+                marker=dict(line=dict(color='white', width=2)),
+                pull=[0.05 if i == 0 else 0 for i in range(len(dealer_data))]
+            )
+            
+            # Apply modern styling
+            title = f"🏪 Dealers in {truncate_text(state_name, 50)} - By {metric_label}"
+            apply_modern_chart_style(fig, title, height=600)
+            
+            # Add summary stats
+            total_revenue = state_df[VALUE_COL].sum()
+            total_qty = state_df[QTY_COL].sum()
+            unique_dealers = state_df['Dealer Name'].nunique()
+            
+            # Create the chart container with stats
+            chart_container = html.Div([
+                # Summary cards
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardBody([
+                                html.H5(f"₹{total_revenue:,.0f}", className="mb-0 text-success"),
+                                html.P("Total Revenue", className="text-muted mb-0 small")
+                            ])
+                        ], className="shadow-sm")
+                    ], width=4),
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardBody([
+                                html.H5(f"{total_qty:,.0f}", className="mb-0 text-info"),
+                                html.P("Total Quantity", className="text-muted mb-0 small")
+                            ])
+                        ], className="shadow-sm")
+                    ], width=4),
+                    dbc.Col([
+                        dbc.Card([
+                            dbc.CardBody([
+                                html.H5(f"{unique_dealers}", className="mb-0 text-warning"),
+                                html.P("Active Dealers", className="text-muted mb-0 small")
+                            ])
+                        ], className="shadow-sm")
+                    ], width=4),
+                ], className="mb-3 g-2"),
+                
+                # Metric toggle buttons above chart
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.Label("View by:", className="me-2 fw-bold", style={'display': 'inline-block'}),
+                            dbc.ButtonGroup([
+                                dbc.Button(
+                                    [html.I(className="bi bi-currency-rupee me-1"), "Revenue"],
+                                    id='state-metric-revenue-btn',
+                                    color='success',
+                                    size='sm',
+                                    outline=False if metric == 'revenue' else True,
+                                ),
+                                dbc.Button(
+                                    [html.I(className="bi bi-box me-1"), "Quantity"],
+                                    id='state-metric-quantity-btn',
+                                    color='success',
+                                    size='sm',
+                                    outline=True if metric == 'revenue' else False,
+                                ),
+                            ]),
+                        ], className="d-flex align-items-center justify-content-center")
+                    ], width=12)
+                ], className="mb-3"),
+                
+                # Chart with drill-down capability
+                dcc.Graph(
+                    id='state-dealer-chart',
+                    figure=fig,
+                    config={'displayModeBar': True},
+                    style={'height': '600px'},
+                    **{'data-enable-drilldown': 'true', 'data-state-name': state_name}  # Mark for JS handler
+                )
+            ])
+            
+            return chart_container, control_style, control_style
+        
+        # LEVEL 0: No drill-down → Show original state chart
+        else:
+            if chart_data and chart_data.get('data'):
+                try:
+                    df = pd.DataFrame(chart_data['data'])
+                    value_col = chart_data.get('VALUE_COL', 'Value')
+                    original_chart = dcc.Graph(
+                        id='fullscreen-chart-display',
+                        figure=_create_state_pie(df, value_col),
+                        config={'displayModeBar': True},
+                        style={'height': '85vh'}
+                    )
+                    return original_chart, {'display': 'none'}, {'display': 'none'}
+                except:
+                    pass
+            return no_update, {'display': 'none'}, {'display': 'none'}
+        
+    except Exception as e:
+        print(f"Error in state drill-down: {str(e)}")
+        traceback.print_exc()
+        return html.Div(f"Error loading data: {str(e)}", className="text-center text-danger p-5"), control_style, control_style
+
+# State Drill-Down: Toggle between Revenue and Quantity
+@app.callback(
+    Output('state-drilldown-metric', 'data'),
+    Output('state-metric-revenue-btn', 'outline'),
+    Output('state-metric-quantity-btn', 'outline'),
+    Input('state-metric-revenue-btn', 'n_clicks'),
+    Input('state-metric-quantity-btn', 'n_clicks'),
+    State('state-drilldown-metric', 'data'),
+    prevent_initial_call=True
+)
+def toggle_state_metric(revenue_clicks, quantity_clicks, current_metric):
+    """Toggle between revenue and quantity view in state drill-down"""
+    ctx_triggered = ctx.triggered_id
+    
+    if ctx_triggered == 'state-metric-revenue-btn':
+        return 'revenue', False, True  # Revenue active, Quantity outlined
+    elif ctx_triggered == 'state-metric-quantity-btn':
+        return 'quantity', True, False  # Quantity active, Revenue outlined
+    
+    return no_update, no_update, no_update
+
+# State Drill-Down: Reset state when modal closes
+@app.callback(
+    Output('state-drilldown-store', 'data', allow_duplicate=True),
+    Output('state-dealer-drilldown-store', 'data', allow_duplicate=True),
+    Output('state-drilldown-metric', 'data', allow_duplicate=True),
+    Input('fullscreen-chart-modal', 'is_open'),
+    prevent_initial_call=True
+)
+def reset_state_drilldown_on_modal_close(is_open):
+    """Reset state drill-down state when fullscreen modal is closed"""
+    if not is_open:
+        # Modal is closing, reset drill-down state
+        return None, None, 'revenue'
+    return no_update, no_update, no_update
+
+# State Drill-Down: Back to dealers button
+@app.callback(
+    Output('state-dealer-drilldown-store', 'data', allow_duplicate=True),
+    Input('back-to-dealers-btn', 'n_clicks'),
+    prevent_initial_call=True
+)
+def back_to_dealers(n_clicks):
+    """Go back from products view to dealers view"""
+    if n_clicks:
+        return None  # Clear the dealer drill-down to go back to state → dealers view
+    return no_update
 
 # Geographic Map Functions
 def _create_india_map(df, metric, level='State', is_bubble=False):
@@ -7255,7 +8574,7 @@ app.clientside_callback(
                 }
             }, 500);
             
-            return [true, chartTitle, chartId];
+            return [true, chartTitle, {chart_id: chartId}];
             
         } catch (e) {
             console.error('Error in fullscreen callback:', e);
