@@ -6,7 +6,10 @@ import dash
 from dash import dcc, html, Input, Output, State, callback, ctx, no_update, ALL, callback_context
 import dash_bootstrap_components as dbc
 import dash_ag_grid as dag
+import dash_leaflet as dl
+import dash_leaflet.express as dlx
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from api_client import APIClient
@@ -1009,25 +1012,35 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
             
             html.Hr(className="my-4"),
             
-            # Geographic Map Section
+            # Geographic Map Section with modern dark theme
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
                         dbc.CardHeader([
-                            html.H5("Geographic Sales Distribution", className="mb-0 fw-bold text-primary"),
-                            html.Small("Interactive map showing sales across India", style={'color': '#000000'})
-                        ]),
+                            html.Div([
+                                html.H5([
+                                    html.I(className="bi bi-geo-alt-fill me-2", style={'color': '#3b82f6'}),
+                                    "Geographic Sales Distribution"
+                                ], className="mb-1 fw-bold text-primary"),
+                                html.Small("Interactive map powered by modern cartography", 
+                                          className="text-muted")
+                            ])
+                        ], style={'background': 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                                 'color': 'white', 'border': 'none'}),
                         dbc.CardBody([
-                            # Map Controls
+                            # Map Controls with modern styling
                             dbc.Row([
                                 dbc.Col([
-                                    dbc.Label("Metric", className="fw-bold"),
+                                    dbc.Label([
+                                        html.I(className="bi bi-bar-chart me-1"),
+                                        "Metric"
+                                    ], className="fw-bold text-primary"),
                                     dbc.RadioItems(
                                         id='map-metric-selector',
                                         options=[
-                                            {'label': 'Revenue', 'value': 'Revenue'},
-                                            {'label': 'Quantity', 'value': 'Quantity'},
-                                            {'label': 'Order Count', 'value': 'Orders'}
+                                            {'label': '💰 Revenue', 'value': 'Revenue'},
+                                            {'label': '📦 Quantity', 'value': 'Quantity'},
+                                            {'label': '📋 Orders', 'value': 'Orders'}
                                         ],
                                         value='Revenue',
                                         inline=True,
@@ -1035,53 +1048,61 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
                                     )
                                 ], width=4),
                                 dbc.Col([
-                                    dbc.Label("View Level", className="fw-bold"),
+                                    dbc.Label([
+                                        html.I(className="bi bi-pin-map me-1"),
+                                        "View Level"
+                                    ], className="fw-bold text-primary"),
                                     dbc.RadioItems(
                                         id='map-level-selector',
                                         options=[
-                                            {'label': 'State', 'value': 'State'},
-                                            {'label': 'City', 'value': 'City'}
+                                            {'label': '🗺️ State', 'value': 'State'},
+                                            {'label': '📍 City', 'value': 'City'}
                                         ],
                                         value='State',
                                         inline=True,
                                         className="mb-2"
                                     )
-                                ], width=4),
+                                ], width=6),
                                 dbc.Col([
-                                    dbc.Label("Map Style", className="fw-bold"),
-                                    dbc.Switch(
-                                        id='map-bubble-toggle',
-                                        label='Bubble Map',
-                                        value=False,
-                                        className="mb-2"
-                                    ),
-                                    dbc.Button(
-                                        "Reset View",
+                                    dbc.Label([
+                                        html.I(className="bi bi-arrow-counterclockwise me-1"),
+                                        "Reset Map"
+                                    ], className="fw-bold text-primary"),
+                                    dbc.Button([
+                                        html.I(className="bi bi-arrow-counterclockwise me-1"),
+                                        "Reset View"
+                                    ],
                                         id='map-reset-btn',
                                         size='sm',
                                         color='secondary',
                                         outline=True,
-                                        className="mt-1"
+                                        className="mt-0 w-100"
                                     )
-                                ], width=4),
-                            ], className="mb-3"),
+                                ], width=6),
+                            ], className="mb-3 p-3", style={
+                                'background': 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                                'borderRadius': '10px'
+                            }),
                             
                             # Selected Location Display
                             html.Div(id='selected-location-display', className="mb-2"),
                             
-                            # Map with fullscreen button
-                            dcc.Loading(
-                                create_chart_with_fullscreen(
-                                    dcc.Graph(
+                            # Map with fullscreen button and dark container
+                            html.Div([
+                                dcc.Loading(
+                                    html.Div(
                                         id='geographic-map',
-                                        config={'displayModeBar': True, 'scrollZoom': True},
-                                        style={'height': '600px'}
+                                        style={'width': '100%', 'height': '600px', 'borderRadius': '10px'}
                                     ),
-                                    'geographic-map',
-                                    'Geographic Sales Distribution'
-                                ),
-                                type='default'
-                            )
+                                    type='default',
+                                    color='#3b82f6'
+                                )
+                            ], style={
+                                'background': '#ffffff',
+                                'borderRadius': '10px',
+                                'padding': '10px',
+                                'boxShadow': '0 10px 25px rgba(0,0,0,0.3)'
+                            })
                         ])
                     ], className="shadow-sm")
                 ], width=12)
@@ -6173,29 +6194,40 @@ def back_to_dealers(n_clicks):
 # Geographic Map Functions
 def _create_india_map(df, metric, level='State', is_bubble=False):
     """
-    Create interactive India map showing sales distribution
+    Create interactive India map with Google Maps style using Dash Leaflet
     
     Args:
         df: DataFrame with sales data
         metric: 'Revenue', 'Quantity', or 'Orders'
         level: 'State' or 'City'
-        is_bubble: If True, create bubble/scatter map; if False, create choropleth
+        is_bubble: If True, create bubble/scatter map; if False, use markers
     """
     if df is None or df.empty:
-        return go.Figure().add_annotation(
-            text="No geographic data available",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=16, color='gray')
+        # Return empty Leaflet map centered on India
+        return dl.Map(
+            center=[20.5937, 78.9629],
+            zoom=5,
+            children=[
+                dl.TileLayer(
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                )
+            ],
+            style={'width': '100%', 'height': '600px'}
         )
     
     # Check if required columns exist
     if level not in df.columns:
-        return go.Figure().add_annotation(
-            text=f"{level} data not available",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=16, color='gray')
+        return dl.Map(
+            center=[20.5937, 78.9629],
+            zoom=5,
+            children=[
+                dl.TileLayer(
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                )
+            ],
+            style={'width': '100%', 'height': '600px'}
         )
     
     # Determine metric column and aggregation
@@ -6203,27 +6235,29 @@ def _create_india_map(df, metric, level='State', is_bubble=False):
         metric_col = 'Value' if 'Value' in df.columns else None
         agg_func = 'sum'
         title_suffix = "Revenue"
-        color_scale = [[0, '#E3F2FD'], [0.5, '#42A5F5'], [1, '#0D47A1']]  # Blue gradient
-        hover_format = "Rs. %{customdata[1]:,.0f}"
+        color = '#3b82f6'  # Blue
     elif metric == 'Quantity':
         metric_col = 'Qty' if 'Qty' in df.columns else None
         agg_func = 'sum'
         title_suffix = "Quantity Sold"
-        color_scale = [[0, '#E8F5E9'], [0.5, '#66BB6A'], [1, '#1B5E20']]  # Green gradient
-        hover_format = "%{customdata[1]:,.0f} units"
+        color = '#10b981'  # Green
     else:  # Orders
         metric_col = None
         agg_func = 'count'
         title_suffix = "Order Count"
-        color_scale = [[0, '#FFF3E0'], [0.5, '#FF9800'], [1, '#E65100']]  # Orange gradient
-        hover_format = "%{customdata[1]:,.0f} orders"
+        color = '#f59e0b'  # Orange
     
     if not metric_col and agg_func != 'count':
-        return go.Figure().add_annotation(
-            text=f"{metric} data not available",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=16, color='gray')
+        return dl.Map(
+            center=[20.5937, 78.9629],
+            zoom=5,
+            children=[
+                dl.TileLayer(
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                )
+            ],
+            style={'width': '100%', 'height': '600px'}
         )
     
     # Aggregate data by location
@@ -6236,210 +6270,106 @@ def _create_india_map(df, metric, level='State', is_bubble=False):
     total_value = location_data['metric_value'].sum()
     location_data['percentage'] = (location_data['metric_value'] / total_value * 100).round(2)
     
-    # Sort and limit to top locations for better performance
+    # Sort and limit to top locations
     location_data = location_data.sort_values('metric_value', ascending=False)
     if level == 'City':
-        location_data = location_data.head(50)  # Limit to top 50 cities
+        location_data = location_data.head(50)
     
-    # Get coordinates dictionary
+    # Get coordinates
     coords_dict = CITY_COORDS if level == 'City' else STATE_COORDS
     
-    # For State level, ensure ALL states are shown (even with zero data)
-    if level == 'State':
-        # Create a complete list of all states
-        all_states = list(STATE_COORDS.keys())
-        existing_states = set(location_data['State'].tolist())
-        missing_states = [s for s in all_states if s not in existing_states]
-        
-        # Add missing states with zero values
-        if missing_states:
-            zero_data = pd.DataFrame({
-                'State': missing_states,
-                'metric_value': [0] * len(missing_states),
-                'percentage': [0.0] * len(missing_states)
-            })
-            location_data = pd.concat([location_data, zero_data], ignore_index=True)
+    # Create markers
+    markers = []
+    for _, row in location_data.iterrows():
+        location_name = row[level]
+        if location_name in coords_dict:
+            lat, lon = coords_dict[location_name]
+            value = row['metric_value']
+            pct = row['percentage']
+            
+            # Format value based on metric
+            if metric == 'Revenue':
+                value_text = f"₹{value:,.0f}"
+            elif metric == 'Quantity':
+                value_text = f"{value:,.0f} units"
+            else:
+                value_text = f"{value:,.0f} orders"
+            
+            # Create marker with custom popup
+            marker = dl.Marker(
+                position=[lat, lon],
+                children=[
+                    dl.Tooltip(location_name),
+                    dl.Popup([
+                        html.Div([
+                            html.H6(location_name, style={'fontWeight': 'bold', 'marginBottom': '8px', 'color': '#1f2937'}),
+                            html.P([
+                                html.Strong(f"{title_suffix}: "),
+                                value_text
+                            ], style={'margin': '4px 0', 'fontSize': '14px'}),
+                            html.P([
+                                html.Strong("Share: "),
+                                f"{pct:.2f}%"
+                            ], style={'margin': '4px 0', 'fontSize': '14px', 'color': '#6b7280'}),
+                        ], style={'padding': '10px', 'minWidth': '200px'})
+                    ])
+                ],
+                icon={
+                    "iconUrl": f"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-{_get_marker_color(pct)}.png",
+                    "shadowUrl": "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+                    "iconSize": [25, 41],
+                    "iconAnchor": [12, 41],
+                    "popupAnchor": [1, -34],
+                    "shadowSize": [41, 41]
+                }
+            )
+            markers.append(marker)
     
-    if is_bubble:
-        # Create bubble/scatter map
-        # Get coordinates for locations
-        coords_dict = CITY_COORDS if level == 'City' else STATE_COORDS
-        
-        locations = []
-        lats = []
-        lons = []
-        values = []
-        names = []
-        percentages = []
-        
-        for _, row in location_data.iterrows():
-            location_name = row[level]
-            if location_name in coords_dict:
-                lat, lon = coords_dict[location_name]
-                locations.append(location_name)
-                lats.append(lat)
-                lons.append(lon)
-                values.append(row['metric_value'])
-                names.append(location_name)
-                percentages.append(row['percentage'])
-        
-        if not locations:
-            return go.Figure().add_annotation(
-                text="No coordinate data available for selected locations",
-                xref="paper", yref="paper",
-                x=0.5, y=0.5, showarrow=False,
-                font=dict(size=16, color='gray')
-            )
-        
-        # Create scatter geo map
-        fig = go.Figure(data=go.Scattergeo(
-            lon=lons,
-            lat=lats,
-            text=names,
-            mode='markers',
-            marker=dict(
-                size=[v/max(values)*50 + 10 for v in values],  # Scale bubble size
-                color=values,
-                colorscale=color_scale,
-                showscale=True,
-                colorbar=dict(
-                    title=title_suffix,
-                    thickness=15,
-                    len=0.7,
-                    x=1.02
-                ),
-                line=dict(width=1, color='white'),
-                sizemode='diameter'
+    # Create the map with Google-style tiles
+    leaflet_map = dl.Map(
+        center=[20.5937, 78.9629],
+        zoom=5,
+        children=[
+            # Use Google-style map tiles (CartoDB Positron for light theme)
+            dl.TileLayer(
+                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                maxZoom=19
             ),
-            customdata=[[name, val, pct] for name, val, pct in zip(names, values, percentages)],
-            hovertemplate=(
-                '<b>%{customdata[0]}</b><br>' +
-                f'{title_suffix}: {hover_format}<br>' +
-                'Share: %{customdata[2]:.2f}%<br>' +
-                '<extra></extra>'
-            ),
-            hoverlabel=dict(
-                bgcolor="white",
-                font_size=14,
-                font_family="Inter, sans-serif",
-                font_color="black"
-            )
-        ))
-        
-        # Update geo layout for India - Use scope='asia' for proper geographic rendering
-        fig.update_geos(
-            scope='asia',
-            projection_type='mercator',
-            center=dict(lat=23.5, lon=78.5),
-            lataxis_range=[6, 37],
-            lonaxis_range=[68, 98],
-            bgcolor='rgba(0,0,0,0)',
-            showland=True,
-            landcolor='#f0f0f0',
-            showocean=True,
-            oceancolor='#e6f2ff',
-            showcountries=True,
-            countrycolor='white',
-            countrywidth=2
-        )
-        
-    else:
-        # Create choropleth-style visualization using scatter geo with filled markers
-        # Get coordinates for locations
-        coords_dict = CITY_COORDS if level == 'City' else STATE_COORDS
-        
-        locations = []
-        lats = []
-        lons = []
-        values = []
-        names = []
-        percentages = []
-        
-        for _, row in location_data.iterrows():
-            location_name = row[level]
-            if location_name in coords_dict:
-                lat, lon = coords_dict[location_name]
-                locations.append(location_name)
-                lats.append(lat)
-                lons.append(lon)
-                values.append(row['metric_value'])
-                names.append(location_name)
-                percentages.append(row['percentage'])
-        
-        if not locations:
-            return go.Figure().add_annotation(
-                text="No coordinate data available for selected locations",
-                xref="paper", yref="paper",
-                x=0.5, y=0.5, showarrow=False,
-                font=dict(size=16, color='gray')
-            )
-        
-        # Create scatter geo map with larger markers for choropleth effect
-        fig = go.Figure(data=go.Scattergeo(
-            lon=lons,
-            lat=lats,
-            text=names,
-            mode='markers',
-            marker=dict(
-                size=40,  # Fixed larger size for choropleth effect
-                color=values,
-                colorscale=color_scale,
-                showscale=True,
-                colorbar=dict(
-                    title=title_suffix,
-                    thickness=15,
-                    len=0.7,
-                    x=1.02
-                ),
-                line=dict(width=2, color='white'),
-                sizemode='diameter',
-                opacity=0.8
-            ),
-            customdata=[[name, val, pct] for name, val, pct in zip(names, values, percentages)],
-            hovertemplate=(
-                '<b>%{customdata[0]}</b><br>' +
-                f'{title_suffix}: {hover_format}<br>' +
-                'Share: %{customdata[2]:.2f}%<br>' +
-                '<extra></extra>'
-            ),
-            hoverlabel=dict(
-                bgcolor="white",
-                font_size=14,
-                font_family="Inter, sans-serif",
-                font_color="black"
-            )
-        ))
-        
-        # Update geo layout for India - Use scope='asia' for proper geographic rendering
-        fig.update_geos(
-            scope='asia',
-            projection_type='mercator',
-            center=dict(lat=23.5, lon=78.5),
-            lataxis_range=[6, 37],
-            lonaxis_range=[68, 98],
-            bgcolor='rgba(0,0,0,0)',
-            showland=True,
-            landcolor='#f0f0f0',
-            showocean=True,
-            oceancolor='#e6f2ff',
-            showcountries=True,
-            countrycolor='white',
-            countrywidth=2
-        )
-    
-    # Update layout
-    apply_modern_chart_style(fig, f"{title_suffix} Distribution by {level}", height=600)
-    
-    fig.update_layout(
-        margin=dict(l=0, r=0, t=50, b=0),
-        geo=dict(bgcolor='rgba(0,0,0,0)')
+            # Add markers
+            dl.LayerGroup(children=markers, id='marker-layer'),
+            # Add zoom control
+            dl.ScaleControl(position="bottomleft"),
+        ],
+        style={
+            'width': '100%', 
+            'height': '600px',
+            'borderRadius': '10px',
+            'boxShadow': '0 4px 6px rgba(0,0,0,0.1)'
+        },
+        id='leaflet-map'
     )
     
-    return fig
+    return leaflet_map
+
+
+def _get_marker_color(percentage):
+    """Get marker color based on percentage share"""
+    if percentage >= 15:
+        return 'red'
+    elif percentage >= 10:
+        return 'orange'
+    elif percentage >= 5:
+        return 'yellow'
+    elif percentage >= 2:
+        return 'green'
+    else:
+        return 'blue'
+
 
 # Geographic Map Callback
 @app.callback(
-    [Output('geographic-map', 'figure'),
+    [Output('geographic-map', 'children'),
      Output('selected-location-display', 'children')],
     [Input('map-metric-selector', 'value'),
      Input('map-level-selector', 'value'),
