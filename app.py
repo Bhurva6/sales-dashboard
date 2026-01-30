@@ -13,6 +13,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from api_client import APIClient
+from api_client_isopl import APIClientISOPL
 from datetime import datetime, timedelta
 import json
 import os
@@ -272,28 +273,43 @@ STATE_COORDS = {
 
 # Cached API data fetch function
 @cache.memoize(timeout=300)  # Cache for 5 minutes
-def fetch_sales_data_cached(username, password, start_date, end_date, hide_innovative):
+def fetch_sales_data_cached(username, password, start_date, end_date, hide_innovative, use_isopl=False):
     """
     Cached version of API data fetch to prevent duplicate calls
     Returns processed DataFrame or None if error
+    
+    Args:
+        username: API username
+        password: API password
+        start_date: Start date in DD-MM-YYYY format
+        end_date: End date in DD-MM-YYYY format
+        hide_innovative: Whether to filter out Innovative dealer
+        use_isopl: If True, use ISOPL API client, otherwise use original API
     """
     try:
-        print(f"🔄 Fetching data from API (not cached) for {start_date} to {end_date}")
-        api_client = APIClient(username=username, password=password)
+        api_name = "ISOPL" if use_isopl else "Overall"
+        print(f"🔄 Fetching data from {api_name} API (not cached) for {start_date} to {end_date}")
+        
+        # Select the appropriate API client
+        if use_isopl:
+            api_client = APIClientISOPL(username=username, password=password)
+        else:
+            api_client = APIClient(username=username, password=password)
+        
         response = api_client.get_sales_report(
             start_date=start_date,
             end_date=end_date
         )
         
         if not response.get('success'):
-            print(f"❌ API Error: {response.get('message')}")
+            print(f"❌ {api_name} API Error: {response.get('message')}")
             return None
         
         api_response = response.get('data', {})
         report_data = api_response.get('report_data', [])
         
         if not report_data:
-            print("⚠️ No data available")
+            print(f"⚠️ No data available from {api_name} API")
             return None
         
         df = pd.DataFrame(report_data)
@@ -318,7 +334,7 @@ def fetch_sales_data_cached(username, password, start_date, end_date, hide_innov
         if hide_innovative and 'Dealer Name' in df.columns:
             df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
         
-        print(f"✅ Data fetched successfully: {len(df)} rows")
+        print(f"✅ Data fetched successfully from {api_name} API: {len(df)} rows")
         return df
         
     except Exception as e:
@@ -330,6 +346,7 @@ def fetch_sales_data_cached(username, password, start_date, end_date, hide_innov
 app.layout = dbc.Container([
     dcc.Location(id='url', refresh=False),
     dcc.Store(id='session-store', storage_type='session'),
+    dcc.Store(id='dashboard-mode-store', data='overall', storage_type='session'),  # Store for dashboard mode (overall/isopl)
     dcc.Store(id='selected-location-store', storage_type='session'),  # Store for map selection
     dcc.Store(id='chart-data-store', storage_type='memory'),  # Store for chart data
     html.Div(id='saved-charts-data', style={'display': 'none'}),  # Hidden div for saved charts data
@@ -485,6 +502,35 @@ app.layout = dbc.Container([
                                        className="mb-0", 
                                        style={'fontSize': '14px', 'fontWeight': '400', 'color': '#000000'})
                             ])
+                        ], style={'display': 'flex', 'alignItems': 'center'}),
+                        # Dashboard Toggle Buttons
+                        html.Div([
+                            dbc.ButtonGroup([
+                                dbc.Button(
+                                    [
+                                        html.I(className="bi bi-building me-2"),
+                                        "Overall Dashboard"
+                                    ],
+                                    id='toggle-overall-btn',
+                                    color='primary',
+                                    outline=False,
+                                    size='md',
+                                    className='fw-bold',
+                                    style={'minWidth': '180px'}
+                                ),
+                                dbc.Button(
+                                    [
+                                        html.I(className="bi bi-shop me-2"),
+                                        "ISOPL Dashboard"
+                                    ],
+                                    id='toggle-isopl-btn',
+                                    color='primary',
+                                    outline=True,
+                                    size='md',
+                                    className='fw-bold',
+                                    style={'minWidth': '180px'}
+                                ),
+                            ], size='md')
                         ], style={'display': 'flex', 'alignItems': 'center'}),
                     ]),
                 ], style={'display': 'flex', 'justifyContent': 'space-between', 'alignItems': 'center'})
@@ -707,15 +753,20 @@ def _create_monthly_slow_moving_summary(df, value_col, qty_col, end_date):
     Input('date-range-picker', 'start_date'),
     Input('date-range-picker', 'end_date'),
     Input('hide-innovative-check', 'value'),
+    Input('dashboard-mode-store', 'data'),
     State('username-input', 'value'),
     State('password-input', 'value'),
     prevent_initial_call=False
 )
-def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, username, password):
+def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dashboard_mode, username, password):
     """Update entire dashboard when dates change or refresh is clicked"""
     
     if not start_date or not end_date:
         return dbc.Alert("Please select date range", color="warning"), "No date range", None
+    
+    # Determine which API to use
+    use_isopl = (dashboard_mode == 'isopl')
+    dashboard_name = "ISOPL" if use_isopl else "Overall"
     
     try:
         # Convert dates to DD-MM-YYYY format
@@ -732,10 +783,10 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
         print(f"   Refresh clicks: {refresh_clicks}")
         
         # Use cached data fetch (only calls API if not cached)
-        df = fetch_sales_data_cached(username, password, start_date_str, end_date_str, hide_innovative)
+        df = fetch_sales_data_cached(username, password, start_date_str, end_date_str, hide_innovative, use_isopl)
         
         if df is None or df.empty:
-            status_text = f"No data | {datetime.now().strftime('%H:%M:%S')}"
+            status_text = f"No data ({dashboard_name}) | {datetime.now().strftime('%H:%M:%S')}"
             return dbc.Alert("No data available for this date range", color="warning"), status_text, None
         
         print(f"   Data fetched: {len(df)} rows (cached)")
@@ -2391,7 +2442,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
         ])
         
         # Status text
-        status_text = f"{len(df):,} records | Last updated: {datetime.now().strftime('%H:%M:%S')}"
+        status_text = f"{len(df):,} records ({dashboard_name}) | Last updated: {datetime.now().strftime('%H:%M:%S')}"
         
         # Prepare chart data for store
         chart_data = {
@@ -2409,7 +2460,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, user
     except Exception as e:
         print(f"Error: {str(e)}")
         traceback.print_exc()
-        status_text = f"Error | {datetime.now().strftime('%H:%M:%S')}"
+        status_text = f"Error ({dashboard_name}) | {datetime.now().strftime('%H:%M:%S')}"
         return dbc.Alert(f"Error: {str(e)}", color="danger"), status_text, None
 
 # Toggle Custom Chart Builder Callback
@@ -6373,22 +6424,27 @@ def _get_marker_color(percentage):
      Output('selected-location-display', 'children')],
     [Input('map-metric-selector', 'value'),
      Input('map-level-selector', 'value'),
-     Input('map-bubble-toggle', 'on'),
      Input('date-range-picker', 'start_date'),
      Input('date-range-picker', 'end_date'),
      Input('hide-innovative-check', 'value'),
      Input('map-reset-btn', 'n_clicks'),
+     Input('dashboard-mode-store', 'data'),
      Input('username-input', 'value'),
      Input('password-input', 'value')],
     prevent_initial_call=False
 )
-def update_map(metric, level, is_bubble, start_date, end_date, 
-               hide_innovative, reset_clicks, username, password):
+def update_map(metric, level, start_date, end_date, 
+               hide_innovative, reset_clicks, dashboard_mode, username, password):
     """Update geographic map based on user selections"""
     try:
+        # Determine which API to use
+        use_isopl = (dashboard_mode == 'isopl')
+        dashboard_name = "ISOPL" if use_isopl else "Overall"
+        
         # Debug logging
         print(f"\nMAP CALLBACK TRIGGERED")
-        print(f"   Metric: {metric}, Level: {level}, Bubble: {is_bubble}")
+        print(f"   Dashboard Mode: {dashboard_name}")
+        print(f"   Metric: {metric}, Level: {level}")
         print(f"   Dates: {start_date} to {end_date}")
         print(f"   Username: {username}, Hide Innovative: {hide_innovative}")
         
@@ -6412,7 +6468,11 @@ def update_map(metric, level, is_bubble, start_date, end_date,
             password = 'asdftuy#$%78@!'
             print(f"   Using default credentials")
         
-        api_client = APIClient(username=username, password=password)
+        # Select the appropriate API client based on dashboard mode
+        if use_isopl:
+            api_client = APIClientISOPL(username=username, password=password)
+        else:
+            api_client = APIClient(username=username, password=password)
         
         # Fetch data from API
         print(f"   Fetching data from {start_date_str} to {end_date_str}...")
@@ -6425,18 +6485,25 @@ def update_map(metric, level, is_bubble, start_date, end_date,
         
         if not response.get('success'):
             print(f"   API Error: {response.get('message')}")
-            empty_fig = go.Figure()
-            empty_fig.add_annotation(
-                text="Failed to fetch data from API",
-                xref="paper", yref="paper",
-                x=0.5, y=0.5, showarrow=False,
-                font=dict(size=16)
+            # Return Leaflet map with error message overlay
+            empty_map = dl.Map(
+                center=[20.5937, 78.9629],
+                zoom=5,
+                children=[
+                    dl.TileLayer(
+                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+                        attribution='&copy; OpenStreetMap contributors &copy; CARTO',
+                        maxZoom=19
+                    )
+                ],
+                style={'width': '100%', 'height': '600px', 'borderRadius': '10px'}
             )
-            empty_fig.update_layout(
-                height=600,
-                paper_bgcolor='white'
-            )
-            return empty_fig, ""
+            error_msg = dbc.Alert([
+                html.I(className="bi bi-exclamation-triangle-fill me-2"),
+                html.Strong("API Error: "),
+                response.get('message', 'Unknown error')
+            ], color="danger", className="mt-2")
+            return empty_map, error_msg
         
         # Extract data from response
         api_response = response.get('data', {})
@@ -6446,24 +6513,24 @@ def update_map(metric, level, is_bubble, start_date, end_date,
         
         if not report_data:
             print(f"   No data available")
-            empty_fig = go.Figure()
-            empty_fig.add_annotation(
-                text="No data available for selected filters",
-                xref="paper", yref="paper",
-                x=0.5, y=0.5, showarrow=False,
-                font=dict(size=16)
+            # Return Leaflet map with no data message
+            empty_map = dl.Map(
+                center=[20.5937, 78.9629],
+                zoom=5,
+                children=[
+                    dl.TileLayer(
+                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+                        attribution='&copy; OpenStreetMap contributors &copy; CARTO',
+                        maxZoom=19
+                    )
+                ],
+                style={'width': '100%', 'height': '600px', 'borderRadius': '10px'}
             )
-            empty_fig.update_layout(
-                height=600,
-                paper_bgcolor='white',
-                geo=dict(
-                    scope='asia',
-                    projection_type='mercator',
-                    center=dict(lat=23.5, lon=78.5),
-                    visible=False
-                )
-            )
-            return empty_fig, ""
+            no_data_msg = dbc.Alert([
+                html.I(className="bi bi-info-circle-fill me-2"),
+                "No sales data available for the selected date range. Try selecting a different period."
+            ], color="warning", className="mt-2")
+            return empty_map, no_data_msg
         
         # Convert to DataFrame
         df = pd.DataFrame(report_data)
@@ -6494,10 +6561,12 @@ def update_map(metric, level, is_bubble, start_date, end_date,
             print(f"   After filter: {len(df)} rows")
         
         # Create the map
-        print(f"   Creating map: metric={metric}, level={level}, is_bubble={is_bubble}")
-        fig = _create_india_map(df, metric, level, is_bubble)
+        print(f"   Creating map: metric={metric}, level={level}")
+        fig = _create_india_map(df, metric, level, is_bubble=False)
         
         print(f"   ✅ Map created successfully")
+        print(f"   Map type: {type(fig)}")
+        print(f"   Map has {len(fig.children) if hasattr(fig, 'children') else 0} children")
         
         # Location display is not needed without filters
         location_text = ""
@@ -6506,18 +6575,26 @@ def update_map(metric, level, is_bubble, start_date, end_date,
         
     except Exception as e:
         logger.error(f"Error updating geographic map: {e}")
-        error_fig = go.Figure()
-        error_fig.add_annotation(
-            text=f"Error loading map: {str(e)}",
-            xref="paper", yref="paper",
-            x=0.5, y=0.5, showarrow=False,
-            font=dict(size=14, color='red')
+        traceback.print_exc()
+        # Return Leaflet map with error message
+        error_map = dl.Map(
+            center=[20.5937, 78.9629],
+            zoom=5,
+            children=[
+                dl.TileLayer(
+                    url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+                    attribution='&copy; OpenStreetMap contributors &copy; CARTO',
+                    maxZoom=19
+                )
+            ],
+            style={'width': '100%', 'height': '600px', 'borderRadius': '10px'}
         )
-        error_fig.update_layout(
-            height=600,
-            paper_bgcolor='white'
-        )
-        return error_fig, ""
+        error_msg = dbc.Alert([
+            html.I(className="bi bi-x-circle-fill me-2"),
+            html.Strong("Error: "),
+            str(e)
+        ], color="danger", className="mt-2")
+        return error_map, error_msg
 
 # Map Click Handler and Filter Sync callbacks are disabled 
 # because state-filter and city-filter components are not in the layout
@@ -8647,6 +8724,32 @@ app.clientside_callback(
     Input({'type': 'save-chart-btn', 'index': ALL}, 'n_clicks'),
     prevent_initial_call=True
 )
+
+# Callback for dashboard toggle buttons
+@app.callback(
+    Output('dashboard-mode-store', 'data'),
+    Output('toggle-overall-btn', 'outline'),
+    Output('toggle-isopl-btn', 'outline'),
+    Input('toggle-overall-btn', 'n_clicks'),
+    Input('toggle-isopl-btn', 'n_clicks'),
+    State('dashboard-mode-store', 'data'),
+    prevent_initial_call=True
+)
+def toggle_dashboard_mode(overall_clicks, isopl_clicks, current_mode):
+    """Toggle between Overall and ISOPL dashboards"""
+    if not ctx.triggered:
+        return current_mode, True if current_mode == 'isopl' else False, True if current_mode == 'overall' else False
+    
+    button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    
+    if button_id == 'toggle-overall-btn':
+        # Switch to Overall dashboard
+        return 'overall', False, True
+    elif button_id == 'toggle-isopl-btn':
+        # Switch to ISOPL dashboard
+        return 'isopl', True, False
+    
+    return current_mode, True if current_mode == 'isopl' else False, True if current_mode == 'overall' else False
 
 if __name__ == '__main__':
     print("\n" + "="*60)
