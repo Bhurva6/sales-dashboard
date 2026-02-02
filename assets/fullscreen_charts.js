@@ -183,6 +183,15 @@ function copyChartToModal(chartId) {
         const chartData = JSON.parse(JSON.stringify(originalPlotlyDiv.data));
         const chartLayout = JSON.parse(JSON.stringify(originalPlotlyDiv.layout));
         
+        // Debug: Check if customdata exists for state-pie-chart
+        if (chartId === 'state-pie-chart' && chartData && chartData.length > 0) {
+            console.log('🔍 State chart data check:');
+            console.log('   customdata exists:', !!chartData[0].customdata);
+            if (chartData[0].customdata) {
+                console.log('   customdata sample:', chartData[0].customdata.slice(0, 3));
+            }
+        }
+        
         // Adjust layout for fullscreen
         chartLayout.height = null;
         chartLayout.autosize = true;
@@ -385,6 +394,7 @@ function setupStateDrillDown(plotlyDiv) {
         console.log('═══════════════════════════════════════');
         console.log('🖱️ STATE PIE CHART CLICKED!');
         console.log('📊 Click data:', data);
+        console.log('📊 data.points:', data.points);
         console.log('═══════════════════════════════════════');
         
         // Prevent default action and stop propagation
@@ -399,7 +409,11 @@ function setupStateDrillDown(plotlyDiv) {
         }
         
         const point = data.points[0];
-        console.log('📍 Clicked point:', point);
+        console.log('📍 Clicked point details:');
+        console.log('   label:', point.label);
+        console.log('   customdata:', point.customdata);
+        console.log('   value:', point.value);
+        console.log('   pointIndex:', point.pointIndex);
         
         // Get state name from customdata (full name) or label (display name)
         const stateName = point.customdata && point.customdata[0] 
@@ -588,17 +602,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (node.nodeType === 1) {  // Element node
                         // Check if the state-dealer-chart was added
                         let stateDealerChart = null;
+                        let chartWrapper = null;
+                        
                         if (node.id === 'state-dealer-chart') {
                             stateDealerChart = node;
+                            chartWrapper = node.parentElement;  // Get wrapper div
                         } else {
                             stateDealerChart = node.querySelector('#state-dealer-chart');
+                            if (stateDealerChart) {
+                                chartWrapper = stateDealerChart.parentElement;  // Get wrapper div
+                            }
                         }
                         
-                        if (stateDealerChart) {
+                        if (stateDealerChart && chartWrapper) {
                             console.log('🔍 Detected state-dealer-chart being created!');
                             
-                            // Get the state name from the data attribute
-                            const stateName = stateDealerChart.getAttribute('data-state-name');
+                            // Get the state name from the wrapper's data attribute
+                            const stateName = chartWrapper.getAttribute('data-state-name');
                             
                             // Wait for Plotly to initialize the chart
                             setTimeout(function() {

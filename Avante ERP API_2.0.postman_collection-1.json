@@ -1,0 +1,403 @@
+{
+  "info": {
+    "_postman_id": "5355deef-fb0b-409a-8cc1-605439e28db0",
+    "name": "Avante ERP API",
+    "description": "Postman collection for Avante ERP API (PHP 5.6, JWT authentication)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "2788259"
+  },
+  "item": [
+    {
+      "name": "Login",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{jwt}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"username\": \"u2vp8kb\",\r\n    \"password\": \"asdftuy#$%78@!\"\r\n}"
+        },
+        "url": {
+          "raw": "https://{{localhost}}/{{erp_api_folder}}/api.php?action=login",
+          "protocol": "https",
+          "host": [
+            "{{localhost}}"
+          ],
+          "path": [
+            "{{erp_api_folder}}",
+            "api.php"
+          ],
+          "query": [
+            {
+              "key": "action",
+              "value": "login",
+              "description": "get the token and refresh token."
+            }
+          ]
+        },
+        "description": "## Login API Endpoint\n\nThis endpoint is used to authenticate a user by logging them into the system. It accepts a username and password, and upon successful authentication, returns a token that can be used for subsequent requests.\n\n### Request\n\n- **Method**: POST\n    \n- **URL**: `http://localhost/avante_erp_api/api.php?action=login`\n    \n- **Content-Type**: application/json\n    \n\n#### Request Body Parameters\n\nThe request body should be a JSON object containing the following parameters:\n\n- `username` (string): The username of the user attempting to log in.\n    \n- `password` (string): The password associated with the provided username.\n    \n\n**Example Request Body:**\n\n``` json\n{\n  \"username\": \"exampleUser\",\n  \"password\": \"examplePassword\"\n}\n\n ```\n\n### Response\n\nUpon making a successful request, the server will respond with a JSON object containing the authentication status and tokens.\n\n#### Successful Response Structure\n\n- **Status Code**: 200\n    \n- **Content-Type**: application/json\n    \n\nThe response will include the following fields:\n\n- `status` (string): Indicates the success or failure of the login attempt.\n    \n- `token` (string): A JWT token that can be used for authenticated requests.\n    \n- `refresh_token` (string): A token used to obtain a new access token when the current one expires.\n    \n\n**Example Successful Response:**\n\n``` json\n{\n  \"status\": \"success\",\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}\n\n ```\n\n#### Error Response Structure\n\nIn case of an unsuccessful login attempt, the response will still return a 200 status code but with an empty status and message fields.\n\n**Example Error Response:**\n\n``` json\n{\n  \"status\": \"\",\n  \"message\": \"\"\n}\n\n ```\n\n### Additional Notes\n\n- Ensure that the username and password are correctly provided in the request body.\n    \n- The server may return warnings related to PHP configurations, but these do not affect the functionality of the API.\n    \n- The tokens returned should be stored securely and used in subsequent requests that require authentication.\n    \n\nThis API endpoint is essential for user authentication and should be used to obtain access tokens for secured API operations."
+      },
+      "response": []
+    },
+    {
+      "name": "Refresh Token",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{bearer_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"refresh_token\": \"{{refresh_token}}\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://{{localhost}}/{{erp_api_folder}}/api.php?action=refresh_token",
+          "protocol": "http",
+          "host": [
+            "{{localhost}}"
+          ],
+          "path": [
+            "{{erp_api_folder}}",
+            "api.php"
+          ],
+          "query": [
+            {
+              "key": "action",
+              "value": "refresh_token"
+            }
+          ]
+        },
+        "description": "## Refresh Token API\n\nThis endpoint is used to refresh an authentication token for a user session. It allows clients to obtain a new access token using a valid refresh token, thereby extending the user's session without requiring them to log in again.\n\n### Request\n\n- **Method**: POST\n    \n- **URL**: `http://localhost/avante_erp_api/api.php?action=refresh_token`\n    \n\n#### Request Body\n\nThe request body must be in JSON format and should contain the following parameter:\n\n- **refresh_token** (string): The refresh token issued during the initial authentication process. This token is used to generate a new access token.\n    \n\n**Example Request Body**:\n\n``` json\n{\n  \"refresh_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6Ik ...\"\n}\n\n ```\n\n### Response\n\nUpon successful execution, the API will return a response with a status code of 200. The response body will be in JSON format and may include the following fields:\n\n- **status** (string): Indicates the status of the request.\n    \n- **token** (string): The newly generated access token.\n    \n- **refresh_token** (string): The refresh token that can be used for future requests.\n    \n\n#### Example Response Body:\n\n``` json\n{\n  \"status\": \"\",\n  \"token\": \"\",\n  \"refresh_token\": \"\"\n}\n\n ```\n\n### Related Responses\n\nIn addition to the primary response, the API may return related responses for other methods called at the same URL, which typically include:\n\n- **success** (boolean): Indicates whether the request was successful.\n    \n- **message** (string): A message providing additional information about the request.\n    \n- **data** (object): Contains user-specific information such as:\n    \n    - **api_user_id** (string): The unique identifier for the user.\n        \n    - **name** (string): The name of the user.\n        \n    - **username** (string): The username of the user.\n        \n    - **token** (string): The access token.\n        \n\n**Example Related Response**:\n\n``` json\n{\n  \"success\": true,\n  \"message\": \"\",\n  \"data\": {\n    \"api_user_id\": \"\",\n    \"name\": \"\",\n    \"username\": \"\",\n    \"token\": \"\"\n  }\n}\n\n ```\n\n### Notes\n\n- Ensure that the refresh token provided is valid; otherwise, the request may fail, and an appropriate error message will be returned.\n    \n- The structure of the response may vary slightly based on the outcome of the request, but the fields mentioned above are commonly included."
+      },
+      "response": []
+    },
+    {
+      "name": "Logout",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{bearer_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt}}",
+            "disabled": true
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://{{localhost}}/{{erp_api_folder}}/api.php?action=logout",
+          "protocol": "http",
+          "host": [
+            "{{localhost}}"
+          ],
+          "path": [
+            "{{erp_api_folder}}",
+            "api.php"
+          ],
+          "query": [
+            {
+              "key": "action",
+              "value": "logout"
+            }
+          ]
+        },
+        "description": "## Logout API\n\nThis endpoint is used to log out a user from the application. It effectively terminates the user's session and ensures that any subsequent requests require re-authentication.\n\n### Request\n\n- **Method**: POST\n    \n- **URL**: `http://localhost/avante_erp_api/api.php?action=logout`\n    \n- **Request Body**: The request does not require any parameters in the body. It uses the `x-www-form-urlencoded` format but does not include any specific key-value pairs.\n    \n\n### Response\n\nUpon a successful logout, the API will return a JSON response with the following structure:\n\n``` json\n{\n  \"status\": \"\",\n  \"message\": \"\"\n}\n\n ```\n\n- **status**: A string indicating the status of the logout operation. It may be empty or contain a relevant message.\n    \n- **message**: A string providing additional information about the logout operation. It may also be empty.\n    \n\n### Status Codes\n\n- **200 OK**: Indicates that the logout was successful.\n    \n\n### Related Responses\n\nOther methods called to this API endpoint may return similar structures, such as:\n\n``` json\n{\n  \"success\": true,\n  \"message\": \"\",\n  \"data\": {\n    \"api_user_id\": \"\",\n    \"name\": \"\",\n    \"username\": \"\",\n    \"token\": \"\"\n  }\n}\n\n ```\n\nThis indicates that the API is designed to handle various authentication-related operations, providing consistent response formats across different actions.\n\n### Summary\n\nThis logout API is essential for maintaining user session integrity and ensuring that users can securely end their sessions."
+      },
+      "response": []
+    },
+    {
+      "name": "Protected",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{bearer_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "disabled": true
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"action\": \"protected\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://{{localhost}}/{{erp_api_folder}}/api.php?action=protected",
+          "protocol": "https",
+          "host": [
+            "{{localhost}}"
+          ],
+          "path": [
+            "{{erp_api_folder}}",
+            "api.php"
+          ],
+          "query": [
+            {
+              "key": "action",
+              "value": "protected"
+            }
+          ]
+        },
+        "description": "### Protected – Auth-Only Operation\n\nThis request invokes a **protected** operation in the Avante ERP API. It is intended to be called only by authenticated clients and is identified by the `action=protected` query parameter.\n\n---\n\n### HTTP Request\n\n``` http\nPOST https://{{localhost}}/{{erp_api_folder}}/api.php?action=protected\n\n ```\n\n- `{{localhost}}`\n    \n    - Base host for the ERP API (for example, `localhost:8000`, a dev/stage domain, or a production host).\n        \n    - Provided as a variable so that the same request can be reused across environments.\n        \n- `{{erp_api_folder}}`\n    \n    - Path segment for the ERP application folder (for example, `avante-erp`).\n        \n    - Also defined as a variable to keep the request reusable when the application is deployed in different directories.\n        \n- `api.php`\n    \n    - The main entry point script for the ERP API.\n        \n- `action=protected` (query parameter)\n    \n    - Identifies this call as a **protected/auth-only** operation.\n        \n    - The server is expected to treat this as an endpoint that requires a valid authenticated context (for example, a verified session or token) before returning the protected content.\n        \n\n---\n\n### Method and Headers\n\n- **Method:** `POST`\n    \n- **Headers:**\n    \n    ``` http\n    Content-Type: application/json\n    \n     ```\n    \n    - Declares that the request body is JSON.\n        \n\n---\n\n### Request Body\n\nBody type: **raw JSON**\n\nCurrent configured body:\n\n``` json\n{\n  \"action\": \"protected\"\n}\n\n ```\n\nBody fields:\n\n- `action` (string, required in this request configuration)\n    - Set explicitly to `\"protected\"`.\n        \n    - Used by the backend to route the request to the logic that handles protected operations.\n        \n\n> Note: This description is intentionally limited to the fields currently present in the body (`action` only) and does not assume any additional payload fields. \n  \n\n---\n\n### Authentication and Protection Semantics\n\nThis operation is **protected**:\n\n- The `action=protected` query parameter and `\"action\": \"protected\"` body value both indicate that the server should handle this as an authenticated/protected call.\n    \n- In many implementations, such endpoints will require a valid authentication context (for example, a bearer token or session), often provided via an `Authorization` header.\n    \n- The exact authentication mechanism depends on your server configuration; enable and configure headers (such as `Authorization: Bearer` ) as required by your deployment.\n    \n\nNo additional authentication parameters (such as refresh tokens or credentials) are present in the current request body.\n\n---\n\n### Sample Successful Response (200)\n\nA known successful response for this request shape is:\n\n``` json\n{\n  \"status\": \"success\",\n  \"message\": \"Welcome u2vp8kb, You are protected.\"\n}\n\n ```\n\nInterpretation:\n\n- `status: \"success\"`\n    \n    - Indicates that the protected operation completed successfully and that the caller satisfied the protection/authentication requirements enforced by the server.\n        \n- `message: \"Welcome u2vp8kb, You are protected.\"`\n    \n    - Confirms that the user or client (example identifier `u2vp8kb`) has accessed the protected resource or action.\n        \n    - The exact identifier value is implementation-specific and serves here as an example of a user- or session-related message.\n        \n\nClients can use this response to verify that:\n\n1. The request structure (URL, headers, and body) is correct.\n    \n2. The authentication context for protected operations is correctly established on the server side."
+      },
+      "response": []
+    },
+    {
+      "name": "Get Server Header",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{bearer_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "disabled": true
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"action\": \"protected\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://{{localhost}}/{{erp_api_folder}}/api.php?action=get_server_header",
+          "protocol": "https",
+          "host": [
+            "{{localhost}}"
+          ],
+          "path": [
+            "{{erp_api_folder}}",
+            "api.php"
+          ],
+          "query": [
+            {
+              "key": "action",
+              "value": "get_server_header"
+            }
+          ]
+        },
+        "description": "### Protected – Auth-Only Operation\n\nThis request invokes a **protected** operation in the Avante ERP API. It is intended to be called only by authenticated clients and is identified by the `action=protected` query parameter.\n\n---\n\n### HTTP Request\n\n``` http\nPOST https://{{localhost}}/{{erp_api_folder}}/api.php?action=protected\n\n ```\n\n- `{{localhost}}`\n    \n    - Base host for the ERP API (for example, `localhost:8000`, a dev/stage domain, or a production host).\n        \n    - Provided as a variable so that the same request can be reused across environments.\n        \n- `{{erp_api_folder}}`\n    \n    - Path segment for the ERP application folder (for example, `avante-erp`).\n        \n    - Also defined as a variable to keep the request reusable when the application is deployed in different directories.\n        \n- `api.php`\n    \n    - The main entry point script for the ERP API.\n        \n- `action=protected` (query parameter)\n    \n    - Identifies this call as a **protected/auth-only** operation.\n        \n    - The server is expected to treat this as an endpoint that requires a valid authenticated context (for example, a verified session or token) before returning the protected content.\n        \n\n---\n\n### Method and Headers\n\n- **Method:** `POST`\n    \n- **Headers:**\n    \n    ``` http\n    Content-Type: application/json\n    \n     ```\n    \n    - Declares that the request body is JSON.\n        \n\n---\n\n### Request Body\n\nBody type: **raw JSON**\n\nCurrent configured body:\n\n``` json\n{\n  \"action\": \"protected\"\n}\n\n ```\n\nBody fields:\n\n- `action` (string, required in this request configuration)\n    - Set explicitly to `\"protected\"`.\n        \n    - Used by the backend to route the request to the logic that handles protected operations.\n        \n\n> Note: This description is intentionally limited to the fields currently present in the body (`action` only) and does not assume any additional payload fields. \n  \n\n---\n\n### Authentication and Protection Semantics\n\nThis operation is **protected**:\n\n- The `action=protected` query parameter and `\"action\": \"protected\"` body value both indicate that the server should handle this as an authenticated/protected call.\n    \n- In many implementations, such endpoints will require a valid authentication context (for example, a bearer token or session), often provided via an `Authorization` header.\n    \n- The exact authentication mechanism depends on your server configuration; enable and configure headers (such as `Authorization: Bearer` ) as required by your deployment.\n    \n\nNo additional authentication parameters (such as refresh tokens or credentials) are present in the current request body.\n\n---\n\n### Sample Successful Response (200)\n\nA known successful response for this request shape is:\n\n``` json\n{\n  \"status\": \"success\",\n  \"message\": \"Welcome u2vp8kb, You are protected.\"\n}\n\n ```\n\nInterpretation:\n\n- `status: \"success\"`\n    \n    - Indicates that the protected operation completed successfully and that the caller satisfied the protection/authentication requirements enforced by the server.\n        \n- `message: \"Welcome u2vp8kb, You are protected.\"`\n    \n    - Confirms that the user or client (example identifier `u2vp8kb`) has accessed the protected resource or action.\n        \n    - The exact identifier value is implementation-specific and serves here as an example of a user- or session-related message.\n        \n\nClients can use this response to verify that:\n\n1. The request structure (URL, headers, and body) is correct.\n    \n2. The authentication context for protected operations is correctly established on the server side."
+      },
+      "response": []
+    },
+    {
+      "name": "get sales report",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{bearer_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"startdate\": \"{{start_date}}\",\r\n    \"enddate\": \"{{end_date}}\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://{{localhost}}/{{erp_api_folder}}/api.php?action=get_sales_report",
+          "protocol": "https",
+          "host": [
+            "{{localhost}}"
+          ],
+          "path": [
+            "{{erp_api_folder}}",
+            "api.php"
+          ],
+          "query": [
+            {
+              "key": "action",
+              "value": "get_sales_report"
+            }
+          ]
+        },
+        "description": "## Overview\n\nThis request calls a POST endpoint on the ERP backend to fetch **sales report data** for a given date range.\n\n## URL\n\n`POST https://{{localhost}}/{{erp_api_folder}}/api.php?action=get_sales_report`\n\n- `{{localhost}}` – Environment/collection variable for the ERP host (for example, `localhost:8000` or a domain).\n    \n- `{{erp_api_folder}}` – Variable representing the ERP API base folder/path (for example, `avante_erp`).\n    \n- Query parameter:\n    \n    - `action` – In the URL, this is set to `get_sales_report` to indicate that the endpoint should return sales report data.\n        \n\n## Headers\n\nRequired:\n\n- `Content-Type: application/json`\n    - Indicates that the request body is JSON.\n        \n\nOptional (recommended when the API is protected):\n\n- `Authorization: Bearer {{jwt}}`\n    - `{{jwt}}` should contain a valid JWT/bearer token for the current user/session.\n        \n\n## Request Body\n\nBody type: **raw JSON**\n\nFields currently used by this request:\n\n- `action` (string)\n    \n    - Purpose: Indicates what operation the backend should perform.\n        \n    - Example (for fetching reports): `\"get_sales_report\"`\n        \n    - **Note:** The current example body may show a different value (e.g., `\"refresh_token\"`) from previous testing. When using this request to fetch sales reports, set this field to `\"get_sales_report\"`.\n        \n- `refresh_token` (string)\n    \n    - Purpose: A long-lived token that can be used to obtain or validate access for the report request, depending on backend implementation.\n        \n    - Example: `\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ...\"`\n        \n- `startdate` (string)\n    \n    - Purpose: Start of the reporting period.\n        \n    - Format: `DD-MM-YYYY` (based on the current example).\n        \n    - Example: `\"12-01-2025\"`\n        \n- `enddate` (string)\n    \n    - Purpose: End of the reporting period.\n        \n    - Format: `DD-MM-YYYY`.\n        \n    - Example: `\"12-12-2025\"`\n        \n\n### Sample Body\n\n``` json\n{\n  \"action\": \"get_sales_report\",\n  \"refresh_token\": \"<your-refresh-token>\",\n  \"startdate\": \"12-01-2025\",\n  \"enddate\": \"12-12-2025\"\n}\n\n ```\n\n## Response\n\nOn success, the endpoint returns a JSON object with at least:\n\n- `status` (string)\n    \n    - Example: `\"success\"` when the call completes successfully.\n        \n- `report_data` (array of objects)\n    \n    - Each element represents a summarized line of the sales report. Key fields observed:\n        \n        - `cust_id` – Customer ID.\n            \n        - `id` – Internal record or product identifier.\n            \n        - `comp_nm` – Customer/company name (e.g., `\"ALTIVATE MEDICARE\"`).\n            \n        - `city` – Customer city (e.g., `\"VADODARA\"`).\n            \n        - `state` – Customer state (e.g., `\"GUJARAT\"`).\n            \n        - `parent_category` – High-level product category (e.g., `\"Bone Screw\"`).\n            \n        - `category_name` – Detailed product/line item name.\n            \n        - `meta_keyword` – Internal product code/keyword (e.g., `\"ASC.101-E\"`).\n            \n        - `SQ` – Sales quantity for that line.\n            \n        - `SV` – Sales value/amount for that line.\n            \n\nExample (truncated) successful response:\n\n``` json\n{\n  \"status\": \"success\",\n  \"report_data\": [\n    {\n      \"cust_id\": \"38\",\n      \"id\": \"12\",\n      \"comp_nm\": \"ALTIVATE MEDICARE\",\n      \"city\": \"VADODARA\",\n      \"state\": \"GUJARAT\",\n      \"parent_category\": \"Bone Screw\",\n      \"category_name\": \"3.5mm Cortical Screw 20TPI, Self Tapping\",\n      \"meta_keyword\": \"ASC.101-E\",\n      \"SQ\": \"56\",\n      \"SV\": \"1412.13\"\n    }\n  ]\n}\n\n ```\n\n## Notes\n\n- Ensure the `action` is set to `\"get_sales_report\"` when using this request to retrieve sales data.\n    \n- The `refresh_token` must be valid according to the ERP's authentication rules.\n    \n- Date formats and allowed ranges are enforced by the backend; invalid or out-of-range dates may result in empty `report_data` or an error response, depending on server implementation."
+      },
+      "response": []
+    },
+    {
+      "name": "get iospl sales report",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{bearer_token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"startdate\": \"{{start_date}}\",\r\n    \"enddate\": \"{{end_date}}\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "https://{{localhost}}/{{erp_api_folder}}/api.php?action=get_iospl_sales_report",
+          "protocol": "https",
+          "host": [
+            "{{localhost}}"
+          ],
+          "path": [
+            "{{erp_api_folder}}",
+            "api.php"
+          ],
+          "query": [
+            {
+              "key": "action",
+              "value": "get_iospl_sales_report"
+            }
+          ]
+        },
+        "description": "## Overview\n\nThis request calls a POST endpoint on the ERP backend to fetch **sales report data** for a given date range.\n\n## URL\n\n`POST https://{{localhost}}/{{erp_api_folder}}/api.php?action=get_sales_report`\n\n- `{{localhost}}` – Environment/collection variable for the ERP host (for example, `localhost:8000` or a domain).\n    \n- `{{erp_api_folder}}` – Variable representing the ERP API base folder/path (for example, `avante_erp`).\n    \n- Query parameter:\n    \n    - `action` – In the URL, this is set to `get_sales_report` to indicate that the endpoint should return sales report data.\n        \n\n## Headers\n\nRequired:\n\n- `Content-Type: application/json`\n    - Indicates that the request body is JSON.\n        \n\nOptional (recommended when the API is protected):\n\n- `Authorization: Bearer {{jwt}}`\n    - `{{jwt}}` should contain a valid JWT/bearer token for the current user/session.\n        \n\n## Request Body\n\nBody type: **raw JSON**\n\nFields currently used by this request:\n\n- `action` (string)\n    \n    - Purpose: Indicates what operation the backend should perform.\n        \n    - Example (for fetching reports): `\"get_sales_report\"`\n        \n    - **Note:** The current example body may show a different value (e.g., `\"refresh_token\"`) from previous testing. When using this request to fetch sales reports, set this field to `\"get_sales_report\"`.\n        \n- `refresh_token` (string)\n    \n    - Purpose: A long-lived token that can be used to obtain or validate access for the report request, depending on backend implementation.\n        \n    - Example: `\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ...\"`\n        \n- `startdate` (string)\n    \n    - Purpose: Start of the reporting period.\n        \n    - Format: `DD-MM-YYYY` (based on the current example).\n        \n    - Example: `\"12-01-2025\"`\n        \n- `enddate` (string)\n    \n    - Purpose: End of the reporting period.\n        \n    - Format: `DD-MM-YYYY`.\n        \n    - Example: `\"12-12-2025\"`\n        \n\n### Sample Body\n\n``` json\n{\n  \"action\": \"get_sales_report\",\n  \"refresh_token\": \"<your-refresh-token>\",\n  \"startdate\": \"12-01-2025\",\n  \"enddate\": \"12-12-2025\"\n}\n\n ```\n\n## Response\n\nOn success, the endpoint returns a JSON object with at least:\n\n- `status` (string)\n    \n    - Example: `\"success\"` when the call completes successfully.\n        \n- `report_data` (array of objects)\n    \n    - Each element represents a summarized line of the sales report. Key fields observed:\n        \n        - `cust_id` – Customer ID.\n            \n        - `id` – Internal record or product identifier.\n            \n        - `comp_nm` – Customer/company name (e.g., `\"ALTIVATE MEDICARE\"`).\n            \n        - `city` – Customer city (e.g., `\"VADODARA\"`).\n            \n        - `state` – Customer state (e.g., `\"GUJARAT\"`).\n            \n        - `parent_category` – High-level product category (e.g., `\"Bone Screw\"`).\n            \n        - `category_name` – Detailed product/line item name.\n            \n        - `meta_keyword` – Internal product code/keyword (e.g., `\"ASC.101-E\"`).\n            \n        - `SQ` – Sales quantity for that line.\n            \n        - `SV` – Sales value/amount for that line.\n            \n\nExample (truncated) successful response:\n\n``` json\n{\n  \"status\": \"success\",\n  \"report_data\": [\n    {\n      \"cust_id\": \"38\",\n      \"id\": \"12\",\n      \"comp_nm\": \"ALTIVATE MEDICARE\",\n      \"city\": \"VADODARA\",\n      \"state\": \"GUJARAT\",\n      \"parent_category\": \"Bone Screw\",\n      \"category_name\": \"3.5mm Cortical Screw 20TPI, Self Tapping\",\n      \"meta_keyword\": \"ASC.101-E\",\n      \"SQ\": \"56\",\n      \"SV\": \"1412.13\"\n    }\n  ]\n}\n\n ```\n\n## Notes\n\n- Ensure the `action` is set to `\"get_sales_report\"` when using this request to retrieve sales data.\n    \n- The `refresh_token` must be valid according to the ERP's authentication rules.\n    \n- Date formats and allowed ranges are enforced by the backend; invalid or out-of-range dates may result in empty `report_data` or an error response, depending on server implementation."
+      },
+      "response": []
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "jwt",
+      "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhcGlfdXNlcl9pZCI6bnVsbCwidXNlcm5hbWUiOiJ1MnZwOGtiIiwiaWF0IjoxNzY1MjgwODY1LCJleHAiOjE3NjUyODE3NjV9.nPsyAISmejyQEJ9YMaP6XphAV_Q13JMwV_CREovzmdQ",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "erp_api_folder",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}

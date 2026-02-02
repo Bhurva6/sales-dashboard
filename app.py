@@ -13,7 +13,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from api_client import APIClient
-from api_client_isopl import APIClientISOPL
+from api_client_isopl import APIClientIOSPL
 from datetime import datetime, timedelta
 import json
 import os
@@ -69,6 +69,13 @@ app.title = "Orthopedic Implant Analytics Dashboard"
 # Get current month start and today
 today = datetime.now()
 month_start = today.replace(day=1)
+
+# For better default experience, use last year's data if current year is 2026
+# (since the database has 2024-2025 data, not 2026)
+if today.year >= 2026:
+    # Use full 2025 data as default (confirmed: 3,872 records available)
+    month_start = datetime(2025, 1, 1)
+    today = datetime(2025, 12, 31)
 
 # Modern Color Palette - Magenta Inspired
 COLORS = {
@@ -189,8 +196,9 @@ def get_week_start():
     today = datetime.now()
     return today - timedelta(days=today.weekday())
 
-# City coordinates for geographic mapping
+# City coordinates for geographic mapping - COMPREHENSIVE LIST
 CITY_COORDS = {
+    # Major Metros
     'Mumbai': (19.0760, 72.8777),
     'Delhi': (28.7041, 77.1025),
     'New Delhi': (28.7041, 77.1025),
@@ -201,6 +209,8 @@ CITY_COORDS = {
     'Kolkata': (22.5726, 88.3639),
     'Pune': (18.5204, 73.8567),
     'Ahmedabad': (23.0225, 72.5714),
+    
+    # Tier 1 Cities
     'Jaipur': (26.9124, 75.7873),
     'Surat': (21.1702, 72.8311),
     'Lucknow': (26.8467, 80.9462),
@@ -210,7 +220,9 @@ CITY_COORDS = {
     'Thane': (19.2183, 72.9781),
     'Bhopal': (23.2599, 77.4126),
     'Visakhapatnam': (17.6868, 83.2185),
+    'Vizag': (17.6868, 83.2185),
     'Pimpri-Chinchwad': (18.6298, 73.7997),
+    'Pimpri Chinchwad': (18.6298, 73.7997),
     'Patna': (25.5941, 85.1376),
     'Vadodara': (22.3072, 73.1812),
     'Ghaziabad': (28.6692, 77.4538),
@@ -220,14 +232,26 @@ CITY_COORDS = {
     'Faridabad': (28.4089, 77.3178),
     'Meerut': (28.9845, 77.7064),
     'Rajkot': (22.3039, 70.8022),
+    
+    # Mumbai Region
     'Kalyan-Dombivali': (19.2403, 73.1305),
+    'Kalyan': (19.2403, 73.1305),
+    'Dombivali': (19.2167, 73.0876),
     'Vasai-Virar': (19.4612, 72.7990),
+    'Vasai': (19.4612, 72.7990),
+    'Virar': (19.4559, 72.8111),
+    'Navi Mumbai': (19.0330, 73.0297),
+    'Mira-Bhayandar': (19.2952, 72.8544),
+    'Mira Bhayandar': (19.2952, 72.8544),
+    'Bhiwandi': (19.3009, 73.0630),
+    'Ulhasnagar': (19.2183, 73.1382),
+    
+    # Tier 2 Cities
     'Varanasi': (25.3176, 82.9739),
     'Srinagar': (34.0837, 74.7973),
     'Aurangabad': (19.8762, 75.3433),
     'Dhanbad': (23.7957, 86.4304),
     'Amritsar': (31.6340, 74.8723),
-    'Navi Mumbai': (19.0330, 73.0297),
     'Allahabad': (25.4358, 81.8463),
     'Prayagraj': (25.4358, 81.8463),
     'Ranchi': (23.3441, 85.3096),
@@ -242,38 +266,302 @@ CITY_COORDS = {
     'Kota': (25.2138, 75.8648),
     'Chandigarh': (30.7333, 76.7794),
     'Guwahati': (26.1445, 91.7362),
+    'Thiruvananthapuram': (8.5241, 76.9366),
+    'Trivandrum': (8.5241, 76.9366),
+    'Mysore': (12.2958, 76.6394),
+    'Mysuru': (12.2958, 76.6394),
+    'Bareilly': (28.3670, 79.4304),
+    'Aligarh': (27.8974, 78.0880),
+    'Tiruppur': (11.1085, 77.3411),
+    'Moradabad': (28.8389, 78.7378),
+    'Jalandhar': (31.3260, 75.5762),
+    'Bhubaneswar': (20.2961, 85.8245),
+    'Salem': (11.6643, 78.1460),
+    'Warangal': (17.9784, 79.6005),
+    'Guntur': (16.3067, 80.4365),
+    'Saharanpur': (29.9680, 77.5460),
+    'Gorakhpur': (26.7606, 83.3732),
+    'Bikaner': (28.0229, 73.3119),
+    'Amravati': (20.9374, 77.7796),
+    'Noida': (28.5355, 77.3910),
+    'Jamshedpur': (22.8046, 86.2029),
+    'Bhilai': (21.2094, 81.3791),
+    'Cuttack': (20.4625, 85.8830),
+    'Firozabad': (27.1591, 78.3957),
+    'Kochi': (9.9312, 76.2673),
+    'Cochin': (9.9312, 76.2673),
+    'Nellore': (14.4426, 79.9865),
+    'Bhavnagar': (21.7645, 72.1519),
+    'Dehradun': (30.3165, 78.0322),
+    'Durgapur': (23.5204, 87.3119),
+    'Asansol': (23.6739, 86.9524),
+    'Rourkela': (22.2604, 84.8536),
+    'Nanded': (19.1383, 77.3210),
+    'Kolhapur': (16.7050, 74.2433),
+    'Ajmer': (26.4499, 74.6399),
+    'Akola': (20.7002, 77.0082),
+    'Gulbarga': (17.3297, 76.8343),
+    'Kalaburagi': (17.3297, 76.8343),
+    'Jamnagar': (22.4707, 70.0577),
+    'Ujjain': (23.1765, 75.7885),
+    'Loni': (28.7515, 77.2869),
+    'Siliguri': (26.7271, 88.3953),
+    'Jhansi': (25.4484, 78.5685),
+    'Jammu': (32.7266, 74.8570),
+    'Sangli': (16.8524, 74.5815),
+    'Mangalore': (12.9141, 74.8560),
+    'Mangaluru': (12.9141, 74.8560),
+    'Erode': (11.3410, 77.7172),
+    'Belgaum': (15.8497, 74.4977),
+    'Belagavi': (15.8497, 74.4977),
+    'Ambattur': (13.1143, 80.1548),
+    'Tirunelveli': (8.7139, 77.7567),
+    'Malegaon': (20.5579, 74.5287),
+    'Gaya': (24.7955, 85.0002),
+    'Jalgaon': (21.0077, 75.5626),
+    'Udaipur': (24.5854, 73.7125),
+    'Maheshtala': (22.5091, 88.2475),
+    
+    # Additional Tier 3 Cities & Towns
+    'Bilaspur': (22.0796, 82.1409),
+    'Kurnool': (15.8281, 78.0373),
+    'Shahjahanpur': (27.8800, 79.9050),
+    'Bally': (22.6533, 88.3406),
+    'Bhatpara': (22.8716, 88.4087),
+    'Panihati': (22.6914, 88.3742),
+    'Latur': (18.4009, 76.5604),
+    'Brahmapur': (19.3150, 84.7941),
+    'Berhampur': (19.3150, 84.7941),
+    'Muzaffarpur': (26.1225, 85.3906),
+    'Ahmednagar': (19.0948, 74.7480),
+    'Mathura': (27.4924, 77.6737),
+    'Kollam': (8.8932, 76.6141),
+    'Avadi': (13.1189, 80.1099),
+    'Rajahmundry': (17.0005, 81.8040),
+    'Kadapa': (14.4674, 78.8241),
+    'Cuddalore': (11.7480, 79.7714),
+    'Raichur': (16.2160, 77.3566),
+    'Raiganj': (25.6124, 88.1235),
+    'Tirupati': (13.6288, 79.4192),
+    'Kakinada': (16.9891, 82.2475),
+    'Davanagere': (14.4644, 75.9217),
+    'Kozhikode': (11.2588, 75.7804),
+    'Calicut': (11.2588, 75.7804),
+    'Akola': (20.7002, 77.0082),
+    'Kurnool': (15.8281, 78.0373),
+    'Bokaro': (23.6693, 86.1511),
+    'South Dumdum': (22.6089, 88.4090),
+    'Bellary': (15.1394, 76.9214),
+    'Ballari': (15.1394, 76.9214),
+    'Patiala': (30.3398, 76.3869),
+    'Gopalpur': (19.2667, 84.9167),
+    'Agartala': (23.8315, 91.2868),
+    'Bhagalpur': (25.2425, 87.0020),
+    'Muzaffarnagar': (29.4727, 77.7085),
+    'Bhatpara': (22.8716, 88.4087),
+    'Rohtak': (28.8955, 76.6066),
+    'Panipat': (29.3909, 76.9635),
+    'Darbhanga': (26.1542, 85.8918),
+    'Kharagpur': (22.3460, 87.2320),
+    'Aizawl': (23.7271, 92.7176),
+    'Ichalkaranji': (16.6912, 74.4608),
+    'Tiruppur': (11.1085, 77.3411),
+    'Karnal': (29.6857, 76.9905),
+    'Bathinda': (30.2110, 74.9455),
+    'Rampur': (28.8094, 79.0250),
+    'Panvel': (18.9894, 73.1103),
+    'Shivamogga': (13.9299, 75.5681),
+    'Shimoga': (13.9299, 75.5681),
+    'Chandrapur': (19.9615, 79.2961),
+    'Junagadh': (21.5222, 70.4579),
+    'Thrissur': (10.5276, 76.2144),
+    'Alwar': (27.5530, 76.6346),
+    'Bardhaman': (23.2324, 87.8615),
+    'Barddhaman': (23.2324, 87.8615),
+    'Kulti': (23.7307, 86.8550),
+    'Nizamabad': (18.6725, 78.0941),
+    'Parbhani': (19.2608, 76.7728),
+    'Tumkur': (13.3392, 77.1012),
+    'Tumakuru': (13.3392, 77.1012),
+    'Khammam': (17.2473, 80.1514),
+    'Ozhukarai': (11.9563, 79.7734),
+    'Bihar Sharif': (25.1996, 85.5226),
+    'Panipat': (29.3909, 76.9635),
+    'Durg': (21.1900, 81.2849),
+    'Sikar': (27.6119, 75.1397),
+    'Tenali': (16.2428, 80.6435),
+    'Pali': (25.7711, 73.3234),
+    'Buxar': (25.5647, 83.9784),
+    'Khora': (28.7185, 77.4294),
+    'Ghazipur': (25.5800, 83.5800),
+    'Orai': (25.9894, 79.4504),
+    'Hapur': (28.7296, 77.7756),
+    'Mahbubnagar': (16.7488, 77.9734),
+    'Anantapur': (14.6819, 77.6006),
+    'Anantapuram': (14.6819, 77.6006),
+    'Chittoor': (13.2172, 79.1003),
+    'Karimnagar': (18.4386, 79.1288),
+    'Hardwar': (29.9457, 78.1642),
+    'Haridwar': (29.9457, 78.1642),
+    'Sonipat': (28.9931, 77.0151),
+    'Nagercoil': (8.1791, 77.4344),
+    'Thanjavur': (10.7870, 79.1378),
+    'Murwara': (23.8388, 80.3975),
+    'Naihati': (22.8935, 88.4215),
+    'Sambhal': (28.5852, 78.5703),
+    'Nadiad': (22.6948, 72.8618),
+    'Yamunanagar': (30.1290, 77.2674),
+    'English Bazar': (25.0119, 88.1427),
+    'Eluru': (16.7107, 81.0950),
+    'Munger': (25.3753, 86.4731),
+    'Panchkula': (30.6942, 76.8535),
+    'Raayachuru': (15.7547, 76.7560),
+    'Serampore': (22.7520, 88.3420),
+    'Farrukhabad': (27.3882, 79.5804),
+    'Kamarhati': (22.6708, 88.3712),
+    'Udupi': (13.3409, 74.7421),
+    'Hospet': (15.2695, 76.3870),
+    'Hospete': (15.2695, 76.3870),
+    'Nandyal': (15.4769, 78.4830),
+    'Bulandshahr': (28.4069, 77.8498),
+    'Bidar': (17.9129, 77.5200),
+    'Karimnagar': (18.4386, 79.1288),
+    'Shimla': (31.1048, 77.1734),
+    'Korba': (22.3595, 82.7501),
+    'Bongaigaon': (26.4836, 90.5588),
+    'Palakkad': (10.7867, 76.6548),
+    'Guna': (24.6484, 77.3117),
+    'Bhilwara': (25.3470, 74.6401),
+    'Shillong': (25.5788, 91.8933),
+    'Sambhal': (28.5852, 78.5703),
+    'Mirzapur': (25.1462, 82.5650),
+    'Imphal': (24.8170, 93.9368),
+    'Hajipur': (25.6892, 85.2096),
+    'Puri': (19.8135, 85.8312),
+    'Sitapur': (27.5669, 80.6854),
+    'Khargone': (21.8200, 75.6100),
+    'Mau': (25.9417, 83.5611),
+    'Ballia': (25.7620, 84.1497),
+    'Port Blair': (11.6234, 92.7265),
+    'Gangtok': (27.3314, 88.6138),
+    'Daman': (20.4140, 72.8328),
+    'Silvassa': (20.2737, 72.9960),
+    'Karaikudi': (10.0666, 78.7795),
+    'Dindigul': (10.3673, 77.9803),
+    'Vellore': (12.9165, 79.1325),
+    'Tiruvannamalai': (12.2253, 79.0747),
+    'Pollachi': (10.6575, 77.0082),
+    'Ramanathapuram': (9.3636, 78.8370),
+    'Pudukkottai': (10.3833, 78.8000),
+    'Greater Noida': (28.4744, 77.5040),
+    'Ghazipur': (25.5800, 83.5800),
+    'Etawah': (26.7855, 79.0215),
+    'Pilibhit': (28.6328, 79.8046),
 }
 
-# State capital coordinates (fallback for state-level mapping)
+# State capital coordinates (fallback for state-level mapping) - ALL STATES & UTs
 STATE_COORDS = {
+    # Major States
     'Maharashtra': (19.7515, 75.7139),
     'Delhi': (28.7041, 77.1025),
+    'NCR': (28.7041, 77.1025),
+    'National Capital Region': (28.7041, 77.1025),
     'Karnataka': (12.9716, 77.5946),
     'Telangana': (17.3850, 78.4867),
     'Tamil Nadu': (13.0827, 80.2707),
+    'TN': (13.0827, 80.2707),
     'West Bengal': (22.5726, 88.3639),
+    'WB': (22.5726, 88.3639),
     'Gujarat': (23.0225, 72.5714),
     'Rajasthan': (26.9124, 75.7873),
     'Uttar Pradesh': (26.8467, 80.9462),
+    'UP': (26.8467, 80.9462),
     'Madhya Pradesh': (23.2599, 77.4126),
+    'MP': (23.2599, 77.4126),
     'Andhra Pradesh': (17.6868, 83.2185),
+    'AP': (17.6868, 83.2185),
     'Bihar': (25.5941, 85.1376),
     'Punjab': (31.1471, 75.3412),
+    'PB': (31.1471, 75.3412),
     'Haryana': (29.0588, 76.0856),
+    'HR': (29.0588, 76.0856),
     'Kerala': (10.8505, 76.2711),
+    'KL': (10.8505, 76.2711),
     'Assam': (26.2006, 92.9376),
+    'AS': (26.2006, 92.9376),
     'Odisha': (20.9517, 85.0985),
+    'Orissa': (20.9517, 85.0985),
+    'OR': (20.9517, 85.0985),
     'Jharkhand': (23.6102, 85.2799),
+    'JH': (23.6102, 85.2799),
     'Chhattisgarh': (21.2787, 81.8661),
+    'CG': (21.2787, 81.8661),
+    'Chattisgarh': (21.2787, 81.8661),
     'Uttarakhand': (30.0668, 79.0193),
+    'UK': (30.0668, 79.0193),
+    'Uttaranchal': (30.0668, 79.0193),
     'Himachal Pradesh': (31.1048, 77.1734),
+    'HP': (31.1048, 77.1734),
     'Jammu and Kashmir': (33.7782, 76.5762),
+    'J&K': (33.7782, 76.5762),
+    'JK': (33.7782, 76.5762),
+    'Jammu & Kashmir': (33.7782, 76.5762),
     'Goa': (15.2993, 74.1240),
+    'GA': (15.2993, 74.1240),
+    'Tripura': (23.9408, 91.9882),
+    'TR': (23.9408, 91.9882),
+    'Meghalaya': (25.4670, 91.3662),
+    'ML': (25.4670, 91.3662),
+    'Manipur': (24.6637, 93.9063),
+    'MN': (24.6637, 93.9063),
+    'Nagaland': (26.1584, 94.5624),
+    'NL': (26.1584, 94.5624),
+    'Mizoram': (23.1645, 92.9376),
+    'MZ': (23.1645, 92.9376),
+    'Sikkim': (27.5330, 88.5122),
+    'SK': (27.5330, 88.5122),
+    'Arunachal Pradesh': (27.1004, 93.6167),
+    'AR': (27.1004, 93.6167),
+    
+    # Union Territories
+    'Puducherry': (11.9416, 79.8083),
+    'Pondicherry': (11.9416, 79.8083),
+    'PY': (11.9416, 79.8083),
+    'Chandigarh': (30.7333, 76.7794),
+    'CH': (30.7333, 76.7794),
+    'Dadra and Nagar Haveli': (20.1809, 73.0169),
+    'Dadra & Nagar Haveli': (20.1809, 73.0169),
+    'DN': (20.1809, 73.0169),
+    'Daman and Diu': (20.3974, 72.8328),
+    'Daman & Diu': (20.3974, 72.8328),
+    'DD': (20.3974, 72.8328),
+    'Lakshadweep': (10.5667, 72.6417),
+    'LD': (10.5667, 72.6417),
+    'Andaman and Nicobar Islands': (11.7401, 92.6586),
+    'Andaman & Nicobar': (11.7401, 92.6586),
+    'AN': (11.7401, 92.6586),
+    'Ladakh': (34.1526, 77.5770),
+    'LA': (34.1526, 77.5770),
+    
+    # Additional Common Variations
+    'New Delhi': (28.7041, 77.1025),
+    'India': (20.5937, 78.9629),  # Fallback for "India" or unspecified
+    'Sikkim': (27.5330, 88.5122),
+    'Arunachal Pradesh': (27.0844, 93.6053),
+    'Mizoram': (23.1645, 92.9376),
+    'Puducherry': (11.9416, 79.8083),
+    'Pondicherry': (11.9416, 79.8083),
+    'Chandigarh': (30.7333, 76.7794),
+    'Dadra and Nagar Haveli': (20.1809, 73.0169),
+    'Daman and Diu': (20.4283, 72.8397),
+    'Lakshadweep': (10.5667, 72.6417),
+    'Andaman and Nicobar Islands': (11.7401, 92.6586),
+    'Ladakh': (34.1526, 77.5771),
 }
 
 # Cached API data fetch function
 @cache.memoize(timeout=300)  # Cache for 5 minutes
-def fetch_sales_data_cached(username, password, start_date, end_date, hide_innovative, use_isopl=False):
+def fetch_sales_data_cached(username, password, start_date, end_date, hide_innovative, use_iospl=False):
     """
     Cached version of API data fetch to prevent duplicate calls
     Returns processed DataFrame or None if error
@@ -284,15 +572,15 @@ def fetch_sales_data_cached(username, password, start_date, end_date, hide_innov
         start_date: Start date in DD-MM-YYYY format
         end_date: End date in DD-MM-YYYY format
         hide_innovative: Whether to filter out Innovative dealer
-        use_isopl: If True, use ISOPL API client, otherwise use original API
+        use_iospl: If True, use IOSPL API client, otherwise use original API
     """
     try:
-        api_name = "ISOPL" if use_isopl else "Overall"
+        api_name = "IOSPL" if use_iospl else "Avante"
         print(f"🔄 Fetching data from {api_name} API (not cached) for {start_date} to {end_date}")
         
         # Select the appropriate API client
-        if use_isopl:
-            api_client = APIClientISOPL(username=username, password=password)
+        if use_iospl:
+            api_client = APIClientIOSPL(username=username, password=password)
         else:
             api_client = APIClient(username=username, password=password)
         
@@ -302,15 +590,19 @@ def fetch_sales_data_cached(username, password, start_date, end_date, hide_innov
         )
         
         if not response.get('success'):
-            print(f"❌ {api_name} API Error: {response.get('message')}")
-            return None
+            error_message = response.get('message', 'Unknown error')
+            print(f"❌ {api_name} API Error: {error_message}")
+            # Return empty dataframe with error info instead of None
+            # This allows the dashboard to show a helpful message
+            return pd.DataFrame({'_error': [error_message]})
         
         api_response = response.get('data', {})
         report_data = api_response.get('report_data', [])
         
         if not report_data:
             print(f"⚠️ No data available from {api_name} API")
-            return None
+            # Return empty dataframe with info message instead of None
+            return pd.DataFrame({'_info': ['No records found for this date range']})
         
         df = pd.DataFrame(report_data)
         
@@ -346,7 +638,7 @@ def fetch_sales_data_cached(username, password, start_date, end_date, hide_innov
 app.layout = dbc.Container([
     dcc.Location(id='url', refresh=False),
     dcc.Store(id='session-store', storage_type='session'),
-    dcc.Store(id='dashboard-mode-store', data='overall', storage_type='session'),  # Store for dashboard mode (overall/isopl)
+    dcc.Store(id='dashboard-mode-store', data='overall', storage_type='session'),  # Store for dashboard mode (avante/iospl)
     dcc.Store(id='selected-location-store', storage_type='session'),  # Store for map selection
     dcc.Store(id='chart-data-store', storage_type='memory'),  # Store for chart data
     html.Div(id='saved-charts-data', style={'display': 'none'}),  # Hidden div for saved charts data
@@ -509,7 +801,7 @@ app.layout = dbc.Container([
                                 dbc.Button(
                                     [
                                         html.I(className="bi bi-building me-2"),
-                                        "Overall Dashboard"
+                                        "Avante Dashboard"
                                     ],
                                     id='toggle-overall-btn',
                                     color='primary',
@@ -521,9 +813,9 @@ app.layout = dbc.Container([
                                 dbc.Button(
                                     [
                                         html.I(className="bi bi-shop me-2"),
-                                        "ISOPL Dashboard"
+                                        "IOSPL Dashboard"
                                     ],
-                                    id='toggle-isopl-btn',
+                                    id='toggle-iospl-btn',
                                     color='primary',
                                     outline=True,
                                     size='md',
@@ -713,7 +1005,7 @@ def _create_monthly_slow_moving_summary(df, value_col, qty_col, end_date):
                         html.Div([
                             *[dbc.Row([
                                 dbc.Col(html.Span(row['Category'][:30]), width=8, className="small"),
-                                dbc.Col(dbc.Badge(f"{row['Product Name']}", color="warning", pill=True), width=4, className="text-end")
+                                dbc.Col(dbc.Badge(f"{row['Product Name']} families", color="warning", pill=True), width=4, className="text-end")
                             ], className="mb-2") for _, row in top_cat.iterrows()]
                         ])
                     ])
@@ -731,7 +1023,7 @@ def _create_monthly_slow_moving_summary(df, value_col, qty_col, end_date):
                         html.Div([
                             *[dbc.Row([
                                 dbc.Col(html.Span(row['Dealer Name'][:30]), width=8, className="small"),
-                                dbc.Col(dbc.Badge(f"{row['Product Name']}", color="warning", pill=True), width=4, className="text-end")
+                                dbc.Col(dbc.Badge(f"{row['Product Name']} families", color="warning", pill=True), width=4, className="text-end")
                             ], className="mb-2") for _, row in top_dealer.iterrows()]
                         ])
                     ])
@@ -765,8 +1057,8 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
         return dbc.Alert("Please select date range", color="warning"), "No date range", None
     
     # Determine which API to use
-    use_isopl = (dashboard_mode == 'isopl')
-    dashboard_name = "ISOPL" if use_isopl else "Overall"
+    use_iospl = (dashboard_mode == 'iospl')
+    dashboard_name = "IOSPL" if use_iospl else "Avante"
     
     try:
         # Convert dates to DD-MM-YYYY format
@@ -783,11 +1075,72 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
         print(f"   Refresh clicks: {refresh_clicks}")
         
         # Use cached data fetch (only calls API if not cached)
-        df = fetch_sales_data_cached(username, password, start_date_str, end_date_str, hide_innovative, use_isopl)
+        df = fetch_sales_data_cached(username, password, start_date_str, end_date_str, hide_innovative, use_iospl)
+        
+        # Check if there's an error message in the dataframe
+        if df is not None and '_error' in df.columns:
+            error_msg = df['_error'].iloc[0]
+            status_text = f"API Error ({dashboard_name}) | {datetime.now().strftime('%H:%M:%S')}"
+            
+            # Provide helpful suggestions based on the error
+            if "Records are not found" in error_msg or "not found" in error_msg.lower():
+                message = html.Div([
+                    html.H4([html.I(className="bi bi-info-circle me-2"), "No Data Available"], className="mb-3"),
+                    html.P([
+                        f"The {dashboard_name} database has no sales records for the selected date range: ",
+                        html.Strong(f"{start_date_str} to {end_date_str}"),
+                    ], className="mb-3"),
+                    html.Hr(),
+                    html.H5("💡 Suggestions:", className="mb-2"),
+                    html.Ul([
+                        html.Li("Try selecting an earlier date range (e.g., dates from 2024 or 2025)"),
+                        html.Li("Use the 'Quick Select' buttons to choose common date ranges"),
+                        html.Li(f"Contact the {dashboard_name} team to confirm when data will be available for this period"),
+                    ]),
+                    html.Hr(),
+                    dbc.Alert([
+                        html.I(className="bi bi-check-circle me-2"),
+                        f"API Status: ✅ Connected Successfully to {dashboard_name} Server"
+                    ], color="success", className="mb-0")
+                ], className="p-4")
+                return dbc.Alert(message, color="info"), status_text, None
+            else:
+                message = html.Div([
+                    html.H4([html.I(className="bi bi-exclamation-triangle me-2"), "API Error"], className="mb-3"),
+                    html.P(f"Error from {dashboard_name} API: {error_msg}"),
+                    html.P("Please check your connection or try again later.", className="mb-0")
+                ], className="p-3")
+                return dbc.Alert(message, color="danger"), status_text, None
+        
+        # Check if there's an info message in the dataframe
+        if df is not None and '_info' in df.columns:
+            info_msg = df['_info'].iloc[0]
+            status_text = f"No data ({dashboard_name}) | {datetime.now().strftime('%H:%M:%S')}"
+            
+            message = html.Div([
+                html.H4([html.I(className="bi bi-info-circle me-2"), "No Data Available"], className="mb-3"),
+                html.P([
+                    f"The {dashboard_name} database has no sales records for the selected date range: ",
+                    html.Strong(f"{start_date_str} to {end_date_str}"),
+                ], className="mb-3"),
+                html.Hr(),
+                html.H5("💡 Suggestions:", className="mb-2"),
+                html.Ul([
+                    html.Li("Try selecting an earlier date range (e.g., dates from 2024 or 2025)"),
+                    html.Li("Use the 'Quick Select' buttons for common date ranges"),
+                    html.Li(f"Contact the {dashboard_name} team to confirm data availability"),
+                ]),
+                html.Hr(),
+                dbc.Alert([
+                    html.I(className="bi bi-check-circle me-2"),
+                    f"API Status: ✅ Connected Successfully to {dashboard_name} Server"
+                ], color="success", className="mb-0")
+            ], className="p-4")
+            return dbc.Alert(message, color="info"), status_text, None
         
         if df is None or df.empty:
             status_text = f"No data ({dashboard_name}) | {datetime.now().strftime('%H:%M:%S')}"
-            return dbc.Alert("No data available for this date range", color="warning"), status_text, None
+            return dbc.Alert("No data available for this date range. Try selecting a different date range.", color="warning"), status_text, None
         
         print(f"   Data fetched: {len(df)} rows (cached)")
         print(f"   Available columns: {list(df.columns)}")
@@ -1134,6 +1487,56 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                 'background': 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
                                 'borderRadius': '10px'
                             }),
+                            
+                            # Marker Legend
+                            dbc.Row([
+                                dbc.Col([
+                                    html.Div([
+                                        html.H6([
+                                            html.I(className="bi bi-info-circle me-2"),
+                                            "Marker Legend"
+                                        ], className="mb-2 fw-bold", style={'fontSize': '14px', 'color': '#374151'}),
+                                        html.Div([
+                                            # Red marker
+                                            html.Span([
+                                                html.Span("🔴", style={'fontSize': '18px', 'marginRight': '6px'}),
+                                                html.Span("≥15%", style={'fontWeight': '600', 'color': '#dc2626'}),
+                                                html.Span(" share", style={'color': '#6b7280', 'fontSize': '12px'})
+                                            ], style={'marginRight': '16px', 'display': 'inline-block'}),
+                                            # Orange marker
+                                            html.Span([
+                                                html.Span("🟠", style={'fontSize': '18px', 'marginRight': '6px'}),
+                                                html.Span("≥10%", style={'fontWeight': '600', 'color': '#ea580c'}),
+                                                html.Span(" share", style={'color': '#6b7280', 'fontSize': '12px'})
+                                            ], style={'marginRight': '16px', 'display': 'inline-block'}),
+                                            # Yellow marker
+                                            html.Span([
+                                                html.Span("🟡", style={'fontSize': '18px', 'marginRight': '6px'}),
+                                                html.Span("≥5%", style={'fontWeight': '600', 'color': '#ca8a04'}),
+                                                html.Span(" share", style={'color': '#6b7280', 'fontSize': '12px'})
+                                            ], style={'marginRight': '16px', 'display': 'inline-block'}),
+                                            # Green marker
+                                            html.Span([
+                                                html.Span("🟢", style={'fontSize': '18px', 'marginRight': '6px'}),
+                                                html.Span("≥2%", style={'fontWeight': '600', 'color': '#16a34a'}),
+                                                html.Span(" share", style={'color': '#6b7280', 'fontSize': '12px'})
+                                            ], style={'marginRight': '16px', 'display': 'inline-block'}),
+                                            # Blue marker
+                                            html.Span([
+                                                html.Span("🔵", style={'fontSize': '18px', 'marginRight': '6px'}),
+                                                html.Span("<2%", style={'fontWeight': '600', 'color': '#2563eb'}),
+                                                html.Span(" share", style={'color': '#6b7280', 'fontSize': '12px'})
+                                            ], style={'display': 'inline-block'}),
+                                        ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '8px', 'alignItems': 'center'})
+                                    ], style={
+                                        'padding': '12px 16px',
+                                        'background': 'linear-gradient(135deg, #ffffff 0%, #f3f4f6 100%)',
+                                        'borderRadius': '8px',
+                                        'border': '1px solid #e5e7eb',
+                                        'boxShadow': '0 1px 3px rgba(0,0,0,0.1)'
+                                    })
+                                ])
+                            ], className="mb-3"),
                             
                             # Selected Location Display
                             html.Div(id='selected-location-display', className="mb-2"),
@@ -1534,7 +1937,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
             # Slow-Moving Items Tracker Section - Always visible
             html.Hr(className="my-4"),
             html.H4("📦 Slow-Moving Items Tracker", className="mb-3 fw-bold"),
-            html.P("Identify products with low sales velocity to optimize inventory management", className="text-muted mb-4"),
+            html.P("Identify product families with low sales velocity to optimize inventory management", className="text-muted mb-4"),
             
             # Calculate this month's slow-moving items summary
             *(_create_monthly_slow_moving_summary(df, VALUE_COL, QTY_COL, end_date_obj) if has_date_data and 'Date' in df.columns else []),
@@ -1544,7 +1947,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                         dbc.Card([
                             dbc.CardHeader([
                                 html.Div([
-                                    html.H6("Slow-Moving Products Analysis", className="mb-2 d-inline-block"),
+                                    html.H6("Slow-Moving Product Families Analysis", className="mb-2 d-inline-block"),
                                     dbc.Badge(f"{start_date_str} → {end_date_str}", color="info", className="ms-2")
                                 ])
                             ]),
@@ -1660,15 +2063,15 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
             
             # Zero Sales Products Tracker Section
             html.Hr(className="my-4"),
-            html.H4("🚫 Zero Sales Products Tracker", className="mb-3 fw-bold"),
-            html.P("Identify products with no sales during the selected period to take corrective action", className="text-muted mb-4"),
+            html.H4("🚫 Zero Sales Product Families Tracker", className="mb-3 fw-bold"),
+            html.P("Identify product families with no sales during the selected period to take corrective action", className="text-muted mb-4"),
             
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
                         dbc.CardHeader([
                             html.Div([
-                                html.H6("Products with Zero Sales", className="mb-2 d-inline-block"),
+                                html.H6("Product Families with Zero Sales", className="mb-2 d-inline-block"),
                                 dbc.Badge(f"{start_date_str} → {end_date_str}", color="danger", className="ms-2")
                             ])
                         ]),
@@ -1720,14 +2123,14 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
             # Cross-Selling Analysis Section - Always visible
             html.Hr(className="my-4"),
             html.H4("🔗 Cross-Selling Analysis", className="mb-3 fw-bold"),
-            html.P("Discover product relationships and frequently bought together items to boost sales opportunities", className="text-muted mb-4"),
+            html.P("Discover product family relationships and frequently bought together items to boost sales opportunities", className="text-muted mb-4"),
             
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
                         dbc.CardHeader([
                             html.Div([
-                                html.H6("Product Association Analysis", className="mb-2 d-inline-block"),
+                                html.H6("Product Family Association Analysis", className="mb-2 d-inline-block"),
                                 dbc.Badge(f"{start_date_str} → {end_date_str}", color="info", className="ms-2")
                             ])
                         ]),
@@ -1739,7 +2142,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                     dbc.RadioItems(
                                         id='cross-sell-analysis-type',
                                         options=[
-                                            {'label': 'By Product', 'value': 'product'},
+                                            {'label': 'By Product Family', 'value': 'product'},
                                             {'label': 'By Category', 'value': 'category'},
                                             {'label': 'By Dealer', 'value': 'dealer'}
                                         ],
@@ -1905,7 +2308,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                             {'label': 'Days Since Last Order', 'value': 'days'},
                                             {'label': 'Historical Revenue', 'value': 'revenue'},
                                             {'label': 'Historical Quantity', 'value': 'quantity'},
-                                            {'label': 'Number of Products', 'value': 'products'}
+                                            {'label': 'Number of Product Families', 'value': 'products'}
                                         ],
                                         value='days',
                                         className='mb-2'
@@ -1966,14 +2369,14 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
             # Time Comparative Analysis Section
             html.Hr(className="my-4"),
             html.H4("📊 Time Comparative Sales Analysis", className="mb-3 fw-bold"),
-            html.P("Compare product sales performance across multiple time periods (quarters/years) to identify trends", className="text-muted mb-4"),
+            html.P("Compare product family sales performance across multiple time periods (quarters/years) to identify trends", className="text-muted mb-4"),
             
             dbc.Row([
                 dbc.Col([
                     dbc.Card([
                         dbc.CardHeader([
                             html.Div([
-                                html.H6("Period-over-Period Product Comparison", className="mb-2 d-inline-block"),
+                                html.H6("Period-over-Period Product Family Comparison", className="mb-2 d-inline-block"),
                                 dbc.Badge("Time Series Analysis", color="primary", className="ms-2")
                             ])
                         ]),
@@ -2037,7 +2440,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                     )
                                 ], width=4),
                                 dbc.Col([
-                                    dbc.Label("Top N Products", className="fw-bold small"),
+                                    dbc.Label("Top N Product Families", className="fw-bold small"),
                                     dbc.Input(
                                         id='time-comp-top-n',
                                         type='number',
@@ -3567,7 +3970,7 @@ def update_slow_moving_items(days_filter, category_filter, dealer_filter, sort_b
                     dbc.CardBody([
                         html.I(className="bi bi-box-seam", style={'fontSize': '24px', 'color': '#ef4444'}),
                         html.H3(f"{len(slow_moving)}", className="text-danger mb-0 mt-2"),
-                        html.P("Slow-Moving Products", className="text-muted small mb-0")
+                        html.P("Slow-Moving Product Families", className="text-muted small mb-0")
                     ])
                 ], className="text-center shadow-sm")
             ], width=3),
@@ -3640,9 +4043,9 @@ def update_slow_moving_items(days_filter, category_filter, dealer_filter, sort_b
             hovertemplate='<b>%{y}</b><br>' + y_label + ': %{x}<br><extra></extra>'
         ))
         
-        chart_title = f"Top {top_n} Slow-Moving Products (No Sales in Last {days_filter}+ Days)"
+        chart_title = f"Top {top_n} Slow-Moving Product Families (No Sales in Last {days_filter}+ Days)"
         if sort_by != 'days':
-            chart_title = f"Top {top_n} Slow-Moving Products by {y_label}"
+            chart_title = f"Top {top_n} Slow-Moving Product Families by {y_label}"
         
         apply_modern_chart_style(fig_bar, chart_title, height=max(400, top_n * 20))
         fig_bar.update_xaxes(title=y_label)
@@ -4100,7 +4503,7 @@ def update_cross_selling_analysis(analysis_type, category_filter, dealer_filter,
         )])
         
         sankey_fig.update_layout(
-            title=f"Product Association Network ({analysis_type.title()} Level)",
+            title=f"Product Family Association Network ({analysis_type.title()} Level)",
             font=dict(size=12),
             height=500,
             paper_bgcolor='rgba(0,0,0,0)',
@@ -4115,7 +4518,7 @@ def update_cross_selling_analysis(analysis_type, category_filter, dealer_filter,
             color='Support (%)',
             color_continuous_scale='Viridis',
             orientation='h',
-            title=f"Top {min(15, len(assoc_df))} Product Associations by Confidence",
+            title=f"Top {min(15, len(assoc_df))} Product Family Associations by Confidence",
             labels={'y': 'Association', 'Confidence (%)': 'Confidence'},
             height=400
         )
@@ -4299,13 +4702,14 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
         # Convert dates
         start_date_obj = pd.to_datetime(start_date)
         end_date_obj = pd.to_datetime(end_date)
-        start_date_str = start_date_obj.strftime("%d-%m-%Y")
         end_date_str = end_date_obj.strftime("%d-%m-%Y")
         
-        # Fetch data from API - need extended historical data
-        # Calculate historical period (2x the inactivity period to get historical data)
-        historical_start = end_date_obj - pd.Timedelta(days=period_filter * 2)
+        # Fetch ALL historical data to get complete dealer history
+        # Use a very early start date to capture all dealers (e.g., 2 years back)
+        historical_start = end_date_obj - pd.Timedelta(days=730)  # 2 years of history
         historical_start_str = historical_start.strftime("%d-%m-%Y")
+        
+        print(f"🔍 Fetching inactive dealers data from {historical_start_str} to {end_date_str}")
         
         api_client = APIClient(username=username, password=password)
         response = api_client.get_sales_report(
@@ -4314,13 +4718,18 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
         )
         
         if not response.get('success'):
-            return dbc.Alert(f"API Error: {response.get('message')}", color="danger"), [], []
+            error_msg = response.get('message', 'Unknown error')
+            print(f"❌ API Error: {error_msg}")
+            return dbc.Alert(f"API Error: {error_msg}", color="danger"), [], []
         
         api_response = response.get('data', {})
         report_data = api_response.get('report_data', [])
         
         if not report_data:
-            return dbc.Alert("No data available for this date range", color="warning"), [], []
+            print(f"⚠️ No data available from {historical_start_str} to {end_date_str}")
+            return dbc.Alert("No historical data available. Try selecting a different date range.", color="warning"), [], []
+        
+        print(f"✅ Fetched {len(report_data)} records for inactive dealer analysis")
         
         df = pd.DataFrame(report_data)
         
@@ -4343,6 +4752,31 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
         if hide_innovative and 'Dealer Name' in df.columns:
             df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
         
+        # Check for required columns first
+        if 'Date' not in df.columns:
+            print(f"❌ Date column not found. Available columns: {list(df.columns)}")
+            return dbc.Alert(
+                "Date information not available in the data. Please contact support.",
+                color="danger"
+            ), [], []
+        
+        if 'Dealer Name' not in df.columns:
+            print(f"❌ Dealer Name column not found. Available columns: {list(df.columns)}")
+            return dbc.Alert(
+                "Dealer Name information not available in the data. Please contact support.",
+                color="danger"
+            ), [], []
+        
+        # Convert Date column
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df = df.dropna(subset=['Date', 'Dealer Name'])
+        
+        if df.empty:
+            print(f"⚠️ No valid data after date conversion")
+            return dbc.Alert("No valid data available after processing", color="warning"), [], []
+        
+        print(f"✅ Processed {len(df)} valid records with dates and dealer names")
+        
         # Get filter options
         state_options = []
         city_options = []
@@ -4351,32 +4785,25 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
         if 'City' in df.columns:
             city_options = [{'label': city, 'value': city} for city in sorted(df['City'].dropna().unique())]
         
-        # Check for required columns
-        if 'Date' not in df.columns or 'Dealer Name' not in df.columns:
-            return dbc.Alert("Date or Dealer Name data not available", color="warning"), state_options, city_options
-        
-        # Convert Date column
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df = df.dropna(subset=['Date'])
-        
-        if df.empty:
-            return dbc.Alert("No valid data available", color="warning"), state_options, city_options
-        
         # Define cutoff date for inactivity
         cutoff_date = end_date_obj - pd.Timedelta(days=period_filter)
         
-        # Get all dealers and their data
+        print(f"📅 Analyzing inactivity: Orders before {cutoff_date.strftime('%d-%m-%Y')} are considered inactive")
+        
+        # Get all dealers and their complete data
         all_dealers = df.groupby('Dealer Name').agg({
             'Date': ['min', 'max'],
             'Value': 'sum',
             'Qty': 'sum',
-            'Product Name': lambda x: list(x.unique()),
-            'State': 'first',
-            'City': 'first'
+            'Product Name': lambda x: list(x.dropna().unique()) if 'Product Name' in df.columns else [],
+            'State': lambda x: x.iloc[0] if len(x) > 0 else 'N/A',
+            'City': lambda x: x.iloc[0] if len(x) > 0 else 'N/A'
         }).reset_index()
         
         all_dealers.columns = ['Dealer Name', 'First Order', 'Last Order', 'Total Revenue', 
                                'Total Quantity', 'Products', 'State', 'City']
+        
+        print(f"📊 Found {len(all_dealers)} total dealers in the data")
         
         # Calculate days since last order
         all_dealers['Days Since Last Order'] = (end_date_obj - all_dealers['Last Order']).dt.days
@@ -4384,16 +4811,23 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
         # Filter inactive dealers (no orders in the specified period)
         inactive_dealers = all_dealers[all_dealers['Days Since Last Order'] >= period_filter].copy()
         
-        # Apply location filters
-        if state_filter:
+        print(f"⚠️ Found {len(inactive_dealers)} inactive dealers (>{period_filter} days without orders)")
+        
+        # Apply location filters ONLY if they are selected (not by default)
+        if state_filter and len(state_filter) > 0:
             inactive_dealers = inactive_dealers[inactive_dealers['State'].isin(state_filter)]
-        if city_filter:
+            print(f"   Filtered by state: {len(inactive_dealers)} dealers remaining")
+        
+        if city_filter and len(city_filter) > 0:
             inactive_dealers = inactive_dealers[inactive_dealers['City'].isin(city_filter)]
+            print(f"   Filtered by city: {len(inactive_dealers)} dealers remaining")
         
         # Apply minimum revenue filter
         if min_revenue:
             try:
-                inactive_dealers = inactive_dealers[inactive_dealers['Total Revenue'] >= float(min_revenue)]
+                min_revenue_value = float(min_revenue)
+                inactive_dealers = inactive_dealers[inactive_dealers['Total Revenue'] >= min_revenue_value]
+                print(f"   Filtered by min revenue (≥₹{min_revenue_value:,.0f}): {len(inactive_dealers)} dealers remaining")
             except:
                 pass
         
@@ -4402,8 +4836,28 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
         
         # Get top 5 products for each dealer
         inactive_dealers['Top Products'] = inactive_dealers['Products'].apply(
-            lambda x: ', '.join(x[:5]) if len(x) > 0 else 'N/A'
+            lambda x: ', '.join([str(p)[:50] for p in x[:5]]) if len(x) > 0 else 'N/A'
         )
+        
+        # Check if any inactive dealers found
+        if inactive_dealers.empty:
+            msg_parts = [f"✅ Great! No inactive dealers found"]
+            
+            if state_filter or city_filter or min_revenue:
+                msg_parts.append(" with the current filters:")
+                if state_filter:
+                    msg_parts.append(f"\n  • State: {', '.join(state_filter)}")
+                if city_filter:
+                    msg_parts.append(f"\n  • City: {', '.join(city_filter)}")
+                if min_revenue:
+                    msg_parts.append(f"\n  • Min Revenue: ≥₹{float(min_revenue):,.0f}")
+            else:
+                msg_parts.append(f" in the last {period_filter} days!")
+            
+            return dbc.Alert(
+                ''.join(msg_parts),
+                color="success"
+            ), state_options, city_options
         
         # Sort based on selected criteria
         sort_column_map = {
@@ -4413,18 +4867,14 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
             'products': 'Product Count'
         }
         sort_column = sort_column_map.get(sort_by, 'Days Since Last Order')
-        ascending = True if sort_by == 'days' else False
+        ascending = False if sort_by == 'days' else False  # Descending for all (most days, highest revenue, etc.)
         inactive_dealers = inactive_dealers.sort_values(sort_column, ascending=ascending)
         
         # Limit to top N
         top_n = top_n or 20
         inactive_dealers_display = inactive_dealers.head(top_n)
         
-        if inactive_dealers.empty:
-            return dbc.Alert(
-                f"✅ Great! No inactive dealers found in the last {period_filter} days",
-                color="success"
-            ), state_options, city_options
+        print(f"📊 Displaying top {len(inactive_dealers_display)} inactive dealers out of {len(inactive_dealers)}")
         
         # Create visualizations
         # 1. Summary cards
@@ -4461,7 +4911,7 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
                     dbc.CardBody([
                         html.I(className="bi bi-box-seam", style={'fontSize': '24px', 'color': '#8b5cf6'}),
                         html.H3(f"{inactive_dealers['Product Count'].sum():,.0f}", className="text-secondary mb-0 mt-2"),
-                        html.P("Total Products", className="text-muted small mb-0")
+                        html.P("Total Product Families", className="text-muted small mb-0")
                     ])
                 ], className="text-center shadow-sm")
             ], width=3),
@@ -4483,7 +4933,7 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
             text_format = lambda x: f"{x:,.0f}"
         elif sort_by == 'products':
             y_values = inactive_dealers_display['Product Count']
-            y_label = "Number of Products"
+            y_label = "Number of Product Families"
             color_values = inactive_dealers_display['Product Count']
             text_format = lambda x: f"{x:.0f}"
         else:
@@ -4570,8 +5020,8 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
                 html.Th("Last Order", style={'width': '100px'}),
                 html.Th("Total Revenue", style={'width': '120px'}),
                 html.Th("Total Qty", style={'width': '100px'}),
-                html.Th("Products", style={'width': '80px'}),
-                html.Th("Top Products Ordered", style={'width': '250px'})
+                html.Th("Product Families", style={'width': '80px'}),
+                html.Th("Top Product Families Ordered", style={'width': '250px'})
             ])),
             html.Tbody(table_rows)
         ], striped=True, bordered=True, hover=True, size='sm', style={'fontSize': '11px'})
@@ -4947,7 +5397,7 @@ def update_time_comparative_analysis(period_type, num_periods, category_filter, 
                     dbc.CardBody([
                         html.I(className="bi bi-graph-up", style={'fontSize': '24px', 'color': '#3b82f6'}),
                         html.H3(f"{total_products}", className="text-primary mb-0 mt-2"),
-                        html.P("Products Analyzed", className="text-muted small mb-0")
+                        html.P("Product Families Analyzed", className="text-muted small mb-0")
                     ])
                 ], className="text-center shadow-sm")
             ], width=3),
@@ -4986,7 +5436,7 @@ def update_time_comparative_analysis(period_type, num_periods, category_filter, 
         # Build column definitions dynamically
         column_defs = [
             {
-                'headerName': 'Product Name',
+                'headerName': 'Product Family',
                 'field': 'Product Name',
                 'filter': 'agTextColumnFilter',
                 'sortable': True,
@@ -5103,7 +5553,7 @@ def update_time_comparative_analysis(period_type, num_periods, category_filter, 
                         html.Strong("Period Range: "),
                         f"{periods[0]['label']} to {periods[-1]['label']} • ",
                         html.Strong("Showing: "),
-                        f"Top {top_n} products by {sort_by}"
+                        f"Top {top_n} product families by {sort_by}"
                     ], color="info", className="mb-3")
                 ], width=12)
             ]),
@@ -5649,7 +6099,7 @@ def handle_dealer_drilldown_click(container_children, fullscreen_data):
     prevent_initial_call=True
 )
 def update_dealer_drilldown_chart(drilldown_data, metric, chart_data, fullscreen_data):
-    """Update the fullscreen chart to show product breakdown for selected dealer"""
+    """Update the fullscreen chart to show product family breakdown for selected dealer"""
     
     # Check if this is a dealer pie chart in fullscreen
     if not fullscreen_data or fullscreen_data.get('chart_id') != 'dealer-pie-chart':
@@ -5705,15 +6155,15 @@ def update_dealer_drilldown_chart(drilldown_data, metric, chart_data, fullscreen
         metric_col = VALUE_COL if metric == 'revenue' else QTY_COL
         metric_label = 'Revenue' if metric == 'revenue' else 'Quantity'
         
-        # Aggregate products by selected metric
-        if 'Product Name' not in dealer_df.columns:
-            return html.Div("Product information not available", className="text-center text-muted p-5"), control_style, control_style
+        # Aggregate product families by selected metric
+        if 'Category' not in dealer_df.columns:
+            return html.Div("Product family information not available", className="text-center text-muted p-5"), control_style, control_style
         
-        product_data = dealer_df.groupby('Product Name')[metric_col].sum().reset_index()
-        product_data = product_data.sort_values(metric_col, ascending=False).head(20)  # Top 20 products
+        product_data = dealer_df.groupby('Category')[metric_col].sum().reset_index()
+        product_data = product_data.sort_values(metric_col, ascending=False).head(20)  # Top 20 product families
         
-        # Truncate long product names
-        product_data['Display Name'] = product_data['Product Name'].apply(lambda x: truncate_text(x, 40))
+        # Truncate long product family names
+        product_data['Display Name'] = product_data['Category'].apply(lambda x: truncate_text(x, 40))
         
         # Create pie chart
         colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', 
@@ -5726,7 +6176,7 @@ def update_dealer_drilldown_chart(drilldown_data, metric, chart_data, fullscreen
             values=metric_col,
             names='Display Name',
             color_discrete_sequence=colors[:len(product_data)],
-            custom_data=['Product Name']
+            custom_data=['Category']
         )
         
         # Update traces with hover template
@@ -5745,13 +6195,13 @@ def update_dealer_drilldown_chart(drilldown_data, metric, chart_data, fullscreen
         )
         
         # Apply modern styling
-        title = f"🎯 Products Sold to {truncate_text(dealer_name, 50)} - By {metric_label}"
+        title = f"🎯 Product Families Sold to {truncate_text(dealer_name, 50)} - By {metric_label}"
         apply_modern_chart_style(fig, title, height=600)
         
         # Add summary stats
         total_revenue = dealer_df[VALUE_COL].sum()
         total_qty = dealer_df[QTY_COL].sum()
-        unique_products = dealer_df['Product Name'].nunique()
+        unique_products = dealer_df['Category'].nunique()
         
         # Create the chart container with stats
         chart_container = html.Div([
@@ -5777,7 +6227,7 @@ def update_dealer_drilldown_chart(drilldown_data, metric, chart_data, fullscreen
                     dbc.Card([
                         dbc.CardBody([
                             html.H5(f"{unique_products}", className="mb-0 text-info"),
-                            html.P("Unique Products", className="text-muted mb-0 small")
+                            html.P("Product Families", className="text-muted mb-0 small")
                         ])
                     ], className="shadow-sm")
                 ], width=4),
@@ -5883,7 +6333,7 @@ def handle_state_drilldown_click(container_children, fullscreen_data):
     prevent_initial_call=True
 )
 def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, chart_data, fullscreen_data):
-    """Update the fullscreen chart to show dealer breakdown for selected state, or products for selected dealer"""
+    """Update the fullscreen chart to show dealer breakdown for selected state, or product families for selected dealer"""
     
     # Check if this is a state pie chart in fullscreen
     if not fullscreen_data or fullscreen_data.get('chart_id') != 'state-pie-chart':
@@ -5925,15 +6375,15 @@ def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, 
             metric_col = VALUE_COL if metric == 'revenue' else QTY_COL
             metric_label = 'Revenue' if metric == 'revenue' else 'Quantity'
             
-            # Aggregate products by selected metric
-            if 'Product Name' not in filtered_df.columns:
-                return html.Div("Product information not available", className="text-center text-muted p-5"), control_style, control_style
+            # Aggregate product families by selected metric
+            if 'Category' not in filtered_df.columns:
+                return html.Div("Product family information not available", className="text-center text-muted p-5"), control_style, control_style
             
-            product_data = filtered_df.groupby('Product Name')[metric_col].sum().reset_index()
-            product_data = product_data.sort_values(metric_col, ascending=False).head(20)  # Top 20 products
+            product_data = filtered_df.groupby('Category')[metric_col].sum().reset_index()
+            product_data = product_data.sort_values(metric_col, ascending=False).head(20)  # Top 20 product families
             
-            # Truncate long product names
-            product_data['Display Name'] = product_data['Product Name'].apply(lambda x: truncate_text(x, 40))
+            # Truncate long product family names
+            product_data['Display Name'] = product_data['Category'].apply(lambda x: truncate_text(x, 40))
             
             # Create pie chart
             colors = ['#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', 
@@ -5946,7 +6396,7 @@ def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, 
                 values=metric_col,
                 names='Display Name',
                 color_discrete_sequence=colors[:len(product_data)],
-                custom_data=['Product Name']
+                custom_data=['Category']
             )
             
             # Update traces with hover template
@@ -5965,13 +6415,13 @@ def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, 
             )
             
             # Apply modern styling
-            title = f"🎯 Products: {truncate_text(dealer_name, 30)} in {truncate_text(state_name, 30)} - By {metric_label}"
+            title = f"🎯 Product Families: {truncate_text(dealer_name, 30)} in {truncate_text(state_name, 30)} - By {metric_label}"
             apply_modern_chart_style(fig, title, height=600)
             
             # Add summary stats
             total_revenue = filtered_df[VALUE_COL].sum()
             total_qty = filtered_df[QTY_COL].sum()
-            unique_products = filtered_df['Product Name'].nunique()
+            unique_products = filtered_df['Category'].nunique()
             
             # Create the chart container with stats
             chart_container = html.Div([
@@ -6019,7 +6469,7 @@ def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, 
                         dbc.Card([
                             dbc.CardBody([
                                 html.H5(f"{unique_products}", className="mb-0 text-warning"),
-                                html.P("Unique Products", className="text-muted mb-0 small")
+                                html.P("Product Families", className="text-muted mb-0 small")
                             ])
                         ], className="shadow-sm")
                     ], width=4),
@@ -6160,14 +6610,15 @@ def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, 
                     ], width=12)
                 ], className="mb-3"),
                 
-                # Chart with drill-down capability
-                dcc.Graph(
-                    id='state-dealer-chart',
-                    figure=fig,
-                    config={'displayModeBar': True},
-                    style={'height': '600px'},
-                    **{'data-enable-drilldown': 'true', 'data-state-name': state_name}  # Mark for JS handler
-                )
+                # Chart with drill-down capability (wrapped in div for custom attributes)
+                html.Div([
+                    dcc.Graph(
+                        id='state-dealer-chart',
+                        figure=fig,
+                        config={'displayModeBar': True},
+                        style={'height': '600px'}
+                    )
+                ], **{'data-enable-drilldown': 'true', 'data-state-name': state_name})  # Custom attributes on wrapper
             ])
             
             return chart_container, control_style, control_style
@@ -6323,11 +6774,15 @@ def _create_india_map(df, metric, level='State', is_bubble=False):
     
     # Sort and limit to top locations
     location_data = location_data.sort_values('metric_value', ascending=False)
-    if level == 'City':
-        location_data = location_data.head(50)
+    # Don't limit cities - show all locations with data
+    # if level == 'City':
+    #     location_data = location_data.head(50)
     
     # Get coordinates
     coords_dict = CITY_COORDS if level == 'City' else STATE_COORDS
+    
+    # Debug: Log locations without coordinates
+    locations_without_coords = []
     
     # Create markers
     markers = []
@@ -6375,6 +6830,17 @@ def _create_india_map(df, metric, level='State', is_bubble=False):
                 }
             )
             markers.append(marker)
+        else:
+            # Track locations without coordinates
+            locations_without_coords.append(location_name)
+    
+    # Log locations that couldn't be mapped
+    if locations_without_coords:
+        print(f"   ⚠️ Locations without coordinates ({len(locations_without_coords)}): {', '.join(locations_without_coords[:10])}")
+        if len(locations_without_coords) > 10:
+            print(f"      ... and {len(locations_without_coords) - 10} more")
+    
+    print(f"   ✅ Created {len(markers)} markers out of {len(location_data)} locations")
     
     # Create the map with Google-style tiles
     leaflet_map = dl.Map(
@@ -6438,8 +6904,8 @@ def update_map(metric, level, start_date, end_date,
     """Update geographic map based on user selections"""
     try:
         # Determine which API to use
-        use_isopl = (dashboard_mode == 'isopl')
-        dashboard_name = "ISOPL" if use_isopl else "Overall"
+        use_iospl = (dashboard_mode == 'iospl')
+        dashboard_name = "IOSPL" if use_iospl else "Avante"
         
         # Debug logging
         print(f"\nMAP CALLBACK TRIGGERED")
@@ -6469,8 +6935,8 @@ def update_map(metric, level, start_date, end_date,
             print(f"   Using default credentials")
         
         # Select the appropriate API client based on dashboard mode
-        if use_isopl:
-            api_client = APIClientISOPL(username=username, password=password)
+        if use_iospl:
+            api_client = APIClientIOSPL(username=username, password=password)
         else:
             api_client = APIClient(username=username, password=password)
         
@@ -6917,15 +7383,15 @@ def _create_revenue_trend(df, value_col):
     return fig
 
 def _create_top_products_table(df, value_col, qty_col):
-    """Create top products table component"""
-    if not value_col or not qty_col or 'Product Name' not in df.columns:
+    """Create top product families table component"""
+    if not value_col or not qty_col or 'Category' not in df.columns:
         return dbc.Card([
-            dbc.CardHeader("🏆 Top 15 Products"),
-            dbc.CardBody("No product data available")
+            dbc.CardHeader("🏆 Top 15 Product Families"),
+            dbc.CardBody("No product family data available")
         ])
     
-    # Group by Product Name and aggregate
-    product_data = df.groupby('Product Name').agg({
+    # Group by Category (Product Family) and aggregate
+    product_data = df.groupby('Category').agg({
         value_col: 'sum',
         qty_col: 'sum'
     }).reset_index()
@@ -6937,7 +7403,7 @@ def _create_top_products_table(df, value_col, qty_col):
     table_rows = []
     for idx, row in product_data.iterrows():
         serial_number = len(table_rows) + 1
-        product_name = row['Product Name']
+        product_family = row['Category']
         revenue = row[value_col]
         quantity = row[qty_col]
         
@@ -6952,7 +7418,7 @@ def _create_top_products_table(df, value_col, qty_col):
         
         table_rows.append(html.Tr([
             html.Td(serial_number),
-            html.Td(product_name),
+            html.Td(product_family),
             html.Td(formatted_revenue),
             html.Td(formatted_quantity)
         ]))
@@ -6961,7 +7427,7 @@ def _create_top_products_table(df, value_col, qty_col):
     table = dbc.Table([
         html.Thead(html.Tr([
             html.Th("S.No"),
-            html.Th("Product Name"),
+            html.Th("Product Family"),
             html.Th("Revenue"),
             html.Th("Quantity")
         ])),
@@ -6971,7 +7437,7 @@ def _create_top_products_table(df, value_col, qty_col):
     # Wrap in card
     card = dbc.Card([
         dbc.CardHeader([
-            html.H6("🏆 Top 15 Products", className="mb-0 fw-bold text-primary"),
+            html.H6("🏆 Top 15 Product Families", className="mb-0 fw-bold text-primary"),
             html.Small("Ranked by total revenue", className="text-muted")
         ]),
         dbc.CardBody([
@@ -8494,7 +8960,7 @@ def update_column_visibility(visible_columns, username, password, start_date, en
             'hide': 'Category' not in visible_columns
         },
         {
-            'headerName': 'Product',
+            'headerName': 'Product Family',
             'field': 'Product Name',
             'filter': 'agTextColumnFilter',
             'sortable': True,
@@ -8729,27 +9195,27 @@ app.clientside_callback(
 @app.callback(
     Output('dashboard-mode-store', 'data'),
     Output('toggle-overall-btn', 'outline'),
-    Output('toggle-isopl-btn', 'outline'),
+    Output('toggle-iospl-btn', 'outline'),
     Input('toggle-overall-btn', 'n_clicks'),
-    Input('toggle-isopl-btn', 'n_clicks'),
+    Input('toggle-iospl-btn', 'n_clicks'),
     State('dashboard-mode-store', 'data'),
     prevent_initial_call=True
 )
-def toggle_dashboard_mode(overall_clicks, isopl_clicks, current_mode):
-    """Toggle between Overall and ISOPL dashboards"""
+def toggle_dashboard_mode(overall_clicks, iospl_clicks, current_mode):
+    """Toggle between Avante and IOSPL dashboards"""
     if not ctx.triggered:
-        return current_mode, True if current_mode == 'isopl' else False, True if current_mode == 'overall' else False
+        return current_mode, True if current_mode == 'iospl' else False, True if current_mode == 'overall' else False
     
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
     
     if button_id == 'toggle-overall-btn':
-        # Switch to Overall dashboard
+        # Switch to Avante dashboard
         return 'overall', False, True
-    elif button_id == 'toggle-isopl-btn':
-        # Switch to ISOPL dashboard
-        return 'isopl', True, False
+    elif button_id == 'toggle-iospl-btn':
+        # Switch to IOSPL dashboard
+        return 'iospl', True, False
     
-    return current_mode, True if current_mode == 'isopl' else False, True if current_mode == 'overall' else False
+    return current_mode, True if current_mode == 'iospl' else False, True if current_mode == 'overall' else False
 
 if __name__ == '__main__':
     print("\n" + "="*60)

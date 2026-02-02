@@ -1,6 +1,6 @@
 """
-API Client for ISOPL ERP Integration
-Handles authentication and data fetching from ISOPL ERP API
+API Client for IOSPL ERP Integration
+Handles authentication and data fetching from IOSPL ERP API
 """
 
 import requests
@@ -18,15 +18,14 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger('api_client_isopl')
+logger = logging.getLogger('api_client_iospl')
 
-class APIClientISOPL:
-    """API Client for ISOPL ERP integration"""
+class APIClientIOSPL:
+    """API Client for IOSPL ERP integration"""
     
-    # ISOPL API URL - Update this with your actual ISOPL API endpoint
+    # IOSPL API URL - Same base URL as Avante API
     # Based on Postman collection format: https://{{localhost}}/{{erp_api_folder}}/api.php
-    # Example: BASE_URL = "https://isopl.avantemedicals.com/API/api.php"
-    BASE_URL = "https://avantemedicals.com/API/api.php"  # ⚠️ UPDATE THIS WITH YOUR ACTUAL ISOPL URL
+    BASE_URL = "https://avantemedicals.com/API/api.php"
     
     def __init__(self, username: str = None, password: str = None):
         self.username = username or "u2vp8kb"  # Default fallback
@@ -44,9 +43,9 @@ class APIClientISOPL:
         requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
         
     def login(self) -> bool:
-        """Authenticate with ISOPL ERP API and get access token"""
+        """Authenticate with IOSPL ERP API and get access token"""
         logger.info("=" * 80)
-        logger.info("ISOPL LOGIN REQUEST INITIATED")
+        logger.info("IOSPL LOGIN REQUEST INITIATED")
         logger.info("=" * 80)
         
         try:
@@ -88,15 +87,15 @@ class APIClientISOPL:
                 
                 logger.debug(f"Token Extracted: {self.token[:30]}..." if self.token else "Token: None")
                 logger.debug(f"Refresh Token Extracted: {self.refresh_token[:30]}..." if self.refresh_token else "Refresh Token: None")
-                logger.info(f"✅ ISOPL LOGIN SUCCESSFUL - Token expires at: {self.token_expiry}")
+                logger.info(f"✅ IOSPL LOGIN SUCCESSFUL - Token expires at: {self.token_expiry}")
             else:
-                logger.error(f"❌ ISOPL LOGIN FAILED: {response_json.get('message', 'Unknown error')}")
+                logger.error(f"❌ IOSPL LOGIN FAILED: {response_json.get('message', 'Unknown error')}")
             
             logger.info("=" * 80)
             return success
             
         except Exception as e:
-            logger.error(f"❌ ISOPL LOGIN ERROR: {str(e)}")
+            logger.error(f"❌ IOSPL LOGIN ERROR: {str(e)}")
             logger.info("=" * 80)
             return False
     
@@ -108,7 +107,7 @@ class APIClientISOPL:
     
     def get_sales_report(self, start_date: str, end_date: str, period: str = "custom") -> Dict[str, Any]:
         """
-        Fetch sales report data from ISOPL API
+        Fetch sales report data from IOSPL API
         
         Args:
             start_date: Start date in DD-MM-YYYY format
@@ -119,7 +118,7 @@ class APIClientISOPL:
             Dict with 'success' boolean and 'data' containing report data
         """
         logger.info("=" * 80)
-        logger.info("ISOPL GET SALES REPORT REQUEST INITIATED")
+        logger.info("IOSPL GET SALES REPORT REQUEST INITIATED")
         logger.info("=" * 80)
         
         try:
@@ -207,9 +206,9 @@ class APIClientISOPL:
             }
     
     def logout(self) -> bool:
-        """Logout from the ISOPL API"""
+        """Logout from the IOSPL API"""
         logger.info("=" * 80)
-        logger.info("ISOPL LOGOUT REQUEST INITIATED")
+        logger.info("IOSPL LOGOUT REQUEST INITIATED")
         logger.info("=" * 80)
         
         try:
@@ -222,11 +221,11 @@ class APIClientISOPL:
             self.refresh_token = None
             self.token_expiry = None
             
-            logger.info("✅ ISOPL LOGOUT SUCCESSFUL")
+            logger.info("✅ IOSPL LOGOUT SUCCESSFUL")
             logger.info("=" * 80)
             return True
             
         except Exception as e:
-            logger.error(f"❌ ISOPL LOGOUT ERROR: {str(e)}")
+            logger.error(f"❌ IOSPL LOGOUT ERROR: {str(e)}")
             logger.info("=" * 80)
             return False
