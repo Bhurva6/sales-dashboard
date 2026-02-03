@@ -27,15 +27,20 @@ class APIClientIOSPL:
     # Based on Postman collection format: https://{{localhost}}/{{erp_api_folder}}/api.php
     BASE_URL = "https://avantemedicals.com/API/api.php"
     
-    def __init__(self, username: str = None, password: str = None):
+    # IOSPL Bearer Token (refreshes periodically)
+    BEARER_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdmFudGVtZWRpY2Fscy5jb20iLCJhdWQiOiJhdmFudGVtZWRpY2Fscy5jb20iLCJpYXQiOjE3Njk1ODgzOTIsImV4cCI6MTc2OTU5MTk5MiwiZGF0YSI6eyJhcGlfdXNlcl9pZCI6IjEiLCJ1c2VybmFtZSI6InUydnA4a2IifX0.SUFoKecNvls0Fc7V-iHbJrFd3U83PS2aUdgZThCjjpM"
+    
+    def __init__(self, username: str = None, password: str = None, bearer_token: str = None):
         self.username = username or "u2vp8kb"  # Default fallback
         self.password = password or "asdftuy#$%78@!"
-        self.token = None
+        # Use provided bearer token or class default
+        self.token = bearer_token or self.BEARER_TOKEN
         self.refresh_token = None
         self.token_expiry = None
         self.session = requests.Session()
         self.session.headers.update({
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {self.token}'  # Set bearer token immediately
         })
         # Disable SSL verification for development (not recommended for production)
         self.session.verify = False
@@ -100,8 +105,15 @@ class APIClientIOSPL:
             return False
     
     def _ensure_token(self) -> bool:
-        """Ensure we have a valid token, login if needed"""
+        """Ensure we have a valid token, refresh if needed"""
+        # If token is already set (from bearer token), just return True
+        if self.token:
+            logger.debug(f"Using existing bearer token: {self.token[:30]}...")
+            return True
+        
+        # Otherwise, try to login to get a new token
         if not self.token or (self.token_expiry and datetime.now() >= self.token_expiry):
+            logger.info("Token expired or missing, attempting login...")
             return self.login()
         return True
     
