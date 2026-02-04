@@ -622,8 +622,14 @@ def fetch_sales_data_cached(username, password, start_date, end_date, hide_innov
         if 'Qty' in df.columns:
             df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
         
-        # Apply filter
-        if hide_innovative and 'Dealer Name' in df.columns:
+        # HARD BLOCK: In IOSPL dashboard, show ONLY Innovative Ortho Surgicals data by default
+        if use_iospl and 'Dealer Name' in df.columns:
+            # Keep ONLY Innovative dealers, remove all others (including Avante)
+            df = df[df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+            print(f"   🎯 IOSPL Mode: Showing ONLY Innovative Ortho Surgicals data")
+        
+        # Apply filter for Innovative (only in Avante dashboard when checkbox is checked)
+        if not use_iospl and hide_innovative and 'Dealer Name' in df.columns:
             df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
         
         print(f"✅ Data fetched successfully from {api_name} API: {len(df)} rows")
@@ -886,12 +892,14 @@ app.layout = dbc.Container([
                     
                     html.H5("Controls", className="mb-3", style={'fontWeight': '600', 'color': COLORS['dark']}),
                     
-                    dbc.Checkbox(
-                        id='hide-innovative-check',
-                        label="Hide 'Innovative Ortho Surgicals'",
-                        value=False,
-                        className="mb-3"
-                    ),
+                    html.Div([
+                        dbc.Checkbox(
+                            id='hide-innovative-check',
+                            label="Hide 'Innovative Ortho Surgicals'",
+                            value=False,
+                            className="mb-3"
+                        ),
+                    ], id='innovative-checkbox-container'),
                     
                     dbc.Button(
                         "Refresh Data",
@@ -3042,13 +3050,17 @@ def update_filtered_charts(dealer_filter, state_filter, category_filter, city_fi
     Input('date-range-picker', 'start_date'),
     Input('date-range-picker', 'end_date'),
     Input('hide-innovative-check', 'value'),
+    Input('dashboard-mode-store', 'data'),
     prevent_initial_call=False
 )
-def update_revenue_comparison(username, password, start_date, end_date, hide_innovative):
+def update_revenue_comparison(username, password, start_date, end_date, hide_innovative, dashboard_mode):
     """Update revenue comparison chart with controls"""
     
     if not start_date or not end_date:
         return dbc.Alert("Please select date range", color="warning")
+    
+    # Determine which API to use
+    use_iospl = (dashboard_mode == 'iospl')
     
     try:
         # Convert dates
@@ -3057,8 +3069,12 @@ def update_revenue_comparison(username, password, start_date, end_date, hide_inn
         start_date_str = start_date_obj.strftime("%d-%m-%Y")
         end_date_str = end_date_obj.strftime("%d-%m-%Y")
         
-        # Fetch data
-        api_client = APIClient(username=username, password=password)
+        # Fetch data from appropriate API
+        if use_iospl:
+            api_client = APIClientIOSPL(username=username, password=password)
+        else:
+            api_client = APIClient(username=username, password=password)
+        
         response = api_client.get_sales_report(start_date=start_date_str, end_date=end_date_str)
         
         if not response.get('success'):
@@ -3089,8 +3105,12 @@ def update_revenue_comparison(username, password, start_date, end_date, hide_inn
         if 'Value' in df.columns:
             df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
         
-        # Apply filter
-        if hide_innovative and 'Dealer Name' in df.columns:
+        # HARD BLOCK: In IOSPL dashboard, show ONLY Innovative Ortho Surgicals data
+        if use_iospl and 'Dealer Name' in df.columns:
+            df = df[df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Apply filter for Innovative (only in Avante dashboard when checkbox is checked)
+        if not use_iospl and hide_innovative and 'Dealer Name' in df.columns:
             df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
         
         # Get value column
@@ -3191,10 +3211,11 @@ def update_revenue_comparison(username, password, start_date, end_date, hide_inn
     State('date-range-picker', 'start_date'),
     State('date-range-picker', 'end_date'),
     State('hide-innovative-check', 'value'),
+    State('dashboard-mode-store', 'data'),
     prevent_initial_call=True
 )
 def update_comparison_chart(daily_clicks, weekly_clicks, monthly_clicks, comparison_type,
-                            username, password, start_date, end_date, hide_innovative):
+                            username, password, start_date, end_date, hide_innovative, dashboard_mode):
     """Update chart based on period and comparison selection"""
     
     # Determine which period was selected
@@ -3208,6 +3229,9 @@ def update_comparison_chart(daily_clicks, weekly_clicks, monthly_clicks, compari
     else:
         period_view = 'daily'  # Default
     
+    # Determine which API to use
+    use_iospl = (dashboard_mode == 'iospl')
+    
     try:
         # Fetch data (same as above)
         start_date_obj = pd.to_datetime(start_date)
@@ -3215,7 +3239,12 @@ def update_comparison_chart(daily_clicks, weekly_clicks, monthly_clicks, compari
         start_date_str = start_date_obj.strftime("%d-%m-%Y")
         end_date_str = end_date_obj.strftime("%d-%m-%Y")
         
-        api_client = APIClient(username=username, password=password)
+        # Fetch data from appropriate API
+        if use_iospl:
+            api_client = APIClientIOSPL(username=username, password=password)
+        else:
+            api_client = APIClient(username=username, password=password)
+        
         response = api_client.get_sales_report(start_date=start_date_str, end_date=end_date_str)
         
         if not response.get('success'):
@@ -3240,7 +3269,12 @@ def update_comparison_chart(daily_clicks, weekly_clicks, monthly_clicks, compari
         if 'Value' in df.columns:
             df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
         
-        if hide_innovative and 'Dealer Name' in df.columns:
+        # HARD BLOCK: In IOSPL dashboard, show ONLY Innovative Ortho Surgicals data
+        if use_iospl and 'Dealer Name' in df.columns:
+            df = df[df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Apply filter for Innovative (only in Avante dashboard when checkbox is checked)
+        if not use_iospl and hide_innovative and 'Dealer Name' in df.columns:
             df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
         
         VALUE_COLS = [c for c in df.columns if c.startswith('Value') and c != 'Value']
@@ -3272,11 +3306,15 @@ def update_comparison_chart(daily_clicks, weekly_clicks, monthly_clicks, compari
     State('hide-innovative-check', 'value'),
     State('username-input', 'value'),
     State('password-input', 'value'),
+    State('dashboard-mode-store', 'data'),
     prevent_initial_call=True
 )
-def generate_custom_chart(n_clicks, x_axis, y_axis, chart_type, agg_type, top_n, sort_desc, start_date, end_date, hide_innovative, username, password):
+def generate_custom_chart(n_clicks, x_axis, y_axis, chart_type, agg_type, top_n, sort_desc, start_date, end_date, hide_innovative, username, password, dashboard_mode):
     if not n_clicks or not x_axis or not y_axis or not chart_type:
         return dbc.Alert("Please select X-axis, Y-axis, and Chart Type", color="warning")
+    
+    # Determine which API to use
+    use_iospl = (dashboard_mode == 'iospl')
     
     try:
         # Convert dates
@@ -3285,8 +3323,12 @@ def generate_custom_chart(n_clicks, x_axis, y_axis, chart_type, agg_type, top_n,
         start_date_str = start_date_obj.strftime("%d-%m-%Y")
         end_date_str = end_date_obj.strftime("%d-%m-%Y")
         
-        # Fetch data
-        api_client = APIClient(username=username, password=password)
+        # Fetch data from appropriate API
+        if use_iospl:
+            api_client = APIClientIOSPL(username=username, password=password)
+        else:
+            api_client = APIClient(username=username, password=password)
+        
         response = api_client.get_sales_report(start_date=start_date_str, end_date=end_date_str)
         if not response.get('success'):
             return dbc.Alert(f"API Error: {response.get('message')}", color="danger")
@@ -3311,8 +3353,12 @@ def generate_custom_chart(n_clicks, x_axis, y_axis, chart_type, agg_type, top_n,
         if 'Qty' in df.columns:
             df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
         
-        # Apply filter
-        if hide_innovative and 'Dealer Name' in df.columns:
+        # HARD BLOCK: In IOSPL dashboard, show ONLY Innovative Ortho Surgicals data
+        if use_iospl and 'Dealer Name' in df.columns:
+            df = df[df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Apply filter for Innovative (only in Avante dashboard when checkbox is checked)
+        if not use_iospl and hide_innovative and 'Dealer Name' in df.columns:
             df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
         
         # Detect columns
@@ -3550,9 +3596,10 @@ app.clientside_callback(
     Input('date-range-picker', 'end_date'),
     Input('hide-innovative-check', 'value'),
     Input('saved-charts-data', 'children'),  # Trigger when saved charts data changes
+    Input('dashboard-mode-store', 'data'),
     prevent_initial_call=False
 )
-def update_my_charts(username, password, start_date, end_date, hide_innovative, charts_data):
+def update_my_charts(username, password, start_date, end_date, hide_innovative, charts_data, dashboard_mode):
     if not start_date or not end_date:
         return dbc.Alert("Please select date range", color="warning")
     
@@ -3580,13 +3627,21 @@ def update_my_charts(username, password, start_date, end_date, hide_innovative, 
                 ])
             ])
         
+        # Determine which API to use
+        use_iospl = (dashboard_mode == 'iospl')
+        
         # Fetch current data
         start_date_obj = pd.to_datetime(start_date)
         end_date_obj = pd.to_datetime(end_date)
         start_date_str = start_date_obj.strftime("%d-%m-%Y")
         end_date_str = end_date_obj.strftime("%d-%m-%Y")
         
-        api_client = APIClient(username=username, password=password)
+        # Fetch data from appropriate API
+        if use_iospl:
+            api_client = APIClientIOSPL(username=username, password=password)
+        else:
+            api_client = APIClient(username=username, password=password)
+        
         response = api_client.get_sales_report(start_date=start_date_str, end_date=end_date_str)
         
         if not response.get('success'):
@@ -3613,8 +3668,12 @@ def update_my_charts(username, password, start_date, end_date, hide_innovative, 
         if 'Qty' in df.columns:
             df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
         
-        # Apply filter
-        if hide_innovative and 'Dealer Name' in df.columns:
+        # HARD BLOCK: In IOSPL dashboard, show ONLY Innovative Ortho Surgicals data
+        if use_iospl and 'Dealer Name' in df.columns:
+            df = df[df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Apply filter for Innovative (only in Avante dashboard when checkbox is checked)
+        if not use_iospl and hide_innovative and 'Dealer Name' in df.columns:
             df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
         
         # Detect columns
@@ -9196,6 +9255,7 @@ app.clientside_callback(
     Output('dashboard-mode-store', 'data'),
     Output('toggle-overall-btn', 'outline'),
     Output('toggle-iospl-btn', 'outline'),
+    Output('innovative-checkbox-container', 'style'),
     Input('toggle-overall-btn', 'n_clicks'),
     Input('toggle-iospl-btn', 'n_clicks'),
     State('dashboard-mode-store', 'data'),
@@ -9204,18 +9264,20 @@ app.clientside_callback(
 def toggle_dashboard_mode(overall_clicks, iospl_clicks, current_mode):
     """Toggle between Avante and IOSPL dashboards"""
     if not ctx.triggered:
-        return current_mode, True if current_mode == 'iospl' else False, True if current_mode == 'overall' else False
+        checkbox_style = {'display': 'none'} if current_mode == 'iospl' else {'display': 'block'}
+        return current_mode, True if current_mode == 'iospl' else False, True if current_mode == 'overall' else False, checkbox_style
     
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
     
     if button_id == 'toggle-overall-btn':
-        # Switch to Avante dashboard
-        return 'overall', False, True
+        # Switch to Avante dashboard - show checkbox
+        return 'overall', False, True, {'display': 'block'}
     elif button_id == 'toggle-iospl-btn':
-        # Switch to IOSPL dashboard
-        return 'iospl', True, False
+        # Switch to IOSPL dashboard - hide checkbox
+        return 'iospl', True, False, {'display': 'none'}
     
-    return current_mode, True if current_mode == 'iospl' else False, True if current_mode == 'overall' else False
+    checkbox_style = {'display': 'none'} if current_mode == 'iospl' else {'display': 'block'}
+    return current_mode, True if current_mode == 'iospl' else False, True if current_mode == 'overall' else False, checkbox_style
 
 if __name__ == '__main__':
     print("\n" + "="*60)
