@@ -1,3 +1,45 @@
+import pandas as pd
+
+def filter_my_charts_data(df, use_iospl=False, hide_avante=False, hide_innovative=False):
+    # Convert numeric
+    if 'Value' in df.columns:
+        df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+    if 'Qty' in df.columns:
+        df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
+    
+    # IOSPL Mode: Apply filter based on hide_avante checkbox
+    if use_iospl and 'Dealer Name' in df.columns:
+        if hide_avante:
+            # Show only Innovative data when checkbox is checked
+            df = df[df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+    
+    # Apply filter for Innovative (only in Avante dashboard when checkbox is checked)
+    if not use_iospl and hide_innovative and 'Dealer Name' in df.columns:
+        df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+    
+    # ...existing code...
+    return df
+import pandas as pd
+
+def filter_custom_chart_data(df, use_iospl=False, hide_avante=False, hide_innovative=False):
+    # Convert numeric
+    if 'Value' in df.columns:
+        df['Value'] = pd.to_numeric(df['Value'], errors='coerce')
+    if 'Qty' in df.columns:
+        df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
+    
+    # IOSPL Mode: Apply filter based on hide_avante checkbox
+    if use_iospl and 'Dealer Name' in df.columns:
+        if hide_avante:
+            # Show only Innovative data when checkbox is checked
+            df = df[df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+    
+    # Apply filter for Innovative (only in Avante dashboard when checkbox is checked)
+    if not use_iospl and hide_innovative and 'Dealer Name' in df.columns:
+        df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+    
+    # ...existing code...
+    return df
 """
 Dash-based Orthopedic Implant Analytics Dashboard
 """
@@ -113,8 +155,44 @@ def truncate_text(text, max_length=30):
     return text_str
 
 # Helper functions for formatting
+def format_indian_number(value):
+    """
+    Format number with Indian numbering system (commas at lakhs and crores)
+    Examples: 1,234 | 12,345 | 1,23,456 | 12,34,567 | 1,23,45,678
+    """
+    if pd.isna(value) or value == 0:
+        return "0"
+    
+    # Convert to string and handle decimals
+    s = str(int(value))
+    
+    # Handle negative numbers
+    if s.startswith('-'):
+        negative = True
+        s = s[1:]
+    else:
+        negative = False
+    
+    # For numbers less than 1000, no comma needed
+    if len(s) <= 3:
+        return ('-' if negative else '') + s
+    
+    # Indian numbering: last 3 digits, then groups of 2
+    result = s[-3:]  # Last 3 digits
+    s = s[:-3]
+    
+    while s:
+        if len(s) <= 2:
+            result = s + ',' + result
+            break
+        else:
+            result = s[-2:] + ',' + result
+            s = s[:-2]
+    
+    return ('-' if negative else '') + result
+
 def format_inr(value):
-    """Format value in Indian currency format (Lakhs/Crores)"""
+    """Format value in Indian currency format (Lakhs/Crores) with Indian comma style"""
     if pd.isna(value):
         return "Rs. 0"
     if value >= 1e7:
@@ -122,10 +200,10 @@ def format_inr(value):
     elif value >= 1e5:
         return f"Rs. {value/1e5:.2f} Lakh"
     else:
-        return f"Rs. {value:,.0f}"
+        return f"Rs. {format_indian_number(value)}"
 
 def format_qty(value):
-    """Format quantity in Indian format (Thousands/Lakhs/Crores)"""
+    """Format quantity in Indian format (Thousands/Lakhs/Crores) with Indian comma style"""
     if pd.isna(value):
         return "0"
     if value >= 1e7:
@@ -135,7 +213,7 @@ def format_qty(value):
     elif value >= 1e3:
         return f"{value/1e3:.2f} K"
     else:
-        return f"{value:,.0f}"
+        return format_indian_number(value)
 
 def create_chart_with_fullscreen(chart_component, chart_id, chart_title="Chart"):
     """
@@ -466,21 +544,21 @@ STATE_COORDS = {
     'Delhi': (28.7041, 77.1025),
     'NCR': (28.7041, 77.1025),
     'National Capital Region': (28.7041, 77.1025),
-    'Karnataka': (12.9716, 77.5946),
-    'Telangana': (17.3850, 78.4867),
-    'Tamil Nadu': (13.0827, 80.2707),
-    'TN': (13.0827, 80.2707),
-    'West Bengal': (22.5726, 88.3639),
-    'WB': (22.5726, 88.3639),
-    'Gujarat': (23.0225, 72.5714),
-    'Rajasthan': (26.9124, 75.7873),
+    'Karnataka': (15.3173, 75.7139),
+    'Telangana': (18.1124, 79.0193),
+    'Tamil Nadu': (11.1271, 78.6569),
+    'TN': (11.1271, 78.6569),
+    'West Bengal': (22.9868, 87.8550),
+    'WB': (22.9868, 87.8550),
+    'Gujarat': (22.2587, 71.1924),
+    'Rajasthan': (27.0238, 74.2179),
     'Uttar Pradesh': (26.8467, 80.9462),
     'UP': (26.8467, 80.9462),
-    'Madhya Pradesh': (23.2599, 77.4126),
-    'MP': (23.2599, 77.4126),
-    'Andhra Pradesh': (17.6868, 83.2185),
-    'AP': (17.6868, 83.2185),
-    'Bihar': (25.5941, 85.1376),
+    'Madhya Pradesh': (22.9734, 78.6569),
+    'MP': (22.9734, 78.6569),
+    'Andhra Pradesh': (15.9129, 79.7400),
+    'AP': (15.9129, 79.7400),
+    'Bihar': (25.0961, 85.3131),
     'Punjab': (31.1471, 75.3412),
     'PB': (31.1471, 75.3412),
     'Haryana': (29.0588, 76.0856),
@@ -506,6 +584,37 @@ STATE_COORDS = {
     'J&K': (33.7782, 76.5762),
     'JK': (33.7782, 76.5762),
     'Jammu & Kashmir': (33.7782, 76.5762),
+    'Goa': (15.2993, 74.1240),
+    'GA': (15.2993, 74.1240),
+    'Tripura': (23.9408, 91.9882),
+    'TR': (23.9408, 91.9882),
+    'Meghalaya': (25.4670, 91.3662),
+    'ML': (25.4670, 91.3662),
+    'Manipur': (24.6637, 93.9063),
+    'MN': (24.6637, 93.9063),
+    'Nagaland': (26.1584, 94.5624),
+    'NL': (26.1584, 94.5624),
+    'Mizoram': (23.1645, 92.9376),
+    'MZ': (23.1645, 92.9376),
+    'Arunachal Pradesh': (28.2180, 94.7278),
+    'AR': (28.2180, 94.7278),
+    'Sikkim': (27.5330, 88.5122),
+    'SK': (27.5330, 88.5122),
+    'Puducherry': (11.9416, 79.8083),
+    'Pondicherry': (11.9416, 79.8083),
+    'PY': (11.9416, 79.8083),
+    'Chandigarh': (30.7333, 76.7794),
+    'CH': (30.7333, 76.7794),
+    'Dadra and Nagar Haveli': (20.1809, 73.0169),
+    'DN': (20.1809, 73.0169),
+    'Daman and Diu': (20.4283, 72.8397),
+    'DD': (20.4283, 72.8397),
+    'Lakshadweep': (10.5667, 72.6417),
+    'LD': (10.5667, 72.6417),
+    'Andaman and Nicobar Islands': (11.7401, 92.6586),
+    'AN': (11.7401, 92.6586),
+    'Ladakh': (34.1526, 77.5771),
+    'LA': (34.1526, 77.5771),
     'Goa': (15.2993, 74.1240),
     'GA': (15.2993, 74.1240),
     'Tripura': (23.9408, 91.9882),
@@ -561,7 +670,7 @@ STATE_COORDS = {
 
 # Cached API data fetch function
 @cache.memoize(timeout=300)  # Cache for 5 minutes
-def fetch_sales_data_cached(username, password, start_date, end_date, hide_innovative, use_iospl=False):
+def fetch_sales_data_cached(username, password, start_date, end_date, hide_innovative, hide_avante, use_iospl=False):
     """
     Cached version of API data fetch to prevent duplicate calls
     Returns processed DataFrame or None if error
@@ -571,7 +680,8 @@ def fetch_sales_data_cached(username, password, start_date, end_date, hide_innov
         password: API password
         start_date: Start date in DD-MM-YYYY format
         end_date: End date in DD-MM-YYYY format
-        hide_innovative: Whether to filter out Innovative dealer
+        hide_innovative: Whether to filter out Innovative dealer (Avante mode)
+        hide_avante: Whether to show only Innovative data (IOSPL mode)
         use_iospl: If True, use IOSPL API client, otherwise use original API
     """
     try:
@@ -622,11 +732,20 @@ def fetch_sales_data_cached(username, password, start_date, end_date, hide_innov
         if 'Qty' in df.columns:
             df['Qty'] = pd.to_numeric(df['Qty'], errors='coerce')
         
-        # HARD BLOCK: In IOSPL dashboard, show ONLY Innovative Ortho Surgicals data by default
+        # IOSPL Mode: Keep Innovative data but add a source tag for clarity
         if use_iospl and 'Dealer Name' in df.columns:
-            # Keep ONLY Innovative dealers, remove all others (including Avante)
-            df = df[df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
-            print(f"   🎯 IOSPL Mode: Showing ONLY Innovative Ortho Surgicals data")
+            # Tag the source instead of filtering
+            df['Data Source'] = df['Dealer Name'].apply(
+                lambda x: 'Innovative Ortho Surgicals' if pd.notna(x) and 'Innovative' in str(x).lower() else 'Other Dealers'
+            )
+            print(f"   🎯 IOSPL Mode: Showing data breakdown by Categories, States, Cities, and Products")
+            print(f"   📊 Innovative records: {(df['Data Source'] == 'Innovative Ortho Surgicals').sum()}")
+            print(f"   📊 Other records: {(df['Data Source'] == 'Other Dealers').sum()}")
+            
+            # Apply IOSPL filter: if hide_avante is True, show only Innovative data
+            if hide_avante:
+                df = df[df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+                print(f"   🔒 Filtering: Showing ONLY Innovative Ortho Surgicals data")
         
         # Apply filter for Innovative (only in Avante dashboard when checkbox is checked)
         if not use_iospl and hide_innovative and 'Dealer Name' in df.columns:
@@ -654,6 +773,7 @@ app.layout = dbc.Container([
     dcc.Store(id='state-drilldown-store', storage_type='memory'),  # Store for state drill-down state (state chart)
     dcc.Store(id='state-drilldown-metric', data='revenue', storage_type='memory'),  # Store for state metric toggle
     dcc.Store(id='state-dealer-drilldown-store', storage_type='memory'),  # Store for second-level drill-down (state → dealer → products)
+    dcc.Store(id='state-city-drilldown-store', storage_type='memory'),  # Store for state → city drill-down
     
     # Toast notification container (positioned at top right)
     html.Div(
@@ -901,6 +1021,15 @@ app.layout = dbc.Container([
                         ),
                     ], id='innovative-checkbox-container'),
                     
+                    html.Div([
+                        dbc.Checkbox(
+                            id='hide-avante-check',
+                            label="Show only Innovative data (IOSPL)",
+                            value=True,
+                            className="mb-3"
+                        ),
+                    ], id='avante-checkbox-container', style={'display': 'none'}),
+                    
                     dbc.Button(
                         "Refresh Data",
                         id='refresh-btn',
@@ -935,7 +1064,7 @@ app.layout = dbc.Container([
                     html.Div(id='my-charts-content')
                 ], className='custom-tab')
             ], style={'marginBottom': '1rem'})
-        ], id="main-col", width=9, lg=9, md=12, sm=12)
+        ], id="main-col", width=9, lg=9, md=12, sm=12, style={'transition': 'all 0.3s ease-in-out'})
     ], className="g-3"),
     
 ], fluid=True, className="py-4", style={'maxWidth': '1400px', 'margin': '0 auto'})
@@ -1053,12 +1182,13 @@ def _create_monthly_slow_moving_summary(df, value_col, qty_col, end_date):
     Input('date-range-picker', 'start_date'),
     Input('date-range-picker', 'end_date'),
     Input('hide-innovative-check', 'value'),
+    Input('hide-avante-check', 'value'),
     Input('dashboard-mode-store', 'data'),
     State('username-input', 'value'),
     State('password-input', 'value'),
     prevent_initial_call=False
 )
-def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dashboard_mode, username, password):
+def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, hide_avante, dashboard_mode, username, password):
     """Update entire dashboard when dates change or refresh is clicked"""
     
     if not start_date or not end_date:
@@ -1080,10 +1210,11 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
         print(f"\n🔄 DASH UPDATE TRIGGERED by: {trigger_id}")
         print(f"   Range: {start_date_str} to {end_date_str}")
         print(f"   Hide Innovative: {hide_innovative}")
+        print(f"   Hide Avante (IOSPL only): {hide_avante}")
         print(f"   Refresh clicks: {refresh_clicks}")
         
         # Use cached data fetch (only calls API if not cached)
-        df = fetch_sales_data_cached(username, password, start_date_str, end_date_str, hide_innovative, use_iospl)
+        df = fetch_sales_data_cached(username, password, start_date_str, end_date_str, hide_innovative, hide_avante, use_iospl)
         
         # Check if there's an error message in the dataframe
         if df is not None and '_error' in df.columns:
@@ -1201,7 +1332,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
             prev_end_str = prev_end_date.strftime("%d-%m-%Y")
             
             # Use cached fetch for previous period too
-            prev_df_temp = fetch_sales_data_cached(username, password, prev_start_str, prev_end_str, hide_innovative)
+            prev_df_temp = fetch_sales_data_cached(username, password, prev_start_str, prev_end_str, hide_innovative, hide_avante, use_iospl)
             
             if prev_df_temp is not None and not prev_df_temp.empty:
                 prev_df = prev_df_temp
@@ -1352,7 +1483,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                     _create_enhanced_metric_card(
                         icon="Orders",
                         label="Orders",
-                        current_value=f"{total_orders:,}",
+                        current_value=format_indian_number(total_orders),
                         previous_value=prev_orders,
                         trend_values=orders_trend,
                         color='#E74C3C',
@@ -1577,12 +1708,12 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
             
             # First Row - Dealers and States
             dbc.Row([
-                # Dealer Pie Chart with Filter
+                # Dealer Pie Chart with Filter (or Category Chart in IOSPL mode)
                 dbc.Col([
                     dbc.Card([
                         dbc.CardHeader([
                             html.Div([
-                                html.H6("Top Dealers by Revenue", className="mb-2"),
+                                html.H6(id='dealer-chart-title', className="mb-2"),
                                 dcc.Dropdown(
                                     id='dealer-filter',
                                     placeholder='Select dealers... (multi-select)',
@@ -1728,7 +1859,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
             
             dbc.Row([
                 dbc.Col([
-                    _create_top_products_table(df, VALUE_COL, QTY_COL)
+                    _create_top_products_table(df, VALUE_COL, QTY_COL, iospl_mode=use_iospl)
                 ], width=8 if has_date_data else 12),
                 
                 # Only include weekday pattern if date data is available
@@ -1841,6 +1972,37 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                         ])
                     ])
                 ], width=4),
+            ], className="g-2 mb-4"),
+            
+            # State-Category Heatmap - Full Width
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardHeader([
+                            html.Div([
+                                html.H6("🗺️📦 Product Category Distribution by State", className="mb-0"),
+                                html.P("See which product categories are popular in each state", className="text-muted small mb-0 mt-1")
+                            ])
+                        ]),
+                        dbc.CardBody([
+                            dcc.Loading(
+                                id="loading-state-category-heatmap",
+                                type="default",
+                                children=[
+                                    create_chart_with_fullscreen(
+                                        dcc.Graph(
+                                            id='state-category-heatmap',
+                                            figure=_create_state_category_heatmap(df, VALUE_COL),
+                                            config={'displayModeBar': True}
+                                        ),
+                                        'state-category-heatmap',
+                                        'Product Categories by State'
+                                    )
+                                ]
+                            )
+                        ])
+                    ])
+                ], width=12),
             ], className="g-2 mb-4"),
             
             # Advanced Revenue Comparison Section - Only show if date data available
@@ -2128,128 +2290,10 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                 ], width=12)
             ], className="mb-4"),
             
-            # Cross-Selling Analysis Section - Always visible
-            html.Hr(className="my-4"),
-            html.H4("🔗 Cross-Selling Analysis", className="mb-3 fw-bold"),
-            html.P("Discover product family relationships and frequently bought together items to boost sales opportunities", className="text-muted mb-4"),
-            
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardHeader([
-                            html.Div([
-                                html.H6("Product Family Association Analysis", className="mb-2 d-inline-block"),
-                                dbc.Badge(f"{start_date_str} → {end_date_str}", color="info", className="ms-2")
-                            ])
-                        ]),
-                        dbc.CardBody([
-                            # Enhanced Filters Row
-                            dbc.Row([
-                                dbc.Col([
-                                    dbc.Label("Analysis Type", className="fw-bold small"),
-                                    dbc.RadioItems(
-                                        id='cross-sell-analysis-type',
-                                        options=[
-                                            {'label': 'By Product Family', 'value': 'product'},
-                                            {'label': 'By Category', 'value': 'category'},
-                                            {'label': 'By Dealer', 'value': 'dealer'}
-                                        ],
-                                        value='product',
-                                        inline=True,
-                                        className="mb-2"
-                                    )
-                                ], width=12)
-                            ], className="mb-3"),
-                            
-                            dbc.Row([
-                                dbc.Col([
-                                    dbc.Label("Filter by Category", className="fw-bold small"),
-                                    dcc.Dropdown(
-                                        id='cross-sell-category-filter',
-                                        placeholder='All Categories (multi-select)',
-                                        multi=True,
-                                        className='mb-2',
-                                        clearable=True,
-                                        searchable=True
-                                    )
-                                ], width=4),
-                                dbc.Col([
-                                    dbc.Label("Filter by Dealer", className="fw-bold small"),
-                                    dcc.Dropdown(
-                                        id='cross-sell-dealer-filter',
-                                        placeholder='All Dealers (multi-select)',
-                                        multi=True,
-                                        className='mb-2',
-                                        clearable=True,
-                                        searchable=True
-                                    )
-                                ], width=4),
-                                dbc.Col([
-                                    dbc.Label("Minimum Support (%)", className="fw-bold small"),
-                                    dbc.Input(
-                                        id='cross-sell-min-support',
-                                        type='number',
-                                        min=1,
-                                        max=100,
-                                        step=1,
-                                        value=5,
-                                        className='mb-2'
-                                    )
-                                ], width=4),
-                            ], className="mb-3"),
-                            
-                            dbc.Row([
-                                dbc.Col([
-                                    dbc.Label("Top N Associations", className="fw-bold small"),
-                                    dbc.Input(
-                                        id='cross-sell-top-n',
-                                        type='number',
-                                        min=5,
-                                        max=50,
-                                        step=5,
-                                        value=10,
-                                        className='mb-2'
-                                    )
-                                ], width=3),
-                                dbc.Col([
-                                    dbc.Label("Minimum Confidence (%)", className="fw-bold small"),
-                                    dbc.Input(
-                                        id='cross-sell-min-confidence',
-                                        type='number',
-                                        min=1,
-                                        max=100,
-                                        step=1,
-                                        value=10,
-                                        className='mb-2'
-                                    )
-                                ], width=3),
-                                dbc.Col([
-                                    dbc.Button(
-                                        "Download Report",
-                                        id='cross-sell-download-btn',
-                                        color='success',
-                                        size='sm',
-                                        className='mt-4'
-                                    ),
-                                    dcc.Download(id='cross-sell-download')
-                                ], width=3),
-                                dbc.Col([
-                                    dbc.Button(
-                                        "Reset Filters",
-                                        id='cross-sell-reset-btn',
-                                        color='secondary',
-                                        outline=True,
-                                        size='sm',
-                                        className='mt-4'
-                                    )
-                                ], width=3),
-                            ], className="mb-3"),
-                            
-                            html.Div(id='cross-sell-content')
-                        ])
-                    ], className="shadow-sm")
-                ], width=12)
-            ], className="mb-4"),
+            # Cross-Selling Analysis Section - HIDDEN (commented out)
+            # html.Hr(className="my-4"),
+            # html.H4("🔗 Cross-Selling Analysis", className="mb-3 fw-bold"),
+            # html.P("Discover product family relationships and frequently bought together items to boost sales opportunities", className="text-muted mb-4"),
             
             # Inactive Dealers Tracker Section - Always visible
             html.Hr(className="my-4"),
@@ -2377,7 +2421,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
             # Time Comparative Analysis Section
             html.Hr(className="my-4"),
             html.H4("📊 Time Comparative Sales Analysis", className="mb-3 fw-bold"),
-            html.P("Compare product family sales performance across multiple time periods (quarters/years) to identify trends", className="text-muted mb-4"),
+            html.P("Compare product family sales performance across multiple time periods (financial quarters/years) to identify trends", className="text-muted mb-4"),
             
             dbc.Row([
                 dbc.Col([
@@ -2385,7 +2429,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                         dbc.CardHeader([
                             html.Div([
                                 html.H6("Period-over-Period Product Family Comparison", className="mb-2 d-inline-block"),
-                                dbc.Badge("Time Series Analysis", color="primary", className="ms-2")
+                                dbc.Badge("Time Series Analysis (Financial Year: April-March)", color="primary", className="ms-2")
                             ])
                         ]),
                         dbc.CardBody([
@@ -2396,12 +2440,14 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                     dbc.RadioItems(
                                         id='time-comp-period-type',
                                         options=[
-                                            {'label': 'Quarterly', 'value': 'quarter'},
-                                            {'label': 'Yearly', 'value': 'year'}
+                                            {'label': 'Financial Quarterly (Q1-Q4)', 'value': 'quarter'},
+                                            {'label': 'Financial Yearly (FY)', 'value': 'year'}
                                         ],
                                         value='quarter',
                                         inline=True,
-                                        className="mb-2"
+                                        className="mb-2",
+                                        persistence=True,
+                                        persistence_type='session'
                                     )
                                 ], width=6),
                                 dbc.Col([
@@ -2415,8 +2461,10 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                             {'label': '5 Periods', 'value': 5},
                                             {'label': '6 Periods', 'value': 6}
                                         ],
-                                        value=4,
-                                        className='mb-2'
+                                        value=2,
+                                        className='mb-2',
+                                        persistence=True,
+                                        persistence_type='session'
                                     )
                                 ], width=6),
                             ], className="mb-3"),
@@ -2427,6 +2475,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                     dbc.Label("Filter by Category", className="fw-bold small"),
                                     dcc.Dropdown(
                                         id='time-comp-category-filter',
+                                        options=[],  # Initialize with empty options, will be populated by callback
                                         placeholder='All Categories (multi-select)',
                                         multi=True,
                                         className='mb-2',
@@ -2443,8 +2492,10 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                             {'label': 'Revenue', 'value': 'revenue'},
                                             {'label': 'Both (Qty + Revenue)', 'value': 'both'}
                                         ],
-                                        value='quantity',
-                                        className='mb-2'
+                                        value='both',
+                                        className='mb-2',
+                                        persistence=True,
+                                        persistence_type='session'
                                     )
                                 ], width=4),
                                 dbc.Col([
@@ -2456,7 +2507,9 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                         max=100,
                                         step=10,
                                         value=20,
-                                        className='mb-2'
+                                        className='mb-2',
+                                        persistence=True,
+                                        persistence_type='session'
                                     )
                                 ], width=4),
                             ], className="mb-3"),
@@ -2473,7 +2526,9 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                             {'label': 'Product Name (A-Z)', 'value': 'name'}
                                         ],
                                         value='latest',
-                                        className='mb-2'
+                                        className='mb-2',
+                                        persistence=True,
+                                        persistence_type='session'
                                     )
                                 ], width=4),
                                 dbc.Col([
@@ -2481,7 +2536,9 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                         id='time-comp-show-change',
                                         label="Show Period-over-Period Change %",
                                         value=True,
-                                        className='mt-4'
+                                        className='mt-4',
+                                        persistence=True,
+                                        persistence_type='session'
                                     )
                                 ], width=4),
                                 dbc.Col([
@@ -2514,7 +2571,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                             html.Div([
                                 html.H6("Sales Transactions", className="mb-2 d-inline-block"),
                                 dbc.Badge(f"{start_date_str} → {end_date_str}", color="info", className="ms-2"),
-                                dbc.Badge(f"{len(df):,} Transactions", color="success", className="ms-2")
+                                dbc.Badge(f"{format_indian_number(len(df))} Transactions", color="success", className="ms-2")
                             ])
                         ]),
                         dbc.CardBody([
@@ -2682,7 +2739,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                 dbc.Card([
                     dbc.CardHeader([
                         html.H5("Detailed Sales Data", className="mb-0 d-inline-block"),
-                        dbc.Badge(f"{len(df):,} records", color="primary", className="ms-2")
+                        dbc.Badge(f"{format_indian_number(len(df))} records", color="primary", className="ms-2")
                     ]),
                     dbc.CardBody([
                         # Controls Row
@@ -2803,7 +2860,7 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
                                         'resizable': True,
                                         'width': 100,
                                         'type': 'numericColumn',
-                                        'valueFormatter': {'function': 'Number(params.value).toLocaleString()'}
+                                        'valueFormatter': {'function': 'window.formatIndianNumber(params.value)'}
                                     },
                                     {
                                         'headerName': 'Revenue (₹)',
@@ -2853,13 +2910,14 @@ def update_dashboard(refresh_clicks, start_date, end_date, hide_innovative, dash
         ])
         
         # Status text
-        status_text = f"{len(df):,} records ({dashboard_name}) | Last updated: {datetime.now().strftime('%H:%M:%S')}"
+        status_text = f"{format_indian_number(len(df))} records ({dashboard_name}) | Last updated: {datetime.now().strftime('%H:%M:%S')}"
         
         # Prepare chart data for store
         chart_data = {
             'data': df.to_dict('records'),
             'VALUE_COL': VALUE_COL,
             'QTY_COL': QTY_COL,
+            'dashboard_mode': dashboard_mode,  # Add mode to identify IOSPL vs Avante
             'dealers': sorted(df['Dealer Name'].unique().tolist()) if 'Dealer Name' in df.columns else [],
             'states': sorted(df['State'].unique().tolist()) if 'State' in df.columns else [],
             'cities': sorted(df['City'].unique().tolist()) if 'City' in df.columns else [],
@@ -2885,44 +2943,67 @@ def toggle_custom_builder(n, is_open):
         return not is_open
     return is_open
 
+# Update Dealer Chart Title based on Dashboard Mode
+@app.callback(
+    Output('dealer-chart-title', 'children'),
+    Input('dashboard-mode-store', 'data'),
+    prevent_initial_call=False
+)
+def update_dealer_chart_title(dashboard_mode):
+    """Update the dealer chart title based on dashboard mode"""
+    if dashboard_mode == 'iospl':
+        return "Revenue by Product Category"
+    else:
+        return "Top Dealers by Revenue"
+
 # Toggle Sidebar Collapse Callback
 @app.callback(
     Output("sidebar-col", "style"),
     Output("sidebar-col", "width"),
     Output("main-col", "width"),
+    Output("main-col", "style"),
     Input("sidebar-toggle", "n_clicks"),
     State("sidebar-col", "style"),
     prevent_initial_call=True
 )
 def toggle_sidebar(n_clicks, current_style):
-    """Toggle sidebar visibility with horizontal slide animation"""
+    """Toggle sidebar visibility with horizontal slide animation and centered content expansion"""
     if n_clicks:
         # Check if sidebar is currently visible
         if current_style and current_style.get('marginLeft') == '-100%':
-            # Sidebar is hidden, show it
-            new_style = {
+            # Sidebar is hidden, show it - return to normal layout
+            sidebar_style = {
                 'transition': 'all 0.3s ease-in-out',
                 'marginLeft': '0',
                 'opacity': '1'
             }
-            return new_style, 3, 9
+            main_style = {
+                'transition': 'all 0.3s ease-in-out'
+            }
+            return sidebar_style, 3, 9, main_style
         else:
-            # Sidebar is visible, hide it
-            new_style = {
+            # Sidebar is visible, hide it - expand main content centered
+            sidebar_style = {
                 'transition': 'all 0.3s ease-in-out',
                 'marginLeft': '-100%',
                 'opacity': '0',
                 'position': 'absolute',
                 'zIndex': '-1'
             }
-            return new_style, 0, 12
+            main_style = {
+                'transition': 'all 0.3s ease-in-out',
+                'maxWidth': '100%',
+                'margin': '0 auto',
+                'padding': '0 2rem'
+            }
+            return sidebar_style, 0, 12, main_style
     
     # Default state (sidebar visible)
     return {
         'transition': 'all 0.3s ease-in-out',
         'marginLeft': '0',
         'opacity': '1'
-    }, 3, 9
+    }, 3, 9, {'transition': 'all 0.3s ease-in-out'}
 
 # Populate dropdown options from chart data
 @app.callback(
@@ -2974,13 +3055,15 @@ def populate_filter_options(chart_data):
     Input('city-filter-2', 'value'),
     Input('category-sunburst-filter', 'value'),
     State('chart-data-store', 'data'),
-    prevent_initial_call=True,
+    prevent_initial_call=False,
     suppress_callback_exceptions=True
 )
 def update_filtered_charts(dealer_filter, state_filter, category_filter, city_filter,
                            dealer_comp_filter, city_filter_2, category_sunburst_filter,
                            chart_data):
     """Update all charts based on filter selections"""
+    
+    print(f"📊 Updating filtered charts - chart_data available: {chart_data is not None and chart_data.get('data') is not None}")
     
     if not chart_data or not chart_data.get('data'):
         empty_fig = go.Figure()
@@ -2996,25 +3079,30 @@ def update_filtered_charts(dealer_filter, state_filter, category_filter, city_fi
     df = pd.DataFrame(chart_data['data'])
     VALUE_COL = chart_data.get('VALUE_COL', 'Value')
     QTY_COL = chart_data.get('QTY_COL', 'Qty')
+    iospl_mode = (chart_data.get('dashboard_mode') == 'iospl')
+    
+    print(f"   📈 Creating charts from {len(df)} records")
+    print(f"   📊 VALUE_COL={VALUE_COL}, QTY_COL={QTY_COL}")
+    print(f"   🎯 IOSPL Mode: {iospl_mode}")
     
     # Apply filters and create charts
-    # Dealer Pie Chart
+    # Dealer Pie Chart (or Category Pie in IOSPL mode)
     df_dealer = df.copy()
     if dealer_filter and len(dealer_filter) > 0:
         df_dealer = df_dealer[df_dealer['Dealer Name'].isin(dealer_filter)]
-    fig_dealer = _create_dealer_pie(df_dealer, VALUE_COL, limit=10)
+    fig_dealer = _create_dealer_pie(df_dealer, VALUE_COL, limit=10, iospl_mode=iospl_mode)
     
-    # State Pie Chart
+    # State Pie Chart (or Category Chart in IOSPL mode)
     df_state = df.copy()
     if state_filter and len(state_filter) > 0:
         df_state = df_state[df_state['State'].isin(state_filter)]
-    fig_state = _create_state_pie(df_state, VALUE_COL)
+    fig_state = _create_state_pie(df_state, VALUE_COL, iospl_mode=iospl_mode)
     
-    # Category Bar Chart
+    # Category Bar Chart (or Product Chart in IOSPL mode)
     df_category = df.copy()
     if category_filter and len(category_filter) > 0:
         df_category = df_category[df_category['Category'].isin(category_filter)]
-    fig_category = _create_category_bar(df_category, VALUE_COL)
+    fig_category = _create_category_bar(df_category, VALUE_COL, iospl_mode=iospl_mode)
     
     # City Bar Chart
     df_city = df.copy()
@@ -3304,12 +3392,13 @@ def update_comparison_chart(daily_clicks, weekly_clicks, monthly_clicks, compari
     State('date-range-picker', 'start_date'),
     State('date-range-picker', 'end_date'),
     State('hide-innovative-check', 'value'),
+    State('hide-avante-check', 'value'),
     State('username-input', 'value'),
     State('password-input', 'value'),
     State('dashboard-mode-store', 'data'),
     prevent_initial_call=True
 )
-def generate_custom_chart(n_clicks, x_axis, y_axis, chart_type, agg_type, top_n, sort_desc, start_date, end_date, hide_innovative, username, password, dashboard_mode):
+def generate_custom_chart(n_clicks, x_axis, y_axis, chart_type, agg_type, top_n, sort_desc, start_date, end_date, hide_innovative, hide_avante, username, password, dashboard_mode):
     if not n_clicks or not x_axis or not y_axis or not chart_type:
         return dbc.Alert("Please select X-axis, Y-axis, and Chart Type", color="warning")
     
@@ -3419,8 +3508,9 @@ def generate_custom_chart(n_clicks, x_axis, y_axis, chart_type, agg_type, top_n,
         
         # Format axes
         if 'Value' in sort_col.lower() or 'revenue' in y_axis.lower():
-            fig.update_yaxes(tickformat=".2f", tickprefix="Rs. ", ticksuffix="", 
-                           tickvals=[1e5, 1e6, 1e7, 1e8, 1e9], ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"])
+            fig.update_yaxes(tickformat=".0f", tickprefix="Rs. ", ticksuffix="", 
+                           tickvals=[1e5, 2.5e5, 5e5, 7.5e5, 1e6, 2.5e6, 5e6, 7.5e6, 1e7, 2.5e7, 5e7, 7.5e7, 1e8], 
+                           ticktext=["1L", "2.5L", "5L", "7.5L", "10L", "25L", "50L", "75L", "1Cr", "2.5Cr", "5Cr", "7.5Cr", "10Cr"])
         
         fig.update_layout(
             height=500, 
@@ -3595,11 +3685,12 @@ app.clientside_callback(
     Input('date-range-picker', 'start_date'),
     Input('date-range-picker', 'end_date'),
     Input('hide-innovative-check', 'value'),
+    Input('hide-avante-check', 'value'),
     Input('saved-charts-data', 'children'),  # Trigger when saved charts data changes
     Input('dashboard-mode-store', 'data'),
     prevent_initial_call=False
 )
-def update_my_charts(username, password, start_date, end_date, hide_innovative, charts_data, dashboard_mode):
+def update_my_charts(username, password, start_date, end_date, hide_innovative, hide_avante, charts_data, dashboard_mode):
     if not start_date or not end_date:
         return dbc.Alert("Please select date range", color="warning")
     
@@ -3796,8 +3887,9 @@ def update_my_charts(username, password, start_date, end_date, hide_innovative, 
                 
                 # Format axes
                 if 'Value' in sort_col.lower() or 'revenue' in y_axis.lower():
-                    fig.update_yaxes(tickformat=".2f", tickprefix="Rs. ", ticksuffix="", 
-                                   tickvals=[1e5, 1e6, 1e7, 1e8, 1e9], ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"])
+                    fig.update_yaxes(tickformat=".0f", tickprefix="Rs. ", ticksuffix="", 
+                                   tickvals=[1e5, 2.5e5, 5e5, 7.5e5, 1e6, 2.5e6, 5e6, 7.5e6, 1e7, 2.5e7, 5e7, 7.5e7, 1e8], 
+                                   ticktext=["1L", "2.5L", "5L", "7.5L", "10L", "25L", "50L", "75L", "1Cr", "2.5Cr", "5Cr", "7.5Cr", "10Cr"])
                 
                 fig.update_layout(
                     height=500, 
@@ -4055,7 +4147,7 @@ def update_slow_moving_items(days_filter, category_filter, dealer_filter, sort_b
                 dbc.Card([
                     dbc.CardBody([
                         html.I(className="bi bi-graph-down", style={'fontSize': '24px'}),
-                        html.H3(f"{slow_moving['Total Quantity'].sum():,.0f}", className="text-secondary mb-0 mt-2"),
+                        html.H3(format_indian_number(slow_moving['Total Quantity'].sum()), className="text-secondary mb-0 mt-2"),
                         html.P("Total Units", className="text-muted small mb-0")
                     ])
                 ], className="text-center shadow-sm")
@@ -4075,7 +4167,7 @@ def update_slow_moving_items(days_filter, category_filter, dealer_filter, sort_b
             y_values = slow_moving_display['Total Quantity']
             y_label = "Quantity"
             color_values = slow_moving_display['Total Quantity']
-            text_format = lambda x: f"{x:,.0f}"
+            text_format = lambda x: format_indian_number(x)
         elif sort_by == 'velocity':
             y_values = slow_moving_display['Sales Velocity']
             y_label = "Sales Velocity (units/day)"
@@ -4130,10 +4222,10 @@ def update_slow_moving_items(days_filter, category_filter, dealer_filter, sort_b
         
         # 4. Data table
         table_data = slow_moving_display.copy()
-        table_data['Total Revenue'] = table_data['Total Revenue'].apply(lambda x: f"₹ {x:,.0f}")
-        table_data['Total Quantity'] = table_data['Total Quantity'].apply(lambda x: f"{x:,.0f}")
+        table_data['Total Revenue'] = table_data['Total Revenue'].apply(lambda x: f"₹ {format_indian_number(x)}")
+        table_data['Total Quantity'] = table_data['Total Quantity'].apply(lambda x: format_indian_number(x))
         table_data['Sales Velocity'] = table_data['Sales Velocity'].apply(lambda x: f"{x:.2f}/day")
-        table_data['Avg Order Value'] = table_data['Avg Order Value'].apply(lambda x: f"₹ {x:,.0f}")
+        table_data['Avg Order Value'] = table_data['Avg Order Value'].apply(lambda x: f"₹ {format_indian_number(x)}")
         table_data['First Sale'] = table_data['First Sale'].dt.strftime('%d-%b-%Y')
         table_data['Last Sale'] = table_data['Last Sale'].dt.strftime('%d-%b-%Y')
         
@@ -4277,26 +4369,64 @@ def download_slow_moving_report(n_clicks, chart_data, days_filter, start_date, e
         print(f"Error downloading report: {str(e)}")
         return no_update
 
-# Cross-Selling Analysis Callback
-@app.callback(
-    Output('cross-sell-content', 'children'),
-    Output('cross-sell-category-filter', 'options'),
-    Output('cross-sell-dealer-filter', 'options'),
-    Input('cross-sell-analysis-type', 'value'),
-    Input('cross-sell-category-filter', 'value'),
-    Input('cross-sell-dealer-filter', 'value'),
-    Input('cross-sell-min-support', 'value'),
-    Input('cross-sell-min-confidence', 'value'),
-    Input('cross-sell-top-n', 'value'),
-    Input('username-input', 'value'),
-    Input('password-input', 'value'),
-    Input('date-range-picker', 'start_date'),
-    Input('date-range-picker', 'end_date'),
-    Input('hide-innovative-check', 'value'),
-    prevent_initial_call=False
-)
-def update_cross_selling_analysis(analysis_type, category_filter, dealer_filter, min_support, 
-                                  min_confidence, top_n, username, password, start_date, end_date, hide_innovative):
+# Cross-Selling Analysis Callback - DISABLED (UI hidden)
+# @app.callback(
+#     Output('cross-sell-content', 'children'),
+#     Output('cross-sell-category-filter', 'options'),
+#     Output('cross-sell-dealer-filter', 'options'),
+#     Input('cross-sell-analysis-type', 'value'),
+#     Input('cross-sell-category-filter', 'value'),
+#     Input('cross-sell-dealer-filter', 'value'),
+#     Input('cross-sell-min-support', 'value'),
+#     Input('cross-sell-min-confidence', 'value'),
+#     Input('cross-sell-top-n', 'value'),
+#     Input('username-input', 'value'),
+#     Input('password-input', 'value'),
+#     Input('date-range-picker', 'start_date'),
+#     Input('date-range-picker', 'end_date'),
+#     Input('hide-innovative-check', 'value'),
+#     prevent_initial_call=False
+# )
+# def update_cross_selling_analysis(analysis_type, category_filter, dealer_filter, min_support, 
+#                                   min_confidence, top_n, username, password, start_date, end_date, hide_innovative):
+# def update_cross_selling_analysis(analysis_type, category_filter, dealer_filter, min_support, 
+#                                   min_confidence, top_n, username, password, start_date, end_date, hide_innovative):
+#     """Analyze cross-selling patterns and product associations"""
+#     # CALLBACK DISABLED - Cross-selling analysis UI is hidden
+#     return dbc.Alert("Cross-selling analysis is currently disabled", color="info"), [], []
+
+# (Original callback implementation commented out - lines removed for brevity)
+
+# Reset Cross-Selling Filters Callback - DISABLED
+# @app.callback(
+#     Output('cross-sell-category-filter', 'value'),
+#     Output('cross-sell-dealer-filter', 'value'),
+#     Output('cross-sell-analysis-type', 'value'),
+#     Output('cross-sell-min-support', 'value'),
+#     Output('cross-sell-min-confidence', 'value'),
+#     Output('cross-sell-top-n', 'value'),
+#     Input('cross-sell-reset-btn', 'n_clicks'),
+#     prevent_initial_call=True
+# )
+# def reset_cross_sell_filters(n_clicks):
+#     """Reset all cross-selling filters to default values"""
+#     return no_update, no_update, no_update, no_update, no_update, no_update
+
+# Download Cross-Selling Report Callback - DISABLED
+# @app.callback(
+#     Output('cross-sell-download', 'data'),
+#     Input('cross-sell-download-btn', 'n_clicks'),
+#     State('chart-data-store', 'data'),
+#     State('cross-sell-analysis-type', 'value'),
+#     State('date-range-picker', 'start_date'),
+#     State('date-range-picker', 'end_date'),
+#     prevent_initial_call=True
+# )
+# def download_cross_sell_report(n_clicks, chart_data, analysis_type, start_date, end_date):
+#     """Download cross-selling analysis report as CSV"""
+#     return no_update
+
+# Inactive Dealers Tracker Callback
     """Analyze cross-selling patterns and product associations"""
     
     if not start_date or not end_date:
@@ -4683,54 +4813,35 @@ def update_cross_selling_analysis(analysis_type, category_filter, dealer_filter,
         return dbc.Alert(f"Error analyzing cross-selling patterns: {str(e)}", color="danger"), [], []
 
 # Reset Cross-Selling Filters Callback
-@app.callback(
-    Output('cross-sell-category-filter', 'value'),
-    Output('cross-sell-dealer-filter', 'value'),
-    Output('cross-sell-analysis-type', 'value'),
-    Output('cross-sell-min-support', 'value'),
-    Output('cross-sell-min-confidence', 'value'),
-    Output('cross-sell-top-n', 'value'),
-    Input('cross-sell-reset-btn', 'n_clicks'),
-    prevent_initial_call=True
-)
-def reset_cross_sell_filters(n_clicks):
-    """Reset all cross-selling filters to default values"""
-    if n_clicks:
-        return None, None, 'product', 5, 10, 10
-    return no_update, no_update, no_update, no_update, no_update, no_update
+# @app.callback(
+#     Output('cross-sell-category-filter', 'value'),
+#     Output('cross-sell-dealer-filter', 'value'),
+#     Output('cross-sell-analysis-type', 'value'),
+#     Output('cross-sell-min-support', 'value'),
+#     Output('cross-sell-min-confidence', 'value'),
+#     Output('cross-sell-top-n', 'value'),
+#     Input('cross-sell-reset-btn', 'n_clicks'),
+#     prevent_initial_call=True
+# )
+# def reset_cross_sell_filters(n_clicks):
+#     """Reset all cross-selling filters to default values"""
+#     if n_clicks:
+#         return None, None, 'product', 5, 10, 10
+#     return no_update, no_update, no_update, no_update, no_update, no_update
 
-# Download Cross-Selling Report Callback
-@app.callback(
-    Output('cross-sell-download', 'data'),
-    Input('cross-sell-download-btn', 'n_clicks'),
-    State('chart-data-store', 'data'),
-    State('cross-sell-analysis-type', 'value'),
-    State('date-range-picker', 'start_date'),
-    State('date-range-picker', 'end_date'),
-    prevent_initial_call=True
-)
-def download_cross_sell_report(n_clicks, chart_data, analysis_type, start_date, end_date):
-    """Download cross-selling analysis report as CSV"""
-    
-    if not n_clicks or not chart_data:
-        return no_update
-    
-    try:
-        # This would contain the actual association rules data
-        # For now, return a simple message
-        import io
-        
-        output = io.StringIO()
-        output.write(f"Cross-Selling Analysis Report\n")
-        output.write(f"Date Range: {start_date} to {end_date}\n")
-        output.write(f"Analysis Type: {analysis_type}\n")
-        output.write(f"\nNote: Detailed association rules will be included in future versions.\n")
-        
-        return dict(content=output.getvalue(), filename=f"cross_sell_analysis_{start_date}_{end_date}.csv")
-    
-    except Exception as e:
-        print(f"Error downloading cross-sell report: {str(e)}")
-        return no_update
+# Download Cross-Selling Report Callback - DISABLED
+# @app.callback(
+#     Output('cross-sell-download', 'data'),
+#     Input('cross-sell-download-btn', 'n_clicks'),
+#     State('chart-data-store', 'data'),
+#     State('cross-sell-analysis-type', 'value'),
+#     State('date-range-picker', 'start_date'),
+#     State('date-range-picker', 'end_date'),
+#     prevent_initial_call=True
+# )
+# def download_cross_sell_report(n_clicks, chart_data, analysis_type, start_date, end_date):
+#     """Download cross-selling analysis report as CSV"""
+#     return no_update
 
 # Inactive Dealers Tracker Callback
 @app.callback(
@@ -4969,7 +5080,7 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
                 dbc.Card([
                     dbc.CardBody([
                         html.I(className="bi bi-box-seam", style={'fontSize': '24px', 'color': '#8b5cf6'}),
-                        html.H3(f"{inactive_dealers['Product Count'].sum():,.0f}", className="text-secondary mb-0 mt-2"),
+                        html.H3(format_indian_number(inactive_dealers['Product Count'].sum()), className="text-secondary mb-0 mt-2"),
                         html.P("Total Product Families", className="text-muted small mb-0")
                     ])
                 ], className="text-center shadow-sm")
@@ -4989,7 +5100,7 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
             y_values = inactive_dealers_display['Total Quantity']
             y_label = "Historical Quantity"
             color_values = inactive_dealers_display['Total Quantity']
-            text_format = lambda x: f"{x:,.0f}"
+            text_format = lambda x: format_indian_number(x)
         elif sort_by == 'products':
             y_values = inactive_dealers_display['Product Count']
             y_label = "Number of Product Families"
@@ -5045,8 +5156,8 @@ def update_inactive_dealers(period_filter, state_filter, city_filter, sort_by, t
             serial_number = len(table_rows) + 1
             
             # Format values
-            revenue_fmt = f"₹ {row['Total Revenue']:,.0f}"
-            qty_fmt = f"{row['Total Quantity']:,.0f}"
+            revenue_fmt = f"₹ {format_indian_number(row['Total Revenue'])}"
+            qty_fmt = format_indian_number(row['Total Quantity'])
             first_order_fmt = row['First Order'].strftime('%d-%b-%Y')
             last_order_fmt = row['Last Order'].strftime('%d-%b-%Y')
             
@@ -5241,6 +5352,45 @@ def download_inactive_dealers_report(n_clicks, period_filter, start_date, end_da
         print(f"Error downloading inactive dealers report: {str(e)}")
         return no_update
 
+# Helper function to calculate financial year and quarter (April-March)
+def get_financial_year_quarter(date):
+    """
+    Calculate financial year and quarter for Indian financial year (April-March)
+    
+    Args:
+        date: pandas Timestamp or datetime object
+    
+    Returns:
+        tuple: (financial_year_string, quarter_number, quarter_label)
+        Example: ("FY 2024-25", 1, "Q1 FY 2024-25")
+    """
+    month = date.month
+    year = date.year
+    
+    # Financial year starts from April
+    if month >= 4:  # April to December
+        fy_start = year
+        fy_end = year + 1
+    else:  # January to March
+        fy_start = year - 1
+        fy_end = year
+    
+    fy_string = f"FY {fy_start}-{str(fy_end)[-2:]}"
+    
+    # Calculate quarter
+    if month in [4, 5, 6]:
+        quarter = 1
+    elif month in [7, 8, 9]:
+        quarter = 2
+    elif month in [10, 11, 12]:
+        quarter = 3
+    else:  # [1, 2, 3]
+        quarter = 4
+    
+    quarter_label = f"Q{quarter} {fy_string}"
+    
+    return fy_string, quarter, quarter_label
+
 # Time Comparative Analysis Callback
 @app.callback(
     Output('time-comparative-content', 'children'),
@@ -5256,33 +5406,65 @@ def download_inactive_dealers_report(n_clicks, period_filter, start_date, end_da
     Input('password-input', 'value'),
     Input('date-range-picker', 'end_date'),
     Input('hide-innovative-check', 'value'),
+    Input('dashboard-mode-store', 'data'),
     prevent_initial_call=False
 )
 def update_time_comparative_analysis(period_type, num_periods, category_filter, metric, top_n, 
-                                    sort_by, show_change, username, password, end_date, hide_innovative):
+                                    sort_by, show_change, username, password, end_date, hide_innovative, dashboard_mode):
     """Create time comparative analysis showing product sales across multiple periods"""
     
+    # Set default values if None
+    if period_type is None:
+        period_type = 'quarter'
+    if num_periods is None:
+        num_periods = 2
+    if metric is None:
+        metric = 'both'
+    if top_n is None:
+        top_n = 20
+    if sort_by is None:
+        sort_by = 'latest'
+    if show_change is None:
+        show_change = True
+    if dashboard_mode is None:
+        dashboard_mode = 'overall'
+    
+    print(f"📊 Time Comparative Analysis - period_type={period_type}, num_periods={num_periods}, category_filter={category_filter}, metric={metric}")
+    
     if not end_date:
+        print(f"   ⚠️ No end_date provided, returning early")
         return dbc.Alert("Please select a date range", color="warning"), []
+    
+    # Determine which API to use
+    use_iospl = (dashboard_mode == 'iospl')
     
     try:
         end_date_obj = pd.to_datetime(end_date)
         
-        # Calculate periods based on type
+        # Calculate periods based on type (Financial Year: April-March)
         periods = []
         for i in range(num_periods):
             if period_type == 'quarter':
-                # Calculate quarter boundaries
+                # Calculate financial quarter boundaries
                 period_end = end_date_obj - pd.DateOffset(months=i*3)
                 period_start = period_end - pd.DateOffset(months=3) + pd.Timedelta(days=1)
                 
-                # Get quarter number and year
-                quarter_num = (period_end.month - 1) // 3 + 1
-                period_label = f"Q{quarter_num} {period_end.year}"
-            else:  # yearly
-                period_end = end_date_obj.replace(year=end_date_obj.year - i, month=12, day=31)
-                period_start = period_end.replace(month=1, day=1)
-                period_label = str(period_end.year)
+                # Get financial year and quarter
+                fy_string, quarter_num, quarter_label = get_financial_year_quarter(period_end)
+                period_label = quarter_label
+            else:  # yearly - show financial year
+                # For financial year, if we're before April, the FY ends in current year, otherwise next year
+                if end_date_obj.month >= 4:
+                    fy_end_year = end_date_obj.year + 1 - i
+                else:
+                    fy_end_year = end_date_obj.year - i
+                
+                fy_start_year = fy_end_year - 1
+                
+                # Financial year: April to March
+                period_start = pd.Timestamp(year=fy_start_year, month=4, day=1)
+                period_end = pd.Timestamp(year=fy_end_year, month=3, day=31)
+                period_label = f"FY {fy_start_year}-{str(fy_end_year)[-2:]}"
             
             periods.append({
                 'label': period_label,
@@ -5294,7 +5476,10 @@ def update_time_comparative_analysis(period_type, num_periods, category_filter, 
         periods.reverse()
         
         # Fetch data for all periods
-        api_client = APIClient(username=username, password=password)
+        if use_iospl:
+            api_client = APIClientIOSPL(username=username, password=password)
+        else:
+            api_client = APIClient(username=username, password=password)
         
         # Get the earliest start date
         earliest_start = periods[0]['start'].strftime("%d-%m-%Y")
@@ -5306,12 +5491,17 @@ def update_time_comparative_analysis(period_type, num_periods, category_filter, 
         )
         
         if not response.get('success'):
-            return dbc.Alert(f"API Error: {response.get('message')}", color="danger"), []
+            error_msg = response.get('message', 'Unknown error')
+            print(f"   ❌ API Error: {error_msg}")
+            return dbc.Alert(f"API Error: {error_msg}", color="danger"), []
         
         api_response = response.get('data', {})
         report_data = api_response.get('report_data', [])
         
+        print(f"   📦 Fetched {len(report_data)} records from API")
+        
         if not report_data:
+            print(f"   ⚠️ No report data available")
             return dbc.Alert("No data available for the selected periods", color="warning"), []
         
         df = pd.DataFrame(report_data)
@@ -5341,8 +5531,13 @@ def update_time_comparative_analysis(period_type, num_periods, category_filter, 
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         
-        # Apply filters
-        if hide_innovative and 'Dealer Name' in df.columns:
+        # HARD BLOCK: In IOSPL dashboard, show ONLY Innovative Ortho Surgicals data
+        if use_iospl and 'Dealer Name' in df.columns:
+            df = df[df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
+        
+        # Apply filter for Innovative (only in Avante dashboard when checkbox is checked)
+        if not use_iospl and hide_innovative and 'Dealer Name' in df.columns:
+            df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
             df = df[~df['Dealer Name'].str.contains('Innovative', case=False, na=False)]
         
         # Drop rows with missing Date or Product Name
@@ -5358,11 +5553,19 @@ def update_time_comparative_analysis(period_type, num_periods, category_filter, 
         # Get category options
         category_options = []
         if 'Category' in df.columns:
-            category_options = [{'label': cat, 'value': cat} for cat in sorted(df['Category'].dropna().unique())]
+            unique_categories = sorted(df['Category'].dropna().unique())
+            category_options = [{'label': cat, 'value': cat} for cat in unique_categories]
+            print(f"   📋 Category options available: {len(category_options)} categories")
+            print(f"   Categories: {unique_categories[:10]}")  # Show first 10
+        else:
+            print(f"   ⚠️ No 'Category' column found in data")
         
-        # Apply category filter
-        if category_filter and 'Category' in df.columns:
+        # Apply category filter - only filter if explicitly selected (not None or empty list)
+        if category_filter and len(category_filter) > 0 and 'Category' in df.columns:
             df = df[df['Category'].isin(category_filter)]
+            print(f"   🎯 Filtered to {len(df)} records for selected categories")
+        else:
+            print(f"   ✅ Showing all categories: {len(df)} records")
         
         if df.empty:
             return dbc.Alert("No data available with current filters", color="warning"), category_options
@@ -5382,6 +5585,8 @@ def update_time_comparative_analysis(period_type, num_periods, category_filter, 
         
         # Combine all period data
         comparison_df = pd.DataFrame(period_data).fillna(0)
+        
+        print(f"   📊 Comparison table: {len(comparison_df)} products found")
         
         if comparison_df.empty:
             return dbc.Alert("No products found for comparison", color="warning"), category_options
@@ -5642,10 +5847,11 @@ def update_time_comparative_analysis(period_type, num_periods, category_filter, 
             ])
         ])
         
+        print(f"   ✅ Returning content with {len(category_options)} category options")
         return content, category_options
         
     except Exception as e:
-        print(f"Error in time comparative analysis: {str(e)}")
+        print(f"❌ Error in time comparative analysis: {str(e)}")
         import traceback
         traceback.print_exc()
         return dbc.Alert(f"Error creating time comparison: {str(e)}", color="danger"), []
@@ -5847,7 +6053,7 @@ def update_crm_table(dealer_filter, state_filter, product_family_filter, payment
                 dbc.Col([
                     dbc.Card([
                         dbc.CardBody([
-                            html.H3(f"{len(filtered_df):,}", className="mb-0 text-primary"),
+                            html.H3(f"{format_indian_number(len(filtered_df))}", className="mb-0 text-primary"),
                             html.P("Total Transactions", className="text-muted mb-0 small")
                         ])
                     ], className="shadow-sm")
@@ -6171,9 +6377,10 @@ def update_dealer_drilldown_chart(drilldown_data, metric, chart_data, fullscreen
             try:
                 df = pd.DataFrame(chart_data['data'])
                 value_col = chart_data.get('VALUE_COL', 'Value')
+                iospl_mode = (chart_data.get('dashboard_mode') == 'iospl')
                 original_chart = dcc.Graph(
                     id='fullscreen-chart-display',
-                    figure=_create_dealer_pie(df, value_col, limit=10),
+                    figure=_create_dealer_pie(df, value_col, limit=10, iospl_mode=iospl_mode),
                     config={'displayModeBar': True},
                     style={'height': '85vh'}
                 )
@@ -6269,7 +6476,7 @@ def update_dealer_drilldown_chart(drilldown_data, metric, chart_data, fullscreen
                 dbc.Col([
                     dbc.Card([
                         dbc.CardBody([
-                            html.H5(f"₹{total_revenue:,.0f}", className="mb-0 text-primary"),
+                            html.H5(f"₹{format_indian_number(total_revenue)}", className="mb-0 text-primary"),
                             html.P("Total Revenue", className="text-muted mb-0 small")
                         ])
                     ], className="shadow-sm")
@@ -6277,7 +6484,7 @@ def update_dealer_drilldown_chart(drilldown_data, metric, chart_data, fullscreen
                 dbc.Col([
                     dbc.Card([
                         dbc.CardBody([
-                            html.H5(f"{total_qty:,.0f}", className="mb-0 text-success"),
+                            html.H5(f"{format_indian_number(total_qty)}", className="mb-0 text-success"),
                             html.P("Total Quantity", className="text-muted mb-0 small")
                         ])
                     ], className="shadow-sm")
@@ -6566,15 +6773,15 @@ def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, 
             metric_col = VALUE_COL if metric == 'revenue' else QTY_COL
             metric_label = 'Revenue' if metric == 'revenue' else 'Quantity'
             
-            # Aggregate dealers by selected metric
-            if 'Dealer Name' not in state_df.columns:
-                return html.Div("Dealer information not available", className="text-center text-muted p-5"), control_style, control_style
+            # Aggregate cities by selected metric
+            if 'City' not in state_df.columns:
+                return html.Div("City information not available", className="text-center text-muted p-5"), control_style, control_style
             
-            dealer_data = state_df.groupby('Dealer Name')[metric_col].sum().reset_index()
-            dealer_data = dealer_data.sort_values(metric_col, ascending=False).head(20)  # Top 20 dealers
+            city_data = state_df.groupby('City')[metric_col].sum().reset_index()
+            city_data = city_data.sort_values(metric_col, ascending=False).head(20)  # Top 20 cities
             
-            # Truncate long dealer names
-            dealer_data['Display Name'] = dealer_data['Dealer Name'].apply(lambda x: truncate_text(x, 30))
+            # Truncate long city names
+            city_data['Display Name'] = city_data['City'].apply(lambda x: truncate_text(x, 30))
             
             # Create pie chart
             colors = ['#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', 
@@ -6583,11 +6790,11 @@ def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, 
                       '#ec4899', '#f59e0b', '#8b5cf6', '#14b8a6', '#ef4444']
             
             fig = px.pie(
-                dealer_data,
+                city_data,
                 values=metric_col,
                 names='Display Name',
-                color_discrete_sequence=colors[:len(dealer_data)],
-                custom_data=['Dealer Name']
+                color_discrete_sequence=colors[:len(city_data)],
+                custom_data=['City']
             )
             
             # Update traces with hover template
@@ -6602,17 +6809,17 @@ def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, 
                 textfont_size=CHART_FONT_CONFIG['general_size'],
                 hovertemplate=hover_template,
                 marker=dict(line=dict(color='white', width=2)),
-                pull=[0.05 if i == 0 else 0 for i in range(len(dealer_data))]
+                pull=[0.05 if i == 0 else 0 for i in range(len(city_data))]
             )
             
             # Apply modern styling
-            title = f"🏪 Dealers in {truncate_text(state_name, 50)} - By {metric_label}"
+            title = f"�️ Cities in {truncate_text(state_name, 50)} - By {metric_label}"
             apply_modern_chart_style(fig, title, height=600)
             
             # Add summary stats
             total_revenue = state_df[VALUE_COL].sum()
             total_qty = state_df[QTY_COL].sum()
-            unique_dealers = state_df['Dealer Name'].nunique()
+            unique_cities = state_df['City'].nunique()
             
             # Create the chart container with stats
             chart_container = html.Div([
@@ -6637,8 +6844,8 @@ def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, 
                     dbc.Col([
                         dbc.Card([
                             dbc.CardBody([
-                                html.H5(f"{unique_dealers}", className="mb-0 text-warning"),
-                                html.P("Active Dealers", className="text-muted mb-0 small")
+                                html.H5(f"{unique_cities}", className="mb-0 text-primary"),
+                                html.P("Cities", className="text-muted mb-0 small")
                             ])
                         ], className="shadow-sm")
                     ], width=4),
@@ -6688,9 +6895,10 @@ def update_state_drilldown_chart(drilldown_data, dealer_drilldown_data, metric, 
                 try:
                     df = pd.DataFrame(chart_data['data'])
                     value_col = chart_data.get('VALUE_COL', 'Value')
+                    iospl_mode = (chart_data.get('dashboard_mode') == 'iospl')
                     original_chart = dcc.Graph(
                         id='fullscreen-chart-display',
-                        figure=_create_state_pie(df, value_col),
+                        figure=_create_state_pie(df, value_col, iospl_mode=iospl_mode),
                         config={'displayModeBar': True},
                         style={'height': '85vh'}
                     )
@@ -6730,6 +6938,7 @@ def toggle_state_metric(revenue_clicks, quantity_clicks, current_metric):
     Output('state-drilldown-store', 'data', allow_duplicate=True),
     Output('state-dealer-drilldown-store', 'data', allow_duplicate=True),
     Output('state-drilldown-metric', 'data', allow_duplicate=True),
+    Output('state-city-drilldown-store', 'data', allow_duplicate=True),
     Input('fullscreen-chart-modal', 'is_open'),
     prevent_initial_call=True
 )
@@ -6737,8 +6946,8 @@ def reset_state_drilldown_on_modal_close(is_open):
     """Reset state drill-down state when fullscreen modal is closed"""
     if not is_open:
         # Modal is closing, reset drill-down state
-        return None, None, 'revenue'
-    return no_update, no_update, no_update
+        return None, None, 'revenue', None
+    return no_update, no_update, no_update, no_update
 
 # State Drill-Down: Back to dealers button
 @app.callback(
@@ -6833,9 +7042,7 @@ def _create_india_map(df, metric, level='State', is_bubble=False):
     
     # Sort and limit to top locations
     location_data = location_data.sort_values('metric_value', ascending=False)
-    # Don't limit cities - show all locations with data
-    # if level == 'City':
-    #     location_data = location_data.head(50)
+    # Don't limit - show ALL locations with data
     
     # Get coordinates
     coords_dict = CITY_COORDS if level == 'City' else STATE_COORDS
@@ -6847,18 +7054,38 @@ def _create_india_map(df, metric, level='State', is_bubble=False):
     markers = []
     for _, row in location_data.iterrows():
         location_name = row[level]
+        lat, lon = None, None
+        
+        # Try exact match first
         if location_name in coords_dict:
             lat, lon = coords_dict[location_name]
+        else:
+            # Try fuzzy matching for common variations
+            location_lower = location_name.lower().strip()
+            for key, coords in coords_dict.items():
+                key_lower = key.lower().strip()
+                # Check if names match after removing common variations
+                if (location_lower == key_lower or 
+                    location_lower.replace('-', ' ') == key_lower or
+                    location_lower.replace('  ', ' ') == key_lower or
+                    location_lower in key_lower or
+                    key_lower in location_lower):
+                    lat, lon = coords
+                    print(f"   🔍 Fuzzy matched: '{location_name}' -> '{key}'")
+                    break
+        
+        # Create marker if we have coordinates
+        if lat and lon:
             value = row['metric_value']
             pct = row['percentage']
             
             # Format value based on metric
             if metric == 'Revenue':
-                value_text = f"₹{value:,.0f}"
+                value_text = f"₹{format_indian_number(value)}"
             elif metric == 'Quantity':
-                value_text = f"{value:,.0f} units"
+                value_text = f"{format_indian_number(value)} units"
             else:
-                value_text = f"{value:,.0f} orders"
+                value_text = f"{format_indian_number(value)} orders"
             
             # Create marker with custom popup
             marker = dl.Marker(
@@ -6898,8 +7125,9 @@ def _create_india_map(df, metric, level='State', is_bubble=False):
         print(f"   ⚠️ Locations without coordinates ({len(locations_without_coords)}): {', '.join(locations_without_coords[:10])}")
         if len(locations_without_coords) > 10:
             print(f"      ... and {len(locations_without_coords) - 10} more")
+        print(f"   💡 To show these locations, add their coordinates to {'CITY_COORDS' if level == 'City' else 'STATE_COORDS'} dictionary")
     
-    print(f"   ✅ Created {len(markers)} markers out of {len(location_data)} locations")
+    print(f"   ✅ Created {len(markers)} markers out of {len(location_data)} total locations (showing {(len(markers)/len(location_data)*100):.1f}%)")
     
     # Create the map with Google-style tiles
     leaflet_map = dl.Map(
@@ -7241,8 +7469,45 @@ def apply_modern_chart_style(fig, title="", height=400):
     return fig
 
 # Chart creation functions
-def _create_dealer_pie(df, value_col, limit=10):
-    """Create dealer revenue pie chart with modern styling""" 
+def _create_dealer_pie(df, value_col, limit=10, iospl_mode=False):
+    """Create dealer revenue pie chart with modern styling
+    
+    In IOSPL mode, shows Product Categories instead of Dealers for better data diversity
+    """ 
+    # IOSPL Mode: Show Product Categories instead of Dealers
+    if iospl_mode and 'Category' in df.columns:
+        if not value_col:
+            fig = go.Figure()
+            fig.add_annotation(text="No data available", font=dict(size=14, color='#9ca3af'))
+            return apply_modern_chart_style(fig, "📦 Revenue by Product Category")
+        
+        category_data = df.groupby('Category')[value_col].sum().reset_index()
+        category_data = category_data.sort_values(value_col, ascending=False).head(limit)
+        
+        # Truncate long category names for display
+        category_data['Display Name'] = category_data['Category'].apply(lambda x: truncate_text(x, 30))
+        
+        # Modern color palette
+        colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', 
+                  '#3b82f6', '#ef4444', '#14b8a6', '#f97316', '#a855f7']
+        
+        fig = px.pie(
+            category_data,
+            values=value_col,
+            names='Display Name',
+            color_discrete_sequence=colors[:len(category_data)],
+            custom_data=['Category']  # Keep full name for hover
+        )
+    fig.update_traces(
+        textposition='inside',
+        textinfo='percent+label',
+        textfont_size=CHART_FONT_CONFIG['general_size'],
+        hovertemplate='<b>%{customdata[0]}</b><br>Revenue: ₹%{value:,.0f}<br>Share: %{percent}<br><i>Click to drill down</i><extra></extra>',
+        marker=dict(line=dict(color='white', width=3)),
+        pull=[0.05 if i == 0 else 0 for i in range(len(category_data))]
+    )
+    
+    return apply_modern_chart_style(fig, f"📦 Top {limit} Product Categories by Revenue", height=450)    # Original Dealer Mode
     if not value_col or 'Dealer Name' not in df.columns:
         fig = go.Figure()
         fig.add_annotation(text="No data available", font=dict(size=14, color='#9ca3af'))
@@ -7269,23 +7534,33 @@ def _create_dealer_pie(df, value_col, limit=10):
         textposition='inside',
         textinfo='percent+label',
         textfont_size=CHART_FONT_CONFIG['general_size'],
-        hovertemplate='<b>%{customdata[0]}</b><br>Revenue: ₹%{value:,.0f}<br>Share: %{percent}<extra></extra>',
+        hovertemplate='<b>%{customdata[0]}</b><br>Revenue: ₹%{value:,.0f}<br>Share: %{percent}<br><i>Click to drill down</i><extra></extra>',
         marker=dict(line=dict(color='white', width=3)),
         pull=[0.05 if i == 0 else 0 for i in range(len(dealer_data))]
     )
     
     return apply_modern_chart_style(fig, f"🏆 Top {limit} Dealers by Revenue", height=450)
 
-def _create_state_pie(df, value_col):
-    """Create state revenue pie chart"""
-    if not value_col or 'State' not in df.columns:
+def _create_state_pie(df, value_col, iospl_mode=False):
+    """Create state revenue pie chart (or Category chart in IOSPL mode)"""
+    if not value_col:
         return go.Figure().add_annotation(text="No data")
     
-    state_data = df.groupby('State')[value_col].sum().reset_index()
+    # In IOSPL mode, show Product Categories instead of States
+    if iospl_mode and 'Category' in df.columns:
+        group_col = 'Category'
+        title_text = "📂 Product Categories by Revenue"
+    elif 'State' in df.columns:
+        group_col = 'State'
+        title_text = "🗺️ Top 10 States by Revenue"
+    else:
+        return go.Figure().add_annotation(text="No data")
+    
+    state_data = df.groupby(group_col)[value_col].sum().reset_index()
     state_data = state_data.sort_values(value_col, ascending=False).head(10)
     
-    # Truncate long state names for display
-    state_data['Display Name'] = state_data['State'].apply(lambda x: truncate_text(x, 20))
+    # Truncate long names for display
+    state_data['Display Name'] = state_data[group_col].apply(lambda x: truncate_text(x, 20))
     
     # Modern color palette
     colors = [COLORS['primary'], COLORS['secondary'], COLORS['success'], COLORS['warning'], 
@@ -7295,21 +7570,21 @@ def _create_state_pie(df, value_col):
         state_data,
         values=value_col,
         names='Display Name',
-        title="🗺️ Top 10 States by Revenue",
+        title=title_text,
         color_discrete_sequence=colors[:len(state_data)],
-        custom_data=['State']  # Keep full name for hover
+        custom_data=[group_col]  # Keep full name for hover
     )
     fig.update_traces(
         textposition='inside',
         textinfo='percent+label',
         textfont_size=CHART_FONT_CONFIG['general_size'],
-        hovertemplate='<b>%{customdata[0]}</b><br>Revenue: Rs. %{value:,.0f}<br>Share: %{percent}<extra></extra>',
+        hovertemplate='<b>%{customdata[0]}</b><br>Revenue: Rs. %{value:,.0f}<br>Share: %{percent}<br><i>Click to drill down</i><extra></extra>',
         marker=dict(line=dict(color='white', width=2)),
         pull=[0.03 if i < 3 else 0 for i in range(len(state_data))]
     )
     
     # Apply modern styling
-    apply_modern_chart_style(fig, "🗺️ Top 10 States by Revenue", height=450)
+    apply_modern_chart_style(fig, title_text, height=450)
     fig.update_layout(
         showlegend=True,
         legend=dict(
@@ -7323,26 +7598,42 @@ def _create_state_pie(df, value_col):
     )
     return fig
 
-def _create_category_bar(df, value_col):
-    """Create category revenue bar chart"""
-    if not value_col or 'Category' not in df.columns:
+def _create_category_bar(df, value_col, iospl_mode=False):
+    """Create category revenue bar chart (or Product Names in IOSPL mode)"""
+    if not value_col:
         return go.Figure().add_annotation(text="No data")
     
-    cat_data = df.groupby('Category')[value_col].sum().reset_index()
+    # In IOSPL mode, show Product Names instead of Categories
+    if iospl_mode and 'Product Name' in df.columns:
+        group_col = 'Product Name'
+        title_text = "📦 Top Products by Revenue"
+        max_length = 40  # Longer for product names
+    elif 'Category' in df.columns:
+        group_col = 'Category'
+        title_text = "📂 Revenue by Category"
+        max_length = 35
+    else:
+        return go.Figure().add_annotation(text="No data")
+    
+    cat_data = df.groupby(group_col)[value_col].sum().reset_index()
     cat_data = cat_data.sort_values(value_col, ascending=True)
     
-    # Truncate long category names for Y-axis
-    cat_data['Display Name'] = cat_data['Category'].apply(lambda x: truncate_text(x, 35))
+    # Take top 15 for better visualization
+    if len(cat_data) > 15:
+        cat_data = cat_data.tail(15)
+    
+    # Truncate long names for Y-axis
+    cat_data['Display Name'] = cat_data[group_col].apply(lambda x: truncate_text(x, max_length))
     
     fig = px.bar(
         cat_data,
         x=value_col,
         y='Display Name',
         orientation='h',
-        title="📂 Revenue by Category",
+        title=title_text,
         color=value_col,
         color_continuous_scale=[[0, COLORS['primary']], [1, COLORS['secondary']]],
-        custom_data=['Category']  # Keep full name for hover
+        custom_data=[group_col]  # Keep full name for hover
     )
     fig.update_traces(
         text=[f"Rs. {x/1e5:.1f}L" for x in cat_data[value_col]],
@@ -7356,7 +7647,7 @@ def _create_category_bar(df, value_col):
     )
     
     # Apply modern styling
-    apply_modern_chart_style(fig, "📂 Revenue by Category", height=450)
+    apply_modern_chart_style(fig, title_text, height=450)
     fig.update_xaxes(tickformat=',.0f')
     fig.update_yaxes(tickfont=dict(size=CHART_FONT_CONFIG['axis_tick_size']))
     fig.update_layout(
@@ -7364,6 +7655,68 @@ def _create_category_bar(df, value_col):
         coloraxis_showscale=False,
         margin=dict(t=50, b=20, l=150, r=50)
     )
+    return fig
+
+def _create_state_category_heatmap(df, value_col):
+    """Create heatmap showing which product categories are sold in which states"""
+    if not value_col or 'State' not in df.columns or 'Category' not in df.columns:
+        return go.Figure().add_annotation(text="No state or category data available")
+    
+    # Create pivot table: States x Categories
+    pivot_data = df.groupby(['State', 'Category'])[value_col].sum().reset_index()
+    pivot_table = pivot_data.pivot(index='State', columns='Category', values=value_col).fillna(0)
+    
+    # Sort by total revenue to show top states first
+    state_totals = pivot_table.sum(axis=1).sort_values(ascending=False)
+    pivot_table = pivot_table.loc[state_totals.head(15).index]  # Top 15 states
+    
+    # Sort categories by total revenue
+    category_totals = pivot_table.sum(axis=0).sort_values(ascending=False)
+    pivot_table = pivot_table[category_totals.head(10).index]  # Top 10 categories
+    
+    # Create heatmap
+    fig = go.Figure(data=go.Heatmap(
+        z=pivot_table.values,
+        x=[truncate_text(cat, 20) for cat in pivot_table.columns],
+        y=[truncate_text(state, 20) for state in pivot_table.index],
+        colorscale=[
+            [0, '#f0f9ff'],      # Very light blue for zero/low
+            [0.2, '#bae6fd'],    # Light blue
+            [0.4, '#7dd3fc'],    # Medium light blue
+            [0.6, '#38bdf8'],    # Medium blue
+            [0.8, '#0ea5e9'],    # Blue
+            [1, '#0369a1']       # Dark blue for high values
+        ],
+        hovertemplate='<b>State:</b> %{y}<br><b>Category:</b> %{x}<br><b>Revenue:</b> ₹%{z:,.0f}<extra></extra>',
+        colorbar=dict(
+            title="Revenue (₹)",
+            title_side="right",
+            tickformat=",.0f",
+            tickvals=[1e5, 5e5, 1e6, 5e6, 1e7, 5e7, 1e8],
+            ticktext=["1L", "5L", "10L", "50L", "1Cr", "5Cr", "10Cr"],
+            len=0.7,
+            thickness=15
+        ),
+        xgap=2,
+        ygap=2
+    ))
+    
+    # Apply modern styling
+    apply_modern_chart_style(fig, "🗺️📦 Product Categories by State - Revenue Heatmap", height=600)
+    fig.update_xaxes(
+        side='bottom',
+        tickangle=-45,
+        tickfont=dict(size=CHART_FONT_CONFIG['axis_tick_size'])
+    )
+    fig.update_yaxes(
+        tickfont=dict(size=CHART_FONT_CONFIG['axis_tick_size'])
+    )
+    fig.update_layout(
+        margin=dict(t=60, b=120, l=150, r=80),
+        xaxis_title="Product Category",
+        yaxis_title="State"
+    )
+    
     return fig
 
 def _create_revenue_trend(df, value_col):
@@ -7430,10 +7783,10 @@ def _create_revenue_trend(df, value_col):
     
     # Format y-axis as Indian currency
     fig.update_yaxes(
-        tickformat=".2f",
+        tickformat=".0f",
         tickprefix="Rs. ",
-        tickvals=[1e5, 1e6, 1e7, 1e8, 1e9],
-        ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"]
+        tickvals=[1e5, 2.5e5, 5e5, 7.5e5, 1e6, 2.5e6, 5e6, 7.5e6, 1e7, 2.5e7, 5e7, 7.5e7, 1e8],
+        ticktext=["1L", "2.5L", "5L", "7.5L", "10L", "25L", "50L", "75L", "1Cr", "2.5Cr", "5Cr", "7.5Cr", "10Cr"]
     )
     
     # Format x-axis
@@ -7441,16 +7794,31 @@ def _create_revenue_trend(df, value_col):
     
     return fig
 
-def _create_top_products_table(df, value_col, qty_col):
-    """Create top product families table component"""
-    if not value_col or not qty_col or 'Category' not in df.columns:
+def _create_top_products_table(df, value_col, qty_col, iospl_mode=False):
+    """Create top product families table component (or actual Products in IOSPL mode)"""
+    if not value_col or not qty_col:
         return dbc.Card([
             dbc.CardHeader("🏆 Top 15 Product Families"),
             dbc.CardBody("No product family data available")
         ])
     
-    # Group by Category (Product Family) and aggregate
-    product_data = df.groupby('Category').agg({
+    # In IOSPL mode, show Product Names instead of Categories
+    if iospl_mode and 'Product Name' in df.columns:
+        group_col = 'Product Name'
+        title_text = "🏆 Top 15 Products"
+        subtitle_text = "Ranked by total revenue"
+    elif 'Category' in df.columns:
+        group_col = 'Category'
+        title_text = "🏆 Top 15 Product Families"
+        subtitle_text = "Ranked by total revenue"
+    else:
+        return dbc.Card([
+            dbc.CardHeader(f"🏆 Top 15 {'Products' if iospl_mode else 'Product Families'}"),
+            dbc.CardBody("No data available")
+        ])
+    
+    # Group by the appropriate column and aggregate
+    product_data = df.groupby(group_col).agg({
         value_col: 'sum',
         qty_col: 'sum'
     }).reset_index()
@@ -7462,7 +7830,7 @@ def _create_top_products_table(df, value_col, qty_col):
     table_rows = []
     for idx, row in product_data.iterrows():
         serial_number = len(table_rows) + 1
-        product_family = row['Category']
+        product_name = row[group_col]
         revenue = row[value_col]
         quantity = row[qty_col]
         
@@ -7477,7 +7845,7 @@ def _create_top_products_table(df, value_col, qty_col):
         
         table_rows.append(html.Tr([
             html.Td(serial_number),
-            html.Td(product_family),
+            html.Td(product_name),
             html.Td(formatted_revenue),
             html.Td(formatted_quantity)
         ]))
@@ -7486,7 +7854,7 @@ def _create_top_products_table(df, value_col, qty_col):
     table = dbc.Table([
         html.Thead(html.Tr([
             html.Th("S.No"),
-            html.Th("Product Family"),
+            html.Th("Product Family" if not iospl_mode else "Product"),
             html.Th("Revenue"),
             html.Th("Quantity")
         ])),
@@ -7496,8 +7864,8 @@ def _create_top_products_table(df, value_col, qty_col):
     # Wrap in card
     card = dbc.Card([
         dbc.CardHeader([
-            html.H6("🏆 Top 15 Product Families", className="mb-0 fw-bold text-primary"),
-            html.Small("Ranked by total revenue", className="text-muted")
+            html.H6(title_text, className="mb-0 fw-bold text-primary"),
+            html.Small(subtitle_text, className="text-muted")
         ]),
         dbc.CardBody([
             table
@@ -7553,10 +7921,10 @@ def _create_dealer_comparison(df, value_col, qty_col):
     fig.update_layout(
         xaxis=dict(
             title="Revenue (Rs.)",
-            tickformat=".2f",
+            tickformat=".0f",
             tickprefix="Rs. ",
-            tickvals=[1e5, 1e6, 1e7, 1e8, 1e9],
-            ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"]
+            tickvals=[1e5, 2.5e5, 5e5, 7.5e5, 1e6, 2.5e6, 5e6, 7.5e6, 1e7, 2.5e7, 5e7, 7.5e7, 1e8],
+            ticktext=["1L", "2.5L", "5L", "7.5L", "10L", "25L", "50L", "75L", "1Cr", "2.5Cr", "5Cr", "7.5Cr", "10Cr"]
         ),
         xaxis2=dict(
             title="Quantity",
@@ -7636,10 +8004,10 @@ def _create_city_bar(df, value_col):
     
     # Format y-axis
     fig.update_yaxes(
-        tickformat=".2f",
+        tickformat=".0f",
         tickprefix="Rs. ",
-        tickvals=[1e5, 1e6, 1e7, 1e8, 1e9],
-        ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"]
+        tickvals=[1e5, 2.5e5, 5e5, 7.5e5, 1e6, 2.5e6, 5e6, 7.5e6, 1e7, 2.5e7, 5e7, 7.5e7, 1e8],
+        ticktext=["1L", "2.5L", "5L", "7.5L", "10L", "25L", "50L", "75L", "1Cr", "2.5Cr", "5Cr", "7.5Cr", "10Cr"]
     )
     
     # Format x-axis
@@ -7733,10 +8101,10 @@ def _create_weekday_pattern(df, value_col):
     
     # Format y-axis as Lakhs
     fig.update_yaxes(
-        tickformat=".2f",
+        tickformat=".0f",
         tickprefix="Rs. ",
-        tickvals=[1e5, 1e6, 1e7, 1e8, 1e9],
-        ticktext=["0.1L", "1L", "10L", "1Cr", "10Cr"]
+        tickvals=[1e5, 2.5e5, 5e5, 7.5e5, 1e6, 2.5e6, 5e6, 7.5e6, 1e7, 2.5e7, 5e7, 7.5e7, 1e8],
+        ticktext=["1L", "2.5L", "5L", "7.5L", "10L", "25L", "50L", "75L", "1Cr", "2.5Cr", "5Cr", "7.5Cr", "10Cr"]
     )
     
     # Format x-axis
@@ -9082,6 +9450,7 @@ app.clientside_callback(
                 'dealer-comparison-chart': '🏪 Dealer Comparison - Revenue vs Quantity',
                 'city-bar-chart-2': '🏙️ Cities by Revenue',
                 'category-sunburst-chart': '📊 Category & Sub-Category Breakdown',
+                'state-category-heatmap': '🗺️📦 Product Categories by State',
                 'geographic-map': '🗺️ Geographic Sales Distribution',
                 'revenue-trend': '📈 Revenue Trend Over Time',
                 'weekday-pattern': '📅 Revenue by Day of Week',
@@ -9256,6 +9625,7 @@ app.clientside_callback(
     Output('toggle-overall-btn', 'outline'),
     Output('toggle-iospl-btn', 'outline'),
     Output('innovative-checkbox-container', 'style'),
+    Output('avante-checkbox-container', 'style'),
     Input('toggle-overall-btn', 'n_clicks'),
     Input('toggle-iospl-btn', 'n_clicks'),
     State('dashboard-mode-store', 'data'),
@@ -9264,20 +9634,22 @@ app.clientside_callback(
 def toggle_dashboard_mode(overall_clicks, iospl_clicks, current_mode):
     """Toggle between Avante and IOSPL dashboards"""
     if not ctx.triggered:
-        checkbox_style = {'display': 'none'} if current_mode == 'iospl' else {'display': 'block'}
-        return current_mode, True if current_mode == 'iospl' else False, True if current_mode == 'overall' else False, checkbox_style
+        innovative_style = {'display': 'none'} if current_mode == 'iospl' else {'display': 'block'}
+        avante_style = {'display': 'block'} if current_mode == 'iospl' else {'display': 'none'}
+        return current_mode, True if current_mode == 'iospl' else False, True if current_mode == 'overall' else False, innovative_style, avante_style
     
     button_id = ctx.triggered[0]['prop_id'].split('.')[0]
     
     if button_id == 'toggle-overall-btn':
-        # Switch to Avante dashboard - show checkbox
-        return 'overall', False, True, {'display': 'block'}
+        # Switch to Avante dashboard - show Innovative checkbox, hide Avante checkbox
+        return 'overall', False, True, {'display': 'block'}, {'display': 'none'}
     elif button_id == 'toggle-iospl-btn':
-        # Switch to IOSPL dashboard - hide checkbox
-        return 'iospl', True, False, {'display': 'none'}
+        # Switch to IOSPL dashboard - hide Innovative checkbox, show Avante checkbox
+        return 'iospl', True, False, {'display': 'none'}, {'display': 'block'}
     
-    checkbox_style = {'display': 'none'} if current_mode == 'iospl' else {'display': 'block'}
-    return current_mode, True if current_mode == 'iospl' else False, True if current_mode == 'overall' else False, checkbox_style
+    innovative_style = {'display': 'none'} if current_mode == 'iospl' else {'display': 'block'}
+    avante_style = {'display': 'block'} if current_mode == 'iospl' else {'display': 'none'}
+    return current_mode, True if current_mode == 'iospl' else False, True if current_mode == 'overall' else False, innovative_style, avante_style
 
 if __name__ == '__main__':
     print("\n" + "="*60)

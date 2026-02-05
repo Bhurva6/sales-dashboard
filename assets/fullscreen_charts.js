@@ -226,9 +226,13 @@ function copyChartToModal(chartId) {
             if (chartId === 'dealer-pie-chart') {
                 console.log('🎯 Setting up dealer drill-down click handler');
                 setupDealerDrillDown(newPlotlyDiv);
+                // Enhance single-slice visual feedback
+                enhanceSingleSliceInteraction(newPlotlyDiv, chartId);
             } else if (chartId === 'state-pie-chart') {
                 console.log('🎯 Setting up state drill-down click handler');
                 setupStateDrillDown(newPlotlyDiv);
+                // Enhance single-slice visual feedback
+                enhanceSingleSliceInteraction(newPlotlyDiv, chartId);
             }
         }).catch(function(err) {
             console.error('❌ Error creating Plotly chart:', err);
@@ -647,6 +651,70 @@ document.addEventListener('DOMContentLoaded', function() {
             subtree: true
         });
         
-        console.log('✅ State-dealer chart observer set up');
     }
+});
+
+// Enhanced interaction for single-slice pie charts
+function enhanceSingleSliceInteraction(plotlyDiv, chartId) {
+    if (!plotlyDiv || !plotlyDiv.data || !plotlyDiv.data[0]) {
+        return;
+    }
+    
+    // Check if this is a single-slice chart
+    const data = plotlyDiv.data[0];
+    const sliceCount = data.values ? data.values.length : 0;
+    
+    if (sliceCount === 1) {
+        console.log('🔵 Single-slice chart detected - enhancing interactivity');
+        
+        // Make the single slice slightly pulled out by default to indicate clickability
+        const update = {
+            'pull': [0.08]  // Slightly pull out the single slice
+        };
+        
+        Plotly.restyle(plotlyDiv, update, 0).then(function() {
+            console.log('✅ Single-slice enhancement applied');
+        }).catch(function(err) {
+            console.warn('⚠️ Could not apply single-slice enhancement:', err);
+        });
+        
+        // Add a note to the layout indicating it's clickable
+        if (plotlyDiv.layout) {
+            const currentTitle = plotlyDiv.layout.title;
+            const titleText = currentTitle && currentTitle.text ? currentTitle.text : '';
+            
+            // Add annotation to indicate clickability
+            const annotation = {
+                text: '👆 Click to see detailed breakdown',
+                x: 0.5,
+                y: -0.15,
+                xref: 'paper',
+                yref: 'paper',
+                showarrow: false,
+                font: {
+                    size: 12,
+                    color: '#6366f1'
+                },
+                xanchor: 'center'
+            };
+            
+            const layoutUpdate = {
+                annotations: [annotation]
+            };
+            
+            Plotly.relayout(plotlyDiv, layoutUpdate).then(function() {
+                console.log('✅ Clickability annotation added');
+            }).catch(function(err) {
+                console.warn('⚠️ Could not add annotation:', err);
+            });
+        }
+    } else {
+        console.log('ℹ️ Multi-slice chart detected (' + sliceCount + ' slices)');
+    }
+}
+
+// Make sure window is loaded before setting up
+window.addEventListener('load', function() {
+    // Safe to access DOM and Dash components here
+    console.log('✅ Window loaded - you can safely interact with the page');
 });
