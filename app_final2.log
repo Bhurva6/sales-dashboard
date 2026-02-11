@@ -1,0 +1,57 @@
+⚠️ Using simple cache (no Redis)
+
+============================================================
+🚀 Starting Dash Dashboard...
+============================================================
+   URL: http://localhost:8050
+   Press Ctrl+C to stop
+============================================================
+
+Dash is running on http://127.0.0.1:8050/
+
+INFO:dash.dash:Dash is running on http://127.0.0.1:8050/
+
+ * Serving Flask app 'app'
+ * Debug mode: on
+Fatal Python error: init_sys_streams: can't initialize sys standard streams
+Python runtime state: core initialized
+⚠️ Using simple cache (no Redis)
+
+============================================================
+🚀 Starting Dash Dashboard...
+============================================================
+   URL: http://localhost:8050
+   Press Ctrl+C to stop
+============================================================
+
+Traceback (most recent call last):
+  File "/Users/bhurvasharma/dashboard/app.py", line 9828, in <module>
+    app.run(debug=True, port=8050)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/dash/dash.py", line 2491, in run
+    self.server.run(host=host, port=port, debug=debug, **flask_run_options)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/flask/app.py", line 662, in run
+    run_simple(t.cast(str, host), port, self, **options)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/werkzeug/serving.py", line 1115, in run_simple
+    run_with_reloader(
+    ~~~~~~~~~~~~~~~~~^
+        srv.serve_forever,
+        ^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        reloader_type=reloader_type,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/werkzeug/_reloader.py", line 453, in run_with_reloader
+    ensure_echo_on()
+    ~~~~~~~~~~~~~~^^
+  File "/Users/bhurvasharma/dashboard/.venv/lib/python3.13/site-packages/werkzeug/_reloader.py", line 433, in ensure_echo_on
+    termios.tcsetattr(sys.stdin, termios.TCSANOW, attributes)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+termios.error: (4, 'Interrupted system call')
+OSError: [Errno 9] Bad file descriptor
+
+Current thread 0x000000020b83ac40 (most recent call first):
+  <no Python frame>

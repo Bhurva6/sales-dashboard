@@ -1,0 +1,362 @@
+⚠️ Using simple cache (no Redis)
+
+============================================================
+🚀 Starting Dash Dashboard...
+============================================================
+   URL: http://localhost:8050
+   Press Ctrl+C to stop
+============================================================
+
+Dash is running on http://127.0.0.1:8050/
+
+INFO:dash.dash:Dash is running on http://127.0.0.1:8050/
+
+ * Serving Flask app 'app'
+ * Debug mode: on
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2025 to 31-12-2025
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2025 to 31-12-2025
+INFO:avante_api:✅ Successfully fetched 3872 Avante records
+INFO:avante_api:📊 DataFrame created with 3872 rows and 10 columns
+INFO:avante_api:📥 Fetching Avante sales data: 01-12-2024 to 30-11-2025
+INFO:avante_api:✅ Successfully fetched 3872 Avante records
+INFO:avante_api:📊 DataFrame created with 3872 rows and 10 columns
+INFO:avante_api:📥 Fetching Avante sales data: 01-12-2024 to 30-11-2025
+INFO:avante_api:✅ Successfully fetched 3735 Avante records
+INFO:avante_api:📊 DataFrame created with 3735 rows and 10 columns
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2025 to 31-12-2025
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2025 to 31-12-2025
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2025 to 31-12-2025
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2024 to 31-12-2025
+INFO:avante_api:📥 Fetching Avante sales data: 01-07-2025 to 31-12-2025
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2025 to 31-12-2025
+INFO:avante_api:✅ Successfully fetched 3735 Avante records
+INFO:avante_api:📊 DataFrame created with 3735 rows and 10 columns
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2025 to 31-12-2025
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2025 to 31-12-2025
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2025 to 31-12-2025
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2024 to 31-12-2025
+INFO:avante_api:📥 Fetching Avante sales data: 01-07-2025 to 31-12-2025
+INFO:avante_api:📥 Fetching Avante sales data: 01-01-2025 to 31-12-2025
+INFO:avante_api:✅ Successfully fetched 2665 Avante records
+INFO:avante_api:✅ Successfully fetched 3872 Avante records
+INFO:avante_api:📊 DataFrame created with 3872 rows and 10 columns
+INFO:avante_api:✅ Successfully fetched 3872 Avante records
+INFO:avante_api:✅ Successfully fetched 3872 Avante records
+⚠️ Using simple cache (no Redis)
+
+============================================================
+🚀 Starting Dash Dashboard...
+============================================================
+   URL: http://localhost:8050
+   Press Ctrl+C to stop
+============================================================
+
+
+🔄 DASH UPDATE TRIGGERED by: 
+   Range: 01-01-2025 to 31-12-2025
+   Hide Innovative: False
+   Hide Avante (IOSPL only): False
+   Refresh clicks: 0
+🔄 Fetching data from Avante API for 01-01-2025 to 31-12-2025
+
+🔄 DASH UPDATE TRIGGERED by: 
+   Range: 01-01-2025 to 31-12-2025
+   Hide Innovative: False
+   Hide Avante (IOSPL only): False
+   Refresh clicks: 0
+🔄 Fetching data from Avante API for 01-01-2025 to 31-12-2025
+   📅 Added synthetic Date column: 2025-12-31
+✅ Data fetched successfully from Avante API: 3872 rows
+   Data fetched: 3872 rows (cached)
+   Available columns: ['cust_id', 'id', 'Dealer Name', 'City', 'State', 'Category', 'Product', 'Code', 'Qty', 'Value', 'Date']
+   Revenue: Rs. 23.13 Cr
+   Quantity: 7.81 Lakh
+🔄 Fetching data from Avante API for 01-12-2024 to 30-11-2025
+   📅 Added synthetic Date column: 2025-12-31
+✅ Data fetched successfully from Avante API: 3872 rows
+   Data fetched: 3872 rows (cached)
+   Available columns: ['cust_id', 'id', 'Dealer Name', 'City', 'State', 'Category', 'Product', 'Code', 'Qty', 'Value', 'Date']
+   Revenue: Rs. 23.13 Cr
+   Quantity: 7.81 Lakh
+🔄 Fetching data from Avante API for 01-12-2024 to 30-11-2025
+   📅 Added synthetic Date column: 2025-11-30
+✅ Data fetched successfully from Avante API: 3735 rows
+   Has date data: True
+   Date column sample: 0   2025-12-31
+1   2025-12-31
+2   2025-12-31
+3   2025-12-31
+4   2025-12-31
+Name: Date, dtype: datetime64[ns]
+   Valid dates: 3872 out of 3872
+
+📊 PREPARING CHART DATA:
+   DataFrame shape: (3872, 11)
+   DataFrame columns: ['cust_id', 'id', 'Dealer Name', 'City', 'State', 'Category', 'Product', 'Code', 'Qty', 'Value', 'Date']
+   VALUE_COL: Value
+   QTY_COL: Qty
+   Dashboard mode: overall
+   Sample data (first 2 rows):
+[{'cust_id': '38', 'id': '12', 'Dealer Name': 'ALTIVATE MEDICARE', 'City': 'VADODARA', 'State': 'GUJARAT', 'Category': 'Bone Screw', 'Product': '3.5mm Cortical Screw 20TPI, Self Tapping', 'Code': 'ASC.101-E', 'Qty': 56, 'Value': 1412.13, 'Date': Timestamp('2025-12-31 00:00:00')}, {'cust_id': '38', 'id': '15', 'Dealer Name': 'ALTIVATE MEDICARE', 'City': 'VADODARA', 'State': 'GUJARAT', 'Category': 'Bone Screw', 'Product': '4.5mm Cortical Screw Self Tapping', 'Code': 'ASC.102-E', 'Qty': 84, 'Value': 2506.55, 'Date': Timestamp('2025-12-31 00:00:00')}]
+   Chart data keys: ['data', 'VALUE_COL', 'QTY_COL', 'dashboard_mode', 'dealers', 'states', 'cities', 'categories']
+   Number of records in chart_data: 3872
+   Number of unique dealers: 174
+   Number of unique states: 33
+✅ Chart data prepared successfully
+
+
+MAP CALLBACK TRIGGERED
+   Dashboard Mode: Avante
+   Metric: Revenue, Level: State
+   Dates: 2025-01-01T00:00:00 to 2025-12-31T00:00:00
+   Username: u2vp8kb, Hide Innovative: False
+   Fetching data from 01-01-2025 to 31-12-2025...
+🔍 Fetching inactive dealers data from 01-01-2024 to 31-12-2025
+📊 Time Comparative Analysis - period_type=quarter, num_periods=2, category_filter=None, metric=both
+
+📊 UPDATE_FILTERED_CHARTS CALLED:
+   chart_data type: <class 'dict'>
+   chart_data is None: False
+   chart_data keys: ['data', 'VALUE_COL', 'QTY_COL', 'dashboard_mode', 'dealers', 'states', 'cities', 'categories']
+   chart_data has 'data' key: True
+   chart_data['data'] length: 3872
+   chart_data['data'] type: <class 'list'>
+   Filters - dealer: None, state: None, category: None
+   Converting chart_data['data'] to DataFrame...
+   DataFrame shape: (3872, 11)
+   DataFrame columns: ['cust_id', 'id', 'Dealer Name', 'City', 'State', 'Category', 'Product', 'Code', 'Qty', 'Value', 'Date']
+   VALUE_COL: Value
+   📈 Creating charts from 3872 records
+   📊 VALUE_COL=Value, QTY_COL=Qty
+   🎯 IOSPL Mode: False
+   📅 Added synthetic Date column: 2025-11-30
+✅ Data fetched successfully from Avante API: 3735 rows
+   Has date data: True
+   Date column sample: 0   2025-12-31
+1   2025-12-31
+2   2025-12-31
+3   2025-12-31
+4   2025-12-31
+Name: Date, dtype: datetime64[ns]
+   Valid dates: 3872 out of 3872
+
+📊 PREPARING CHART DATA:
+   DataFrame shape: (3872, 11)
+   DataFrame columns: ['cust_id', 'id', 'Dealer Name', 'City', 'State', 'Category', 'Product', 'Code', 'Qty', 'Value', 'Date']
+   VALUE_COL: Value
+   QTY_COL: Qty
+   Dashboard mode: overall
+   Sample data (first 2 rows):
+[{'cust_id': '38', 'id': '12', 'Dealer Name': 'ALTIVATE MEDICARE', 'City': 'VADODARA', 'State': 'GUJARAT', 'Category': 'Bone Screw', 'Product': '3.5mm Cortical Screw 20TPI, Self Tapping', 'Code': 'ASC.101-E', 'Qty': 56, 'Value': 1412.13, 'Date': Timestamp('2025-12-31 00:00:00')}, {'cust_id': '38', 'id': '15', 'Dealer Name': 'ALTIVATE MEDICARE', 'City': 'VADODARA', 'State': 'GUJARAT', 'Category': 'Bone Screw', 'Product': '4.5mm Cortical Screw Self Tapping', 'Code': 'ASC.102-E', 'Qty': 84, 'Value': 2506.55, 'Date': Timestamp('2025-12-31 00:00:00')}]
+   Chart data keys: ['data', 'VALUE_COL', 'QTY_COL', 'dashboard_mode', 'dealers', 'states', 'cities', 'categories']
+   Number of records in chart_data: 3872
+   Number of unique dealers: 174
+   Number of unique states: 33
+✅ Chart data prepared successfully
+
+
+MAP CALLBACK TRIGGERED
+   Dashboard Mode: Avante
+   Metric: Revenue, Level: State
+   Dates: 2025-01-01T00:00:00 to 2025-12-31T00:00:00
+   Username: u2vp8kb, Hide Innovative: False
+   Fetching data from 01-01-2025 to 31-12-2025...
+
+📊 UPDATE_FILTERED_CHARTS CALLED:
+   chart_data type: <class 'dict'>
+   chart_data is None: False
+   chart_data keys: ['data', 'VALUE_COL', 'QTY_COL', 'dashboard_mode', 'dealers', 'states', 'cities', 'categories']
+   chart_data has 'data' key: True
+   chart_data['data'] length: 3872
+   chart_data['data'] type: <class 'list'>
+   Filters - dealer: None, state: None, category: None
+   Converting chart_data['data'] to DataFrame...
+   DataFrame shape: (3872, 11)
+   DataFrame columns: ['cust_id', 'id', 'Dealer Name', 'City', 'State', 'Category', 'Product', 'Code', 'Qty', 'Value', 'Date']
+   VALUE_COL: Value
+   📈 Creating charts from 3872 records
+   📊 VALUE_COL=Value, QTY_COL=Qty
+   🎯 IOSPL Mode: False
+🔍 Fetching inactive dealers data from 01-01-2024 to 31-12-2025
+📊 Time Comparative Analysis - period_type=quarter, num_periods=2, category_filter=None, metric=both
+   📦 Fetched 2665 records from API
+📅 Added synthetic Date column to time comparative: 2025-12-31T00:00:00
+   ⚠️ No 'Category' column found in data
+   ✅ Showing all categories: 2665 records
+   📊 Comparison table: 447 products found
+   ✅ Returning content with 0 category options
+
+🔽 POPULATING FILTER OPTIONS:
+   chart_data type: <class 'dict'>
+   chart_data keys: ['data', 'VALUE_COL', 'QTY_COL', 'dashboard_mode', 'dealers', 'states', 'cities', 'categories']
+   Dealer options count: 174
+   State options count: 33
+   City options count: 144
+   Category options count: 13
+   Sample dealer options (first 3): [{'label': '3SRMEDITECH', 'value': '3SRMEDITECH'}, {'label': 'A. R SURGICALS', 'value': 'A. R SURGICALS'}, {'label': 'A.R. INTERNATIONAL', 'value': 'A.R. INTERNATIONAL'}]
+✅ Filter options populated
+
+
+📊 UPDATE_FILTERED_CHARTS CALLED:
+   chart_data type: <class 'dict'>
+   chart_data is None: False
+   chart_data keys: ['data', 'VALUE_COL', 'QTY_COL', 'dashboard_mode', 'dealers', 'states', 'cities', 'categories']
+   chart_data has 'data' key: True
+   chart_data['data'] length: 3872
+   chart_data['data'] type: <class 'list'>
+   Filters - dealer: None, state: None, category: None
+   Converting chart_data['data'] to DataFrame...
+   DataFrame shape: (3872, 11)
+   DataFrame columns: ['cust_id', 'id', 'Dealer Name', 'City', 'State', 'Category', 'Product', 'Code', 'Qty', 'Value', 'Date']
+   VALUE_COL: Value
+   📈 Creating charts from 3872 records
+   📊 VALUE_COL=Value, QTY_COL=Qty
+   🎯 IOSPL Mode: False
+   API Response success: True
+   Data rows received: 3872
+📅 Added synthetic Date column to slow-moving: 2025-12-31T00:00:00
+   DataFrame columns after mapping: ['cust_id', 'id', 'Dealer Name', 'City', 'State', 'parent_category', 'category_name', 'meta_keyword', 'Qty', 'Value']Traceback (most recent call last):
+  File "/Users/bhurvasharma/dashboard/app.py", line 4176, in update_slow_moving_items
+    VALUE_COL: 'sum',
+    ^^^^^^^^^
+NameError: name 'VALUE_COL' is not defined
+INFO:avante_api:✅ Successfully fetched 2665 Avante records
+INFO:avante_api:✅ Successfully fetched 3872 Avante records
+INFO:avante_api:✅ Successfully fetched 3872 Avante records
+INFO:avante_api:✅ Successfully fetched 3872 Avante records
+INFO:avante_api:📊 DataFrame created with 3872 rows and 10 columns
+INFO:avante_api:✅ Successfully fetched 3872 Avante records
+Traceback (most recent call last):
+  File "/Users/bhurvasharma/dashboard/app.py", line 4176, in update_slow_moving_items
+    VALUE_COL: 'sum',
+    ^^^^^^^^^
+NameError: name 'VALUE_COL' is not defined
+INFO:avante_api:✅ Successfully fetched 3872 Avante records
+INFO:avante_api:✅ Successfully fetched 5282 Avante records
+INFO:avante_api:✅ Successfully fetched 5282 Avante records
+Error in slow-moving items: name 'VALUE_COL' is not defined
+
+   Unique States: 33
+   Unique Cities: 147
+   Creating map: metric=Revenue, level=State
+   🔍 Fuzzy matched: 'GUJARAT' -> 'Gujarat'
+   🔍 Fuzzy matched: 'MAHARASHTRA' -> 'Maharashtra'
+   🔍 Fuzzy matched: 'KARNATAKA' -> 'Karnataka'
+   🔍 Fuzzy matched: 'TAMIL NADU' -> 'Tamil Nadu'
+   🔍 Fuzzy matched: 'ANDHRA PRADESH' -> 'Andhra Pradesh'
+   🔍 Fuzzy matched: 'WEST BENGAL' -> 'West Bengal'
+   🔍 Fuzzy matched: 'ODISHA' -> 'Odisha'
+   🔍 Fuzzy matched: 'MADHYA PRADESH' -> 'Madhya Pradesh'
+   🔍 Fuzzy matched: 'ASSAM' -> 'Assam'
+   🔍 Fuzzy matched: 'UTTAR PRADESH' -> 'Uttar Pradesh'
+   🔍 Fuzzy matched: 'UTTARAKHAND' -> 'Uttarakhand'
+   🔍 Fuzzy matched: 'CHHATTISGARH' -> 'Chhattisgarh'
+   🔍 Fuzzy matched: 'TELANGANA' -> 'Telangana'
+   🔍 Fuzzy matched: 'CHATTISGARH' -> 'Chattisgarh'
+   🔍 Fuzzy matched: 'RAJASTHAN' -> 'Rajasthan'
+   🔍 Fuzzy matched: 'HARYANA' -> 'Haryana'
+   🔍 Fuzzy matched: 'JHARKHAND' -> 'Jharkhand'
+   🔍 Fuzzy matched: 'BIHAR' -> 'Bihar'
+   🔍 Fuzzy matched: 'maharastra' -> 'AS'
+   🔍 Fuzzy matched: 'KERALA' -> 'Kerala'
+   🔍 Fuzzy matched: 'CHANDIGARH' -> 'GA'
+   🔍 Fuzzy matched: 'ANDRA PRADESH ' -> 'AN'
+   🔍 Fuzzy matched: 'PONDICHERRY' -> 'Pondicherry'
+   🔍 Fuzzy matched: 'GOA' -> 'Goa'
+   🔍 Fuzzy matched: 'HIMACHAL PRADESH' -> 'Himachal Pradesh'
+   🔍 Fuzzy matched: 'DELHI' -> 'Delhi'
+   🔍 Fuzzy matched: 'PUNJAB' -> 'Punjab'
+   🔍 Fuzzy matched: 'TRIPURA' -> 'Tripura'
+   ✅ Created 33 markers out of 33 total locations (showing 100.0%)
+   ✅ Map created successfully
+   Map type: <class 'dash_leaflet.MapContainer.MapContainer'>
+   Map has 3 children
+   📦 Fetched 2665 records from API
+📅 Added synthetic Date column to time comparative: 2025-12-31T00:00:00
+   ⚠️ No 'Category' column found in data
+   ✅ Showing all categories: 2665 records
+   📊 Comparison table: 447 products found
+   ✅ Returning content with 0 category options
+
+🔽 POPULATING FILTER OPTIONS:
+   chart_data type: <class 'dict'>
+   chart_data keys: ['data', 'VALUE_COL', 'QTY_COL', 'dashboard_mode', 'dealers', 'states', 'cities', 'categories']
+   Dealer options count: 174
+   State options count: 33
+   City options count: 144
+   Category options count: 13
+   Sample dealer options (first 3): [{'label': '3SRMEDITECH', 'value': '3SRMEDITECH'}, {'label': 'A. R SURGICALS', 'value': 'A. R SURGICALS'}, {'label': 'A.R. INTERNATIONAL', 'value': 'A.R. INTERNATIONAL'}]
+✅ Filter options populated
+
+
+📊 UPDATE_FILTERED_CHARTS CALLED:
+   chart_data type: <class 'dict'>
+   chart_data is None: False
+   chart_data keys: ['data', 'VALUE_COL', 'QTY_COL', 'dashboard_mode', 'dealers', 'states', 'cities', 'categories']
+   chart_data has 'data' key: True
+   chart_data['data'] length: 3872
+   chart_data['data'] type: <class 'list'>
+   Filters - dealer: None, state: None, category: None
+   Converting chart_data['data'] to DataFrame...
+   DataFrame shape: (3872, 11)
+   DataFrame columns: ['cust_id', 'id', 'Dealer Name', 'City', 'State', 'Category', 'Product', 'Code', 'Qty', 'Value', 'Date']
+   VALUE_COL: Value
+   📈 Creating charts from 3872 records
+   📊 VALUE_COL=Value, QTY_COL=Qty
+   🎯 IOSPL Mode: False
+   API Response success: True
+   Data rows received: 3872
+   DataFrame columns after mapping: ['cust_id', 'id', 'Dealer Name', 'City', 'State', 'parent_category', 'category_name', 'meta_keyword', 'Qty', 'Value']
+   Unique States: 33
+   Unique Cities: 147
+   Creating map: metric=Revenue, level=State
+   🔍 Fuzzy matched: 'GUJARAT' -> 'Gujarat'
+   🔍 Fuzzy matched: 'MAHARASHTRA' -> 'Maharashtra'
+   🔍 Fuzzy matched: 'KARNATAKA' -> 'Karnataka'
+   🔍 Fuzzy matched: 'TAMIL NADU' -> 'Tamil Nadu'
+   🔍 Fuzzy matched: 'ANDHRA PRADESH' -> 'Andhra Pradesh'
+   🔍 Fuzzy matched: 'WEST BENGAL' -> 'West Bengal'
+   🔍 Fuzzy matched: 'ODISHA' -> 'Odisha'
+   🔍 Fuzzy matched: 'MADHYA PRADESH' -> 'Madhya Pradesh'
+   🔍 Fuzzy matched: 'ASSAM' -> 'Assam'
+   🔍 Fuzzy matched: 'UTTAR PRADESH' -> 'Uttar Pradesh'
+   🔍 Fuzzy matched: 'UTTARAKHAND' -> 'Uttarakhand'
+   🔍 Fuzzy matched: 'CHHATTISGARH' -> 'Chhattisgarh'
+   🔍 Fuzzy matched: 'TELANGANA' -> 'Telangana'
+   🔍 Fuzzy matched: 'CHATTISGARH' -> 'Chattisgarh'
+   🔍 Fuzzy matched: 'RAJASTHAN' -> 'Rajasthan'
+   🔍 Fuzzy matched: 'HARYANA' -> 'Haryana'
+   🔍 Fuzzy matched: 'JHARKHAND' -> 'Jharkhand'
+   🔍 Fuzzy matched: 'BIHAR' -> 'Bihar'
+   🔍 Fuzzy matched: 'maharastra' -> 'AS'
+   🔍 Fuzzy matched: 'KERALA' -> 'Kerala'
+   🔍 Fuzzy matched: 'CHANDIGARH' -> 'GA'
+   🔍 Fuzzy matched: 'ANDRA PRADESH ' -> 'AN'
+   🔍 Fuzzy matched: 'PONDICHERRY' -> 'Pondicherry'
+   🔍 Fuzzy matched: 'GOA' -> 'Goa'
+   🔍 Fuzzy matched: 'HIMACHAL PRADESH' -> 'Himachal Pradesh'
+   🔍 Fuzzy matched: 'DELHI' -> 'Delhi'
+   🔍 Fuzzy matched: 'PUNJAB' -> 'Punjab'
+   🔍 Fuzzy matched: 'TRIPURA' -> 'Tripura'
+   ✅ Created 33 markers out of 33 total locations (showing 100.0%)
+   ✅ Map created successfully
+   Map type: <class 'dash_leaflet.MapContainer.MapContainer'>
+   Map has 3 children
+📅 Added synthetic Date column to slow-moving: 2025-12-31T00:00:00
+Error in slow-moving items: name 'VALUE_COL' is not defined
+✅ Fetched 5282 records for inactive dealer analysis
+📅 Added synthetic Date column: 2025-12-31T00:00:00
+✅ Processed 5282 valid records with dates and dealer names
+📅 Analyzing inactivity: Orders before 01-12-2025 are considered inactive
+📊 Found 227 total dealers in the data
+⚠️ Found 0 inactive dealers (>30 days without orders)
+✅ Fetched 5282 records for inactive dealer analysis
+📅 Added synthetic Date column: 2025-12-31T00:00:00
+✅ Processed 5282 valid records with dates and dealer names
+📅 Analyzing inactivity: Orders before 01-12-2025 are considered inactive
+📊 Found 227 total dealers in the data
+⚠️ Found 0 inactive dealers (>30 days without orders)
+/opt/homebrew/Cellar/python@3.13/3.13.11/Frameworks/Python.framework/Versions/3.13/lib/python3.13/multiprocessing/resource_tracker.py:400: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-2ft34nau'}
+  warnings.warn(
+/opt/homebrew/Cellar/python@3.13/3.13.11/Frameworks/Python.framework/Versions/3.13/lib/python3.13/multiprocessing/resource_tracker.py:400: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/mp-fta8st5_'}
+  warnings.warn(

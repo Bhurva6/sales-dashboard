@@ -1,222 +1,315 @@
 """
-API Client for ERP Integration
-Handles authentication and data fetching from Avante Medicals ERP API
+API Client for Avante Medicals and IOSPL endpoints
+Handles authentication and data fetching from external APIs
 """
-
 import requests
+from typing import Dict, List, Any, Optional
+from datetime import datetime
 import logging
-import json
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
 
-# Configure logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s - [%(levelname)s] - %(name)s - %(message)s',
-    handlers=[
-        logging.FileHandler('api_client.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger('api_client')
+logger = logging.getLogger(__name__)
 
-class APIClient:
-    """API Client for ERP integration"""
+class AvanteAPIClient:
+    """Client for Avante Medicals API"""
     
-    BASE_URL = "https://avantemedicals.com/API/api.php"
+    BASE_URL = "http://avantemedicals.com/API/api.php"
     
-    def __init__(self, username: str = None, password: str = None):
-        self.username = username or "u2vp8kb"  # Default fallback
-        self.password = password or "asdftuy#$%78@!"
-        self.token = None
-        self.refresh_token = None
-        self.token_expiry = None
-        self.session = requests.Session()
-        self.session.headers.update({
-            'Content-Type': 'application/json'
-        })
-        # Disable SSL verification for development (not recommended for production)
-        self.session.verify = False
-        # Suppress SSL warnings
-        requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
-        
-    def login(self) -> bool:
-        """Authenticate with ERP API and get access token"""
-        logger.info("=" * 80)
-        logger.info("LOGIN REQUEST INITIATED")
-        logger.info("=" * 80)
-        
-        try:
-            url = f"{self.BASE_URL}?action=login"
-            logger.info(f"URL: {url}")
-            
-            payload = {
-                "username": self.username,
-                "password": self.password
-            }
-            logger.debug(f"Username: {self.username}")
-            logger.debug(f"Request Payload: {json.dumps(payload, indent=2)}")
-            
-            response = self.session.post(url, json=payload)
-            logger.info(f"Response Status Code: {response.status_code}")
-            logger.debug(f"Response Headers: {dict(response.headers)}")
-            
-            response_text = response.text
-            logger.debug(f"Raw Response Text: {response_text}")
-            
-            response_json = response.json()
-            logger.info(f"Response JSON: {json.dumps(response_json, indent=2)}")
-            
-            # Check if login was successful
-            success = response_json.get('status') == 'success'
-            logger.debug(f"Login Success Check: {success}")
-            
-            if success:
-                self.token = response_json.get('token')
-                self.refresh_token = response_json.get('refresh_token')
-                
-                # Set token expiry (typically 1 hour from now, but we'll use 3 hours for safety)
-                self.token_expiry = datetime.now() + timedelta(hours=3)
-                
-                logger.debug(f"Token Extracted: {self.token[:30]}..." if self.token else "Token: None")
-                logger.debug(f"Refresh Token Extracted: {self.refresh_token[:30]}..." if self.refresh_token else "Refresh Token: None")
-                logger.info(f"✅ LOGIN SUCCESSFUL - Token expires at: {self.token_expiry}")
-            else:
-                logger.error(f"❌ LOGIN FAILED: {response_json.get('message', 'Unknown error')}")
-            
-            logger.info("=" * 80)
-            return success
-            
-        except Exception as e:
-            logger.error(f"❌ LOGIN ERROR: {str(e)}")
-            logger.info("=" * 80)
-            return False
+    CREDENTIALS = {
+        "username": "u2vp8kb",
+        "password": "asdftuy#$%78@!"
+    }
     
-    def _ensure_token(self) -> bool:
-        """Ensure we have a valid token, login if needed"""
-        if not self.token or (self.token_expiry and datetime.now() >= self.token_expiry):
-            return self.login()
-        return True
+    # Default date range
+    DEFAULT_START_DATE = "01-01-2025"
+    DEFAULT_END_DATE = "31-12-2025"
     
-    def get_sales_report(self, start_date: str, end_date: str, period: str = "custom") -> Dict[str, Any]:
+    @classmethod
+    def get_avante_sales(cls, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
         """
-        Fetch sales report data from the API
+        Fetch Avante sales report
         
         Args:
-            start_date: Start date in DD-MM-YYYY format
-            end_date: End date in DD-MM-YYYY format
-            period: Period type (custom, month, year, etc.)
-        
+            start_date: Start date in format 'DD-MM-YYYY'
+            end_date: End date in format 'DD-MM-YYYY'
+            
         Returns:
-            Dict with 'success' boolean and 'data' containing report data
+            Dict with sales data
         """
-        logger.info("=" * 80)
-        logger.info("GET SALES REPORT REQUEST INITIATED")
-        logger.info("=" * 80)
+        start_date = start_date or cls.DEFAULT_START_DATE
+        end_date = end_date or cls.DEFAULT_END_DATE
         
         try:
-            # Ensure we have a valid token
-            if not self._ensure_token():
-                logger.error("Failed to obtain authentication token")
-                return {"success": False, "message": "Authentication failed", "data": {}}
-            
-            logger.info(f"Period-based date range: {period}")
-            logger.info(f"Date Range - Start: {start_date}, End: {end_date}")
-            
-            # Validate date format
-            try:
-                datetime.strptime(start_date, "%d-%m-%Y")
-                datetime.strptime(end_date, "%d-%m-%Y")
-                logger.debug("✅ Date format validation passed")
-            except ValueError as e:
-                logger.error(f"❌ Invalid date format: {str(e)}")
-                return {"success": False, "message": "Invalid date format", "data": {}}
-            
-            url = f"{self.BASE_URL}?action=get_sales_report"
-            logger.info(f"API URL: {url}")
-            
+            # Action goes in URL, data in POST body
+            url = f"{cls.BASE_URL}?action=get_sales_report"
             payload = {
-                "action": "get_sales_report",
                 "startdate": start_date,
-                "enddate": end_date
+                "enddate": end_date,
+                **cls.CREDENTIALS
             }
-            logger.debug(f"Request Payload: {json.dumps(payload, indent=2)}")
-            logger.debug(f"Request Headers: {json.dumps(dict(self.session.headers), indent=2)}")
             
-            response = self.session.post(url, json=payload)
-            logger.info(f"Response Status Code: {response.status_code}")
-            logger.debug(f"Response Headers: {dict(response.headers)}")
+            response = requests.post(url, json=payload, timeout=60)
+            response.raise_for_status()
             
-            response_json = response.json()
+            data = response.json()
+            logger.info(f"✅ Avante sales data fetched successfully for {start_date} to {end_date}")
+            return data
             
-            # Check response status
-            if response_json.get('status') == 'success':
-                logger.info("Response Status: success")
-                logger.debug(f"Response Keys: {list(response_json.keys())}")
-                
-                report_data = response_json.get('report_data', [])
-                logger.info(f"✅ Records returned: {len(report_data)}")
-                
-                if report_data:
-                    logger.debug(f"Sample record (first): {json.dumps(report_data[0], indent=2)}")
-                
-                logger.info("=" * 80)
-                
-                return {
-                    "success": True,
-                    "message": "Data fetched successfully",
-                    "data": {
-                        "report_data": report_data,
-                        "total_records": len(report_data),
-                        "period": period,
-                        "date_range": {
-                            "start": start_date,
-                            "end": end_date
-                        }
-                    }
-                }
-            else:
-                error_msg = response_json.get('message', 'Unknown error')
-                logger.error(f"❌ API Error: {error_msg}")
-                logger.info("=" * 80)
-                
-                return {
-                    "success": False,
-                    "message": error_msg,
-                    "data": {}
-                }
-                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Error fetching Avante sales: {str(e)}")
+            return {"status": "error", "message": str(e), "report_data": []}
         except Exception as e:
-            logger.error(f"❌ ERROR: {str(e)}")
-            logger.info("=" * 80)
+            logger.error(f"❌ Unexpected error in Avante sales: {str(e)}")
+            return {"status": "error", "message": str(e), "report_data": []}
+    
+    @classmethod
+    def get_iospl_sales(cls, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Fetch IOSPL sales report
+        
+        Args:
+            start_date: Start date in format 'DD-MM-YYYY'
+            end_date: End date in format 'DD-MM-YYYY'
+            
+        Returns:
+            Dict with sales data
+        """
+        start_date = start_date or cls.DEFAULT_START_DATE
+        end_date = end_date or cls.DEFAULT_END_DATE
+        
+        try:
+            # Action goes in URL, data in POST body
+            url = f"{cls.BASE_URL}?action=get_iospl_sales_report"
+            payload = {
+                "startdate": start_date,
+                "enddate": end_date,
+                **cls.CREDENTIALS
+            }
+            
+            response = requests.post(url, json=payload, timeout=60)
+            response.raise_for_status()
+            
+            data = response.json()
+            logger.info(f"✅ IOSPL sales data fetched successfully for {start_date} to {end_date}")
+            return data
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ Error fetching IOSPL sales: {str(e)}")
+            return {"status": "error", "message": str(e), "report_data": []}
+        except Exception as e:
+            logger.error(f"❌ Unexpected error in IOSPL sales: {str(e)}")
+            return {"status": "error", "message": str(e), "report_data": []}
+    
+    @classmethod
+    def parse_sales_data(cls, raw_data: List[Dict]) -> Dict[str, Any]:
+        """
+        Parse raw sales data and calculate statistics
+        
+        Args:
+            raw_data: Raw sales data from API (report_data field)
+            
+        Returns:
+            Dict with parsed statistics
+        """
+        try:
+            if not raw_data:
+                return {
+                    "total_revenue": 0,
+                    "total_quantity": 0,
+                    "total_dealers": 0,
+                    "total_products": 0,
+                    "data": []
+                }
+            
+            total_revenue = 0
+            total_quantity = 0
+            dealers = set()
+            products = set()
+            
+            for item in raw_data:
+                try:
+                    # Parse SV (Sales Value) and SQ (Sales Quantity)
+                    revenue = float(item.get('SV', 0) or 0)
+                    quantity = float(item.get('SQ', 0) or 0)
+                    
+                    total_revenue += revenue
+                    total_quantity += quantity
+                    
+                    # Track unique dealers and products
+                    if item.get('comp_nm'):
+                        dealers.add(item.get('comp_nm').strip())
+                    if item.get('category_name'):
+                        products.add(item.get('category_name').strip())
+                except (ValueError, TypeError):
+                    continue
             
             return {
-                "success": False,
-                "message": str(e),
-                "data": {}
+                "total_revenue": round(total_revenue, 2),
+                "total_quantity": int(total_quantity),
+                "total_dealers": len(dealers),
+                "total_products": len(products),
+                "data": raw_data
+            }
+        except Exception as e:
+            logger.error(f"Error parsing sales data: {str(e)}")
+            return {
+                "total_revenue": 0,
+                "total_quantity": 0,
+                "total_dealers": 0,
+                "total_products": 0,
+                "data": raw_data
             }
     
-    def logout(self) -> bool:
-        """Logout from the API"""
-        logger.info("=" * 80)
-        logger.info("LOGOUT REQUEST INITIATED")
-        logger.info("=" * 80)
+    @classmethod
+    def get_dealer_performance(cls, sales_data: List[Dict]) -> List[Dict]:
+        """
+        Extract dealer-wise performance from sales data
         
-        try:
-            url = f"{self.BASE_URL}?action=logout"
+        Args:
+            sales_data: List of sales records from report_data
             
-            response = self.session.post(url, json={})
-            logger.info(f"Response Status Code: {response.status_code}")
+        Returns:
+            List of dealer performance data
+        """
+        dealer_stats = {}
+        
+        for item in sales_data:
+            dealer = (item.get('comp_nm') or 'Unknown').strip()
+            if dealer not in dealer_stats:
+                dealer_stats[dealer] = {
+                    "dealer_name": dealer,
+                    "total_sales": 0,
+                    "total_quantity": 0,
+                    "transaction_count": 0
+                }
             
-            self.token = None
-            self.refresh_token = None
-            self.token_expiry = None
+            try:
+                sales = float(item.get('SV', 0) or 0)
+                qty = float(item.get('SQ', 0) or 0)
+                dealer_stats[dealer]["total_sales"] += sales
+                dealer_stats[dealer]["total_quantity"] += qty
+                dealer_stats[dealer]["transaction_count"] += 1
+            except (ValueError, TypeError):
+                continue
+        
+        return sorted(
+            list(dealer_stats.values()),
+            key=lambda x: x['total_sales'],
+            reverse=True
+        )
+    
+    @classmethod
+    def get_state_performance(cls, sales_data: List[Dict]) -> List[Dict]:
+        """
+        Extract state-wise performance from sales data
+        
+        Args:
+            sales_data: List of sales records from report_data
             
-            logger.info("✅ LOGOUT SUCCESSFUL")
-            logger.info("=" * 80)
-            return True
+        Returns:
+            List of state performance data
+        """
+        state_stats = {}
+        
+        for item in sales_data:
+            state = (item.get('state') or 'Unknown').strip()
+            if state not in state_stats:
+                state_stats[state] = {
+                    "state": state,
+                    "total_sales": 0,
+                    "total_quantity": 0,
+                    "transaction_count": 0
+                }
             
-        except Exception as e:
-            logger.error(f"❌ LOGOUT ERROR: {str(e)}")
-            logger.info("=" * 80)
-            return False
+            try:
+                sales = float(item.get('SV', 0) or 0)
+                qty = float(item.get('SQ', 0) or 0)
+                state_stats[state]["total_sales"] += sales
+                state_stats[state]["total_quantity"] += qty
+                state_stats[state]["transaction_count"] += 1
+            except (ValueError, TypeError):
+                continue
+        
+        return sorted(
+            list(state_stats.values()),
+            key=lambda x: x['total_sales'],
+            reverse=True
+        )
+    
+    @classmethod
+    def get_category_performance(cls, sales_data: List[Dict]) -> List[Dict]:
+        """
+        Extract category/product-wise performance from sales data
+        
+        Args:
+            sales_data: List of sales records from report_data
+            
+        Returns:
+            List of category performance data
+        """
+        category_stats = {}
+        
+        for item in sales_data:
+            # Use category_name as product identifier
+            product = (item.get('category_name') or 'Unknown').strip()
+            if product not in category_stats:
+                category_stats[product] = {
+                    "product_name": product,
+                    "parent_category": (item.get('parent_category') or '').strip(),
+                    "total_sales": 0,
+                    "total_quantity": 0,
+                    "transaction_count": 0
+                }
+            
+            try:
+                sales = float(item.get('SV', 0) or 0)
+                qty = float(item.get('SQ', 0) or 0)
+                category_stats[product]["total_sales"] += sales
+                category_stats[product]["total_quantity"] += qty
+                category_stats[product]["transaction_count"] += 1
+            except (ValueError, TypeError):
+                continue
+        
+        return sorted(
+            list(category_stats.values()),
+            key=lambda x: x['total_sales'],
+            reverse=True
+        )
+    
+    @classmethod
+    def get_city_performance(cls, sales_data: List[Dict]) -> List[Dict]:
+        """
+        Extract city-wise performance from sales data
+        
+        Args:
+            sales_data: List of sales records from report_data
+            
+        Returns:
+            List of city performance data
+        """
+        city_stats = {}
+        
+        for item in sales_data:
+            city = (item.get('city') or 'Unknown').strip()
+            if city not in city_stats:
+                city_stats[city] = {
+                    "city": city,
+                    "state": (item.get('state') or '').strip(),
+                    "total_sales": 0,
+                    "total_quantity": 0,
+                    "transaction_count": 0
+                }
+            
+            try:
+                sales = float(item.get('SV', 0) or 0)
+                qty = float(item.get('SQ', 0) or 0)
+                city_stats[city]["total_sales"] += sales
+                city_stats[city]["total_quantity"] += qty
+                city_stats[city]["transaction_count"] += 1
+            except (ValueError, TypeError):
+                continue
+        
+        return sorted(
+            list(city_stats.values()),
+            key=lambda x: x['total_sales'],
+            reverse=True
+        )

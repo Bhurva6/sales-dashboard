@@ -1,0 +1,628 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useDashboardStore } from '@/lib/store';
+import Layout from '@/components/Layout';
+import { 
+  RevenueLineChart, 
+  RevenueBarChart, 
+  RevenuePieChart, 
+  HorizontalBarChart,
+  DonutChart,
+  AreaChartComponent,
+  ComposedChartComponent 
+} from '@/components/Charts';
+import { ChartModal, ClickableChartWrapper, ChartConfig } from '@/components/ChartModal';
+
+// API base URL - empty for same-origin requests in production, localhost for dev
+const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+  ? 'http://localhost:5000' 
+  : '';
+
+// Helper function to format dates for API (DD-MM-YYYY)
+const formatDateForAPI = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
+// Helper to format Indian currency
+const formatIndianCurrency = (num: number): string => {
+  if (num >= 10000000) {
+    return `₹${(num / 10000000).toFixed(2)} Cr`;
+  } else if (num >= 100000) {
+    return `₹${(num / 100000).toFixed(2)} L`;
+  } else if (num >= 1000) {
+    return `₹${(num / 1000).toFixed(2)} K`;
+  }
+  return `₹${num.toFixed(2)}`;
+};
+
+// Helper to format numbers with commas (Indian format)
+const formatNumber = (num: number): string => {
+  return num.toLocaleString('en-IN');
+};
+
+// Helper to format full currency
+const formatFullCurrency = (num: number): string => {
+  return `₹${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+interface Stats {
+  total_revenue: number;
+  total_quantity: number;
+  total_dealers: number;
+  total_products: number;
+}
+
+interface DealerData {
+  name: string;
+  revenue: number;
+  quantity?: number;
+}
+
+interface StateData {
+  name: string;
+  value: number;
+  quantity?: number;
+}
+
+interface CategoryData {
+  name: string;
+  value: number;
+}
+
+interface CityData {
+  name: string;
+  value: number;
+  state?: string;
+}
+
+// Stat Card Component
+const StatCard: React.FC<{
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: React.ReactNode;
+  color: string;
+  loading?: boolean;
+  trend?: string;
+  trendPositive?: boolean;
+}> = ({ title, value, subtitle, icon, color, loading, trend, trendPositive }) => (
+  <div className={`bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow`}>
+    <div className="flex items-center justify-between">
+      <div className="flex-1">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{title}</p>
+        <h3 className={`text-xl font-bold mt-1 ${color}`}>
+          {loading ? (
+            <span className="animate-pulse bg-gray-200 rounded h-6 w-24 inline-block"></span>
+          ) : (
+            value
+          )}
+        </h3>
+        {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+        {trend && (
+          <p className={`text-xs mt-1 font-medium ${trendPositive ? 'text-green-600' : 'text-red-600'}`}>
+            {trendPositive ? '↑' : '↓'} {trend}
+          </p>
+        )}
+      </div>
+      <div className={`p-2.5 rounded-lg ${color.replace('text-', 'bg-').replace('-600', '-100')}`}>
+        {icon}
+      </div>
+    </div>
+  </div>
+);
+
+// Mini Metric Card
+const MiniMetricCard: React.FC<{
+  title: string;
+  value: string | number;
+  change?: string;
+  positive?: boolean;
+}> = ({ title, value, change, positive }) => (
+  <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{title}</p>
+    <p className="text-lg font-bold text-gray-900 mt-1">{value}</p>
+    {change && (
+      <p className={`text-xs mt-1 ${positive ? 'text-green-600' : 'text-red-600'}`}>
+        {positive ? '↑' : '↓'} {change}
+      </p>
+    )}
+  </div>
+);
+
+export default function DashboardPage() {
+  const { dashboardMode, startDate, endDate, hideInnovative, hideAvante } = useDashboardStore();
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState<Stats>({ total_revenue: 0, total_quantity: 0, total_dealers: 0, total_products: 0 });
+  const [dealerData, setDealerData] = useState<DealerData[]>([]);
+  const [stateData, setStateData] = useState<StateData[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [cityData, setCityData] = useState<CityData[]>([]);
+  const [parentCategoryData, setParentCategoryData] = useState<CategoryData[]>([]);
+  const [combinedDealerData, setCombinedDealerData] = useState<any[]>([]);
+  
+  // Raw API data (unfiltered) for filtering purposes
+  const [rawDealerData, setRawDealerData] = useState<any[]>([]);
+  const [rawStateData, setRawStateData] = useState<any[]>([]);
+  const [rawCategoryData, setRawCategoryData] = useState<any[]>([]);
+  const [rawCityData, setRawCityData] = useState<any[]>([]);
+  const [rawStats, setRawStats] = useState<Stats>({ total_revenue: 0, total_quantity: 0, total_dealers: 0, total_products: 0 });
+  
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState<ChartConfig | null>(null);
+
+  // Function to open chart in fullscreen modal
+  const openChartModal = (config: ChartConfig) => {
+    setModalConfig(config);
+    setModalOpen(true);
+  };
+
+  // Helper function to check if a dealer name contains "Innovative"
+  const isInnovativeDealer = (dealerName: string): boolean => {
+    return dealerName?.toLowerCase().includes('innovative');
+  };
+
+  // Apply filtering based on hideInnovative
+  useEffect(() => {
+    if (dashboardMode !== 'avante') {
+      // For IOSPL, no filtering needed - use raw data directly
+      setDealerData(rawDealerData.slice(0, 10).map((d: any) => ({
+        name: d.dealer_name?.substring(0, 20) || 'Unknown',
+        revenue: d.total_sales || 0,
+        quantity: d.total_quantity || 0
+      })));
+      setCombinedDealerData(rawDealerData.slice(0, 10).map((d: any) => ({
+        name: d.dealer_name?.substring(0, 20) || 'Unknown',
+        revenue: d.total_sales || 0,
+        quantity: d.total_quantity || 0
+      })));
+      setStateData(rawStateData.slice(0, 15).map((s: any) => ({
+        name: s.state || 'Unknown',
+        value: s.total_sales || 0,
+        quantity: s.total_quantity || 0
+      })));
+      setCategoryData(rawCategoryData.slice(0, 10).map((c: any) => ({
+        name: c.product_name?.substring(0, 25) || 'Unknown',
+        value: c.total_sales || 0
+      })));
+      setCityData(rawCityData.slice(0, 15).map((c: any) => ({
+        name: c.city || 'Unknown',
+        value: c.total_sales || 0,
+        state: c.state || ''
+      })));
+      setStats(rawStats);
+      
+      // Parent categories
+      const parentMap: Record<string, number> = {};
+      rawCategoryData.forEach((c: any) => {
+        const key = c.parent_category || 'Other';
+        parentMap[key] = (parentMap[key] || 0) + (c.total_sales || 0);
+      });
+      const parentCategories = Object.entries(parentMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
+      setParentCategoryData(parentCategories);
+      return;
+    }
+
+    // For Avante dashboard, apply hideInnovative filter
+    let filteredDealers = rawDealerData;
+    let filteredStates = rawStateData;
+    let filteredCategories = rawCategoryData;
+    let filteredCities = rawCityData;
+
+    if (hideInnovative) {
+      // Filter out Innovative dealers
+      filteredDealers = rawDealerData.filter((d: any) => !isInnovativeDealer(d.dealer_name || ''));
+      
+      // For states, cities, categories - we need to recalculate based on filtered dealers
+      // Since API gives aggregated data, we'll filter what we can
+      // Note: For more accurate filtering, the backend should support this filter
+    }
+
+    // Process dealer data
+    const processedDealers = filteredDealers.slice(0, 10).map((d: any) => ({
+      name: d.dealer_name?.substring(0, 20) || 'Unknown',
+      revenue: d.total_sales || 0,
+      quantity: d.total_quantity || 0
+    }));
+    setDealerData(processedDealers);
+    setCombinedDealerData(processedDealers);
+
+    // Calculate filtered stats
+    if (hideInnovative && filteredDealers.length > 0) {
+      const filteredRevenue = filteredDealers.reduce((sum: number, d: any) => sum + (d.total_sales || 0), 0);
+      const filteredQuantity = filteredDealers.reduce((sum: number, d: any) => sum + (d.total_quantity || 0), 0);
+      const uniqueProducts = new Set(rawCategoryData.map((c: any) => c.product_name)).size;
+      
+      setStats({
+        total_revenue: filteredRevenue,
+        total_quantity: filteredQuantity,
+        total_dealers: filteredDealers.length,
+        total_products: uniqueProducts
+      });
+    } else {
+      setStats(rawStats);
+    }
+
+    // Process other data (state, category, city - keep as is since they're aggregated)
+    setStateData(filteredStates.slice(0, 15).map((s: any) => ({
+      name: s.state || 'Unknown',
+      value: s.total_sales || 0,
+      quantity: s.total_quantity || 0
+    })));
+
+    setCategoryData(filteredCategories.slice(0, 10).map((c: any) => ({
+      name: c.product_name?.substring(0, 25) || 'Unknown',
+      value: c.total_sales || 0
+    })));
+
+    setCityData(filteredCities.slice(0, 15).map((c: any) => ({
+      name: c.city || 'Unknown',
+      value: c.total_sales || 0,
+      state: c.state || ''
+    })));
+
+    // Parent categories
+    const parentMap: Record<string, number> = {};
+    filteredCategories.forEach((c: any) => {
+      const key = c.parent_category || 'Other';
+      parentMap[key] = (parentMap[key] || 0) + (c.total_sales || 0);
+    });
+    const parentCategories = Object.entries(parentMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+    setParentCategoryData(parentCategories);
+
+  }, [hideInnovative, rawDealerData, rawStateData, rawCategoryData, rawCityData, rawStats, dashboardMode]);
+
+  useEffect(() => {
+    // Load dashboard data from real API
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const apiEndpoint = dashboardMode === 'avante' ? 'avante' : 'iospl';
+        const formattedStartDate = formatDateForAPI(startDate);
+        const formattedEndDate = formatDateForAPI(endDate);
+        
+        // Fetch stats
+        const statsResponse = await fetch(
+          `${API_BASE}/api/${apiEndpoint}/stats?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+        );
+        const statsData = await statsResponse.json();
+        setRawStats(statsData);
+
+        // Fetch dealer performance
+        const dealerResponse = await fetch(
+          `${API_BASE}/api/${apiEndpoint}/dealer-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+        );
+        const dealerPerf = await dealerResponse.json();
+        setRawDealerData(dealerPerf);
+
+        // Fetch state performance
+        const stateResponse = await fetch(
+          `${API_BASE}/api/${apiEndpoint}/state-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+        );
+        const statePerf = await stateResponse.json();
+        setRawStateData(statePerf);
+
+        // Fetch category performance
+        const categoryResponse = await fetch(
+          `${API_BASE}/api/${apiEndpoint}/category-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+        );
+        const categoryPerf = await categoryResponse.json();
+        setRawCategoryData(categoryPerf);
+
+        // Fetch city performance
+        const cityResponse = await fetch(
+          `${API_BASE}/api/${apiEndpoint}/city-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+        );
+        const cityPerf = await cityResponse.json();
+        setRawCityData(cityPerf);
+        
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [startDate, endDate, dashboardMode]);
+
+  // Calculate additional metrics
+  const avgOrderValue = stats.total_quantity > 0 ? stats.total_revenue / stats.total_quantity : 0;
+  const revenuePerDealer = stats.total_dealers > 0 ? stats.total_revenue / stats.total_dealers : 0;
+  const avgQtyPerDealer = stats.total_dealers > 0 ? stats.total_quantity / stats.total_dealers : 0;
+  const avgRevenuePerProduct = stats.total_products > 0 ? stats.total_revenue / stats.total_products : 0;
+  const topDealerRevenue = dealerData.length > 0 ? dealerData[0]?.revenue || 0 : 0;
+  const topStateRevenue = stateData.length > 0 ? stateData[0]?.value || 0 : 0;
+  const totalCities = cityData.length;
+  const totalStates = stateData.length;
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        {/* Dashboard Title */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {dashboardMode === 'avante' ? '🏢 Avante' : '🛍️ IOSPL'} Sales Dashboard
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              {startDate} to {endDate} | Real-time analytics from live API
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {loading && (
+              <span className="flex items-center gap-2 text-sm text-indigo-600">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                Loading...
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Key Metrics - Top Row (6 cards) */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <StatCard
+            title="Total Revenue"
+            value={loading ? '...' : formatIndianCurrency(stats.total_revenue)}
+            subtitle={loading ? '' : formatFullCurrency(stats.total_revenue)}
+            icon={<svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            color="text-green-600"
+            loading={loading}
+          />
+          <StatCard
+            title="Total Quantity"
+            value={loading ? '...' : formatNumber(stats.total_quantity)}
+            subtitle="Units sold"
+            icon={<svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
+            color="text-blue-600"
+            loading={loading}
+          />
+          <StatCard
+            title="Active Dealers"
+            value={loading ? '...' : formatNumber(stats.total_dealers)}
+            subtitle="Unique dealers"
+            icon={<svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
+            color="text-purple-600"
+            loading={loading}
+          />
+          <StatCard
+            title="Products/SKUs"
+            value={loading ? '...' : formatNumber(stats.total_products)}
+            subtitle="Unique items"
+            icon={<svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2M7 7h10" /></svg>}
+            color="text-orange-600"
+            loading={loading}
+          />
+          <StatCard
+            title="States Covered"
+            value={loading ? '...' : totalStates}
+            subtitle="Geographic reach"
+            icon={<svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            color="text-teal-600"
+            loading={loading}
+          />
+          <StatCard
+            title="Cities Covered"
+            value={loading ? '...' : totalCities}
+            subtitle="Distribution network"
+            icon={<svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
+            color="text-indigo-600"
+            loading={loading}
+          />
+        </div>
+
+        {/* Additional Metrics Row (8 mini cards) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          <MiniMetricCard
+            title="Avg. Unit Price"
+            value={formatIndianCurrency(avgOrderValue)}
+          />
+          <MiniMetricCard
+            title="Revenue/Dealer"
+            value={formatIndianCurrency(revenuePerDealer)}
+          />
+          <MiniMetricCard
+            title="Qty/Dealer"
+            value={formatNumber(Math.round(avgQtyPerDealer))}
+          />
+          <MiniMetricCard
+            title="Revenue/Product"
+            value={formatIndianCurrency(avgRevenuePerProduct)}
+          />
+          <MiniMetricCard
+            title="Top Dealer"
+            value={dealerData.length > 0 ? dealerData[0].name : '-'}
+          />
+          <MiniMetricCard
+            title="Top Dealer Rev."
+            value={formatIndianCurrency(topDealerRevenue)}
+          />
+          <MiniMetricCard
+            title="Top State"
+            value={stateData.length > 0 ? stateData[0].name : '-'}
+          />
+          <MiniMetricCard
+            title="Top Category"
+            value={parentCategoryData.length > 0 ? parentCategoryData[0].name : '-'}
+          />
+        </div>
+
+        {/* Charts Row 1 - Dealer Performance */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ClickableChartWrapper
+            onClick={() => openChartModal({
+              type: 'horizontalBar',
+              title: '🏆 Top 10 Dealers by Revenue',
+              data: dealerData,
+              xKey: 'name',
+              yKey: 'revenue'
+            })}
+          >
+            <HorizontalBarChart
+              data={dealerData}
+              title="🏆 Top 10 Dealers by Revenue"
+              xKey="name"
+              yKey="revenue"
+              loading={loading}
+            />
+          </ClickableChartWrapper>
+          <ClickableChartWrapper
+            onClick={() => openChartModal({
+              type: 'composed',
+              title: '📊 Dealer Revenue vs Quantity',
+              data: combinedDealerData,
+              xKey: 'name',
+              yKey: 'revenue',
+              barKey: 'revenue',
+              lineKey: 'quantity'
+            })}
+          >
+            <ComposedChartComponent
+              data={combinedDealerData}
+              title="📊 Dealer Revenue vs Quantity"
+              xKey="name"
+              barKey="revenue"
+              lineKey="quantity"
+              loading={loading}
+            />
+          </ClickableChartWrapper>
+        </div>
+
+        {/* Charts Row 2 - Category & State */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ClickableChartWrapper
+            onClick={() => openChartModal({
+              type: 'pie',
+              title: '📦 Revenue by Parent Category',
+              data: parentCategoryData,
+              xKey: 'name',
+              yKey: 'value',
+              dataKey: 'value',
+              nameKey: 'name'
+            })}
+          >
+            <RevenuePieChart
+              data={parentCategoryData}
+              title="📦 Revenue by Parent Category"
+              dataKey="value"
+              nameKey="name"
+              loading={loading}
+            />
+          </ClickableChartWrapper>
+          <ClickableChartWrapper
+            onClick={() => openChartModal({
+              type: 'bar',
+              title: '🗺️ Revenue by State (Top 10)',
+              data: stateData.slice(0, 10),
+              xKey: 'name',
+              yKey: 'value'
+            })}
+          >
+            <RevenueBarChart
+              data={stateData.slice(0, 10)}
+              title="🗺️ Revenue by State (Top 10)"
+              xKey="name"
+              yKey="value"
+              loading={loading}
+            />
+          </ClickableChartWrapper>
+        </div>
+
+        {/* Charts Row 3 - Products & Cities */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ClickableChartWrapper
+            onClick={() => openChartModal({
+              type: 'horizontalBar',
+              title: '🏷️ Top Products by Revenue',
+              data: categoryData,
+              xKey: 'name',
+              yKey: 'value'
+            })}
+          >
+            <HorizontalBarChart
+              data={categoryData}
+              title="🏷️ Top Products by Revenue"
+              xKey="name"
+              yKey="value"
+              loading={loading}
+            />
+          </ClickableChartWrapper>
+          <ClickableChartWrapper
+            onClick={() => openChartModal({
+              type: 'donut',
+              title: '🏙️ Revenue by City (Top 8)',
+              data: cityData.slice(0, 8),
+              xKey: 'name',
+              yKey: 'value',
+              dataKey: 'value',
+              nameKey: 'name'
+            })}
+          >
+            <DonutChart
+              data={cityData.slice(0, 8)}
+              title="🏙️ Revenue by City (Top 8)"
+              dataKey="value"
+              nameKey="name"
+              loading={loading}
+            />
+          </ClickableChartWrapper>
+        </div>
+
+        {/* Data Tables Section */}
+        <div className="grid grid-cols-1 gap-6">
+          {/* Top Dealers Table */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Top Dealers Details</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 px-3 font-medium text-gray-600">#</th>
+                    <th className="text-left py-2 px-3 font-medium text-gray-600">Dealer</th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600">Revenue</th>
+                    <th className="text-right py-2 px-3 font-medium text-gray-600">Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={4} className="text-center py-4 text-gray-500">Loading...</td></tr>
+                  ) : dealerData.length > 0 ? (
+                    dealerData.slice(0, 5).map((dealer, idx) => (
+                      <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-2 px-3 text-gray-900">{idx + 1}</td>
+                        <td className="py-2 px-3 text-gray-900 font-medium">{dealer.name}</td>
+                        <td className="py-2 px-3 text-right text-green-600 font-medium">{formatIndianCurrency(dealer.revenue)}</td>
+                        <td className="py-2 px-3 text-right text-gray-600">{formatNumber(dealer.quantity || 0)}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan={4} className="text-center py-4 text-gray-500">No data</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Fullscreen Chart Modal */}
+      <ChartModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        config={modalConfig}
+      />
+    </Layout>
+  );
+}
