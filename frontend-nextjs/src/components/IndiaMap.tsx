@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { ZoomIn, ZoomOut, Maximize2, Minimize2, Layers, MapPin, Navigation, Search, X } from 'lucide-react';
 
 // India state coordinates (approximate centers for pins)
 const INDIA_STATE_COORDS: Record<string, { lat: number; lng: number; name: string }> = {
@@ -374,11 +375,18 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
   viewMode = 'state',
   loading = false,
 }) => {
-  const [hoveredItem, setHoveredItem] = useState<{ name: string; value: number; x: number; y: number } | null>(null);
+  const [hoveredItem, setHoveredItem] = useState<{ name: string; value: number; x: number; y: number; state?: string } | null>(null);
   const [currentViewMode, setCurrentViewMode] = useState<'state' | 'city'>(viewMode);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState<any>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
   
-  const width = 500;
-  const height = 550;
+  const baseWidth = 500;
+  const baseHeight = 550;
   
   // Calculate max values for scaling
   const maxStateValue = useMemo(() => {
@@ -388,6 +396,26 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
   const maxCityValue = useMemo(() => {
     return Math.max(...cityData.map(c => c.value), 1);
   }, [cityData]);
+
+  // Get color based on value intensity
+  const getColorIntensity = (value: number, maxValue: number, isState: boolean) => {
+    const intensity = Math.min(value / maxValue, 1);
+    if (isState) {
+      // Blue shades for states
+      if (intensity > 0.8) return { fill: '#1e40af', stroke: '#1e3a8a', opacity: 0.85 };
+      if (intensity > 0.6) return { fill: '#2563eb', stroke: '#1d4ed8', opacity: 0.8 };
+      if (intensity > 0.4) return { fill: '#3b82f6', stroke: '#2563eb', opacity: 0.75 };
+      if (intensity > 0.2) return { fill: '#60a5fa', stroke: '#3b82f6', opacity: 0.7 };
+      return { fill: '#93c5fd', stroke: '#60a5fa', opacity: 0.65 };
+    } else {
+      // Red/Orange shades for cities (like Google Maps markers)
+      if (intensity > 0.8) return { fill: '#dc2626', stroke: '#b91c1c', opacity: 0.9 };
+      if (intensity > 0.6) return { fill: '#ef4444', stroke: '#dc2626', opacity: 0.85 };
+      if (intensity > 0.4) return { fill: '#f87171', stroke: '#ef4444', opacity: 0.8 };
+      if (intensity > 0.2) return { fill: '#fca5a5', stroke: '#f87171', opacity: 0.75 };
+      return { fill: '#fecaca', stroke: '#fca5a5', opacity: 0.7 };
+    }
+  };
   
   // Generate state pins
   const statePins = useMemo(() => {
@@ -397,8 +425,9 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
       
       if (!coords) return null;
       
-      const { x, y } = latLngToSvg(coords.lat, coords.lng, width, height);
-      const size = 8 + (state.value / maxStateValue) * 20;
+      const { x, y } = latLngToSvg(coords.lat, coords.lng, baseWidth, baseHeight);
+      const size = 10 + (state.value / maxStateValue) * 25;
+      const colors = getColorIntensity(state.value, maxStateValue, true);
       
       return {
         ...state,
@@ -406,6 +435,7 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
         y,
         size,
         displayName: coords.name,
+        ...colors,
       };
     }).filter(Boolean);
   }, [stateData, maxStateValue]);
@@ -418,8 +448,9 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
       
       if (!coords) return null;
       
-      const { x, y } = latLngToSvg(coords.lat, coords.lng, width, height);
-      const size = 5 + (city.value / maxCityValue) * 15;
+      const { x, y } = latLngToSvg(coords.lat, coords.lng, baseWidth, baseHeight);
+      const size = 6 + (city.value / maxCityValue) * 18;
+      const colors = getColorIntensity(city.value, maxCityValue, false);
       
       return {
         ...city,
@@ -427,56 +458,184 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
         y,
         size,
         stateName: coords.state,
+        ...colors,
       };
     }).filter(Boolean);
   }, [cityData, maxCityValue]);
+
+  // Filter pins based on search
+  const filteredStatePins = useMemo(() => {
+    if (!searchQuery) return statePins;
+    return statePins.filter((pin: any) => 
+      pin.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pin.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [statePins, searchQuery]);
+
+  const filteredCityPins = useMemo(() => {
+    if (!searchQuery) return cityPins;
+    return cityPins.filter((pin: any) => 
+      pin.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pin.stateName?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [cityPins, searchQuery]);
+
+  // Zoom controls
+  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.25, 3));
+  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.25, 0.5));
+  const handleResetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+
+  // Toggle fullscreen
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+    if (!isFullscreen) {
+      setZoom(1.2);
+    } else {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    }
+  };
+
+  // Handle pin click
+  const handlePinClick = (pin: any) => {
+    setSelectedLocation(pin);
+    // Center view on selected location
+    const offsetX = (baseWidth / 2 - pin.x) * zoom;
+    const offsetY = (baseHeight / 2 - pin.y) * zoom;
+    setPan({ x: offsetX * 0.5, y: offsetY * 0.5 });
+  };
   
   if (loading) {
     return (
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
-        <div className="flex items-center justify-center h-96">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="flex items-center justify-center h-96 bg-gradient-to-b from-blue-50 to-green-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-3 text-sm text-gray-500">Loading map...</p>
+          </div>
         </div>
       </div>
     );
   }
+
+  const containerClass = isFullscreen 
+    ? 'fixed inset-0 z-50 bg-white' 
+    : 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden';
   
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-        <div className="flex gap-2">
+    <div className={containerClass} ref={mapContainerRef}>
+      {/* Top Bar - Google Maps Style */}
+      <div className="absolute top-0 left-0 right-0 z-20 p-3 flex items-center gap-3">
+        {/* Search Box */}
+        <div className={`flex-1 max-w-md transition-all duration-200 ${showSearch ? 'opacity-100' : 'opacity-90'}`}>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              placeholder={`Search ${currentViewMode === 'state' ? 'states' : 'cities'}...`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setShowSearch(true)}
+              className="w-full pl-10 pr-10 py-2.5 bg-white border-0 rounded-lg shadow-lg text-sm focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(''); setShowSearch(false); }}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              >
+                <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+              </button>
+            )}
+          </div>
+          
+          {/* Search Results Dropdown */}
+          {showSearch && searchQuery && (
+            <div className="absolute top-full left-0 right-0 mt-1 max-w-md bg-white rounded-lg shadow-lg border border-gray-100 max-h-60 overflow-y-auto">
+              {(currentViewMode === 'state' ? filteredStatePins : filteredCityPins).slice(0, 8).map((pin: any, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    handlePinClick(pin);
+                    setShowSearch(false);
+                  }}
+                  className="w-full px-4 py-2.5 text-left hover:bg-gray-50 flex items-center gap-3 border-b border-gray-50 last:border-0"
+                >
+                  <MapPin className={`h-4 w-4 ${currentViewMode === 'state' ? 'text-blue-500' : 'text-red-500'}`} />
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{pin.displayName || pin.name}</div>
+                    <div className="text-xs text-gray-500">{formatIndianCurrency(pin.value)}</div>
+                  </div>
+                </button>
+              ))}
+              {(currentViewMode === 'state' ? filteredStatePins : filteredCityPins).length === 0 && (
+                <div className="px-4 py-3 text-sm text-gray-500 text-center">No results found</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* View Toggle - Layers Button */}
+        <div className="bg-white rounded-lg shadow-lg flex overflow-hidden">
           <button
             onClick={() => setCurrentViewMode('state')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+            className={`px-3 py-2 text-sm font-medium flex items-center gap-1.5 transition-colors ${
               currentViewMode === 'state'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-blue-500 text-white'
+                : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
+            <Layers className="h-4 w-4" />
             States
           </button>
           <button
             onClick={() => setCurrentViewMode('city')}
-            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+            className={`px-3 py-2 text-sm font-medium flex items-center gap-1.5 transition-colors ${
               currentViewMode === 'city'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-red-500 text-white'
+                : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
+            <MapPin className="h-4 w-4" />
             Cities
           </button>
         </div>
-      </div>
-      
-      <div className="relative">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-auto"
-          style={{ maxHeight: '500px' }}
+
+        {/* Fullscreen Toggle */}
+        <button
+          onClick={toggleFullscreen}
+          className="p-2.5 bg-white rounded-lg shadow-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
         >
-          {/* Background map outline of India - simplified path */}
+          {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {/* Map Container */}
+      <div 
+        className={`relative overflow-hidden bg-gradient-to-b from-sky-100 via-sky-50 to-emerald-50 ${isFullscreen ? 'h-screen' : 'h-[500px]'}`}
+        onClick={() => { setShowSearch(false); setSelectedLocation(null); }}
+      >
+        {/* Grid pattern overlay for map feel */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: `linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px)`,
+          backgroundSize: '40px 40px'
+        }} />
+
+        <svg
+          viewBox={`0 0 ${baseWidth} ${baseHeight}`}
+          className="w-full h-full"
+          style={{ 
+            transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+            transformOrigin: 'center center',
+            transition: 'transform 0.3s ease-out'
+          }}
+        >
+          {/* Map background with subtle water color */}
+          <rect x="0" y="0" width={baseWidth} height={baseHeight} fill="transparent" />
+          
+          {/* Simplified India outline - cleaner Google Maps style */}
           <path
             d="M 140 80 
                Q 180 40, 220 50
@@ -498,132 +657,240 @@ export const IndiaMap: React.FC<IndiaMapProps> = ({
                Q 70 100, 100 80
                Q 120 60, 140 80
                Z"
-            fill="#E5E7EB"
-            stroke="#9CA3AF"
+            fill="#f0fdf4"
+            stroke="#86efac"
             strokeWidth="2"
+            opacity="0.9"
           />
           
-          {/* State pins */}
-          {currentViewMode === 'state' && statePins.map((pin: any, idx) => (
-            <g key={`state-${idx}`}>
+          {/* State pins with Google Maps-like markers */}
+          {currentViewMode === 'state' && filteredStatePins.map((pin: any, idx) => (
+            <g 
+              key={`state-${idx}`} 
+              className="cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); handlePinClick(pin); }}
+              onMouseEnter={() => {
+                setHoveredItem({
+                  name: pin.displayName || pin.name,
+                  value: pin.value,
+                  x: pin.x,
+                  y: pin.y,
+                });
+              }}
+              onMouseLeave={() => setHoveredItem(null)}
+            >
+              {/* Marker shadow */}
+              <ellipse
+                cx={pin.x}
+                cy={pin.y + pin.size * 0.3}
+                rx={pin.size * 0.6}
+                ry={pin.size * 0.2}
+                fill="rgba(0,0,0,0.15)"
+              />
+              {/* Main circle marker */}
               <circle
                 cx={pin.x}
                 cy={pin.y}
                 r={pin.size}
-                fill="rgba(79, 70, 229, 0.6)"
-                stroke="#4F46E5"
-                strokeWidth="2"
-                className="cursor-pointer transition-all duration-200 hover:fill-opacity-80"
-                onMouseEnter={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setHoveredItem({
-                    name: pin.displayName || pin.name,
-                    value: pin.value,
-                    x: pin.x,
-                    y: pin.y,
-                  });
-                }}
-                onMouseLeave={() => setHoveredItem(null)}
+                fill={pin.fill}
+                stroke="white"
+                strokeWidth="3"
+                opacity={pin.opacity}
+                className="transition-all duration-200 hover:opacity-100"
+                style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}
               />
-              {pin.size > 15 && (
+              {/* Inner highlight */}
+              <circle
+                cx={pin.x - pin.size * 0.3}
+                cy={pin.y - pin.size * 0.3}
+                r={pin.size * 0.25}
+                fill="rgba(255,255,255,0.4)"
+              />
+              {/* Revenue label for larger pins */}
+              {pin.size > 18 && zoom >= 1 && (
                 <text
                   x={pin.x}
-                  y={pin.y + pin.size + 12}
+                  y={pin.y + 4}
                   textAnchor="middle"
-                  fontSize="9"
-                  fill="#374151"
-                  fontWeight="500"
+                  fontSize="8"
+                  fill="white"
+                  fontWeight="bold"
+                  style={{ textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}
                 >
-                  {pin.displayName?.substring(0, 10) || pin.name?.substring(0, 10)}
+                  {formatIndianCurrency(pin.value).replace('₹', '')}
                 </text>
               )}
             </g>
           ))}
           
-          {/* City pins */}
-          {currentViewMode === 'city' && cityPins.map((pin: any, idx) => (
-            <g key={`city-${idx}`}>
+          {/* City pins with Google Maps-like red markers */}
+          {currentViewMode === 'city' && filteredCityPins.map((pin: any, idx) => (
+            <g 
+              key={`city-${idx}`}
+              className="cursor-pointer"
+              onClick={(e) => { e.stopPropagation(); handlePinClick(pin); }}
+              onMouseEnter={() => {
+                setHoveredItem({
+                  name: pin.name,
+                  value: pin.value,
+                  x: pin.x,
+                  y: pin.y,
+                  state: pin.stateName,
+                });
+              }}
+              onMouseLeave={() => setHoveredItem(null)}
+            >
+              {/* Marker pin shape - like Google Maps */}
+              <path
+                d={`M ${pin.x} ${pin.y + pin.size * 1.5} 
+                    C ${pin.x - pin.size * 0.8} ${pin.y + pin.size * 0.5}, ${pin.x - pin.size} ${pin.y - pin.size * 0.3}, ${pin.x} ${pin.y - pin.size}
+                    C ${pin.x + pin.size} ${pin.y - pin.size * 0.3}, ${pin.x + pin.size * 0.8} ${pin.y + pin.size * 0.5}, ${pin.x} ${pin.y + pin.size * 1.5}
+                    Z`}
+                fill={pin.fill}
+                stroke="white"
+                strokeWidth="2"
+                opacity={pin.opacity}
+                className="transition-all duration-200 hover:opacity-100"
+                style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}
+              />
+              {/* Inner circle */}
               <circle
                 cx={pin.x}
                 cy={pin.y}
-                r={pin.size}
-                fill="rgba(16, 185, 129, 0.6)"
-                stroke="#10B981"
-                strokeWidth="1.5"
-                className="cursor-pointer transition-all duration-200 hover:fill-opacity-80"
-                onMouseEnter={() => {
-                  setHoveredItem({
-                    name: pin.name,
-                    value: pin.value,
-                    x: pin.x,
-                    y: pin.y,
-                  });
-                }}
-                onMouseLeave={() => setHoveredItem(null)}
+                r={pin.size * 0.4}
+                fill="white"
+                opacity="0.9"
               />
-              {pin.size > 10 && (
-                <text
-                  x={pin.x}
-                  y={pin.y + pin.size + 10}
-                  textAnchor="middle"
-                  fontSize="8"
-                  fill="#374151"
-                  fontWeight="500"
-                >
-                  {pin.name?.substring(0, 8)}
-                </text>
-              )}
             </g>
           ))}
         </svg>
-        
-        {/* Tooltip */}
-        {hoveredItem && (
+
+        {/* Hover Tooltip - Google Maps style */}
+        {hoveredItem && !selectedLocation && (
           <div
-            className="absolute bg-gray-900 text-white px-3 py-2 rounded-lg shadow-lg text-sm pointer-events-none z-10"
+            className="absolute bg-white px-3 py-2 rounded-lg shadow-xl text-sm pointer-events-none z-30 border border-gray-100"
             style={{
-              left: `${(hoveredItem.x / width) * 100}%`,
-              top: `${(hoveredItem.y / height) * 100}%`,
-              transform: 'translate(-50%, -120%)',
+              left: `${(hoveredItem.x / baseWidth) * 100}%`,
+              top: `${(hoveredItem.y / baseHeight) * 100}%`,
+              transform: `translate(-50%, calc(-100% - 20px)) scale(${1/zoom})`,
             }}
           >
-            <div className="font-semibold">{hoveredItem.name}</div>
-            <div className="text-green-400">{formatIndianCurrency(hoveredItem.value)}</div>
+            <div className="font-semibold text-gray-900">{hoveredItem.name}</div>
+            {hoveredItem.state && <div className="text-xs text-gray-500">{hoveredItem.state}</div>}
+            <div className="text-green-600 font-bold">{formatIndianCurrency(hoveredItem.value)}</div>
+            {/* Tooltip arrow */}
+            <div className="absolute left-1/2 bottom-0 transform -translate-x-1/2 translate-y-full">
+              <div className="border-8 border-transparent border-t-white" style={{ filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.1))' }} />
+            </div>
           </div>
         )}
       </div>
-      
-      {/* Legend */}
-      <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1">
-            <div className={`w-3 h-3 rounded-full ${currentViewMode === 'state' ? 'bg-indigo-500' : 'bg-emerald-500'}`}></div>
-            <span>{currentViewMode === 'state' ? 'State Revenue' : 'City Revenue'}</span>
+
+      {/* Zoom Controls - Google Maps Style (Bottom Right) */}
+      <div className="absolute bottom-24 right-4 z-20 flex flex-col gap-1">
+        <button
+          onClick={handleZoomIn}
+          className="p-2 bg-white rounded-t-lg shadow-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-b border-gray-100"
+          title="Zoom in"
+        >
+          <ZoomIn className="h-5 w-5" />
+        </button>
+        <button
+          onClick={handleZoomOut}
+          className="p-2 bg-white shadow-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-b border-gray-100"
+          title="Zoom out"
+        >
+          <ZoomOut className="h-5 w-5" />
+        </button>
+        <button
+          onClick={handleResetView}
+          className="p-2 bg-white rounded-b-lg shadow-lg text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+          title="Reset view"
+        >
+          <Navigation className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* Selected Location Card - Google Maps Style (Bottom Left) */}
+      {selectedLocation && (
+        <div className="absolute bottom-4 left-4 right-4 md:right-auto md:w-80 z-20 bg-white rounded-xl shadow-xl overflow-hidden">
+          <div className="p-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-bold text-gray-900 text-lg">
+                  {selectedLocation.displayName || selectedLocation.name}
+                </h3>
+                {selectedLocation.stateName && (
+                  <p className="text-sm text-gray-500">{selectedLocation.stateName}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setSelectedLocation(null)}
+                className="p-1 hover:bg-gray-100 rounded-full"
+              >
+                <X className="h-5 w-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="mt-3 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-green-600">
+                {formatIndianCurrency(selectedLocation.value)}
+              </span>
+              <span className="text-sm text-gray-500">revenue</span>
+            </div>
+            {selectedLocation.quantity && (
+              <p className="text-sm text-gray-600 mt-1">
+                {selectedLocation.quantity.toLocaleString('en-IN')} units sold
+              </p>
+            )}
+          </div>
+          {/* Progress bar showing relative revenue */}
+          <div className="h-1 bg-gray-100">
+            <div 
+              className={`h-full ${currentViewMode === 'state' ? 'bg-blue-500' : 'bg-red-500'}`}
+              style={{ 
+                width: `${(selectedLocation.value / (currentViewMode === 'state' ? maxStateValue : maxCityValue)) * 100}%` 
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Legend - Google Maps Style (Bottom Right, above zoom) */}
+      <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <div className={`w-3 h-3 rounded-full ${currentViewMode === 'state' ? 'bg-blue-500' : 'bg-red-500'}`} />
+            <span className="text-gray-600 font-medium">
+              {currentViewMode === 'state' ? statePins.length : cityPins.length} {currentViewMode === 'state' ? 'States' : 'Cities'}
+            </span>
           </div>
           <div className="text-gray-400">|</div>
-          <span>Circle size = Revenue amount</span>
-        </div>
-        <div>
-          <span className="font-medium">
-            {currentViewMode === 'state' ? statePins.length : cityPins.length} locations
-          </span>
+          <span className="text-gray-500">Size = Revenue</span>
         </div>
       </div>
-      
-      {/* Top locations list */}
-      <div className="mt-4 border-t border-gray-100 pt-4">
-        <h4 className="text-sm font-medium text-gray-700 mb-2">
-          Top {currentViewMode === 'state' ? 'States' : 'Cities'} by Revenue
-        </h4>
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          {(currentViewMode === 'state' ? stateData : cityData).slice(0, 6).map((item, idx) => (
-            <div key={idx} className="flex justify-between items-center bg-gray-50 px-2 py-1.5 rounded">
-              <span className="text-gray-700 truncate">{idx + 1}. {item.name}</span>
-              <span className="text-green-600 font-medium ml-2">{formatIndianCurrency(item.value)}</span>
-            </div>
-          ))}
-        </div>
+
+      {/* Scale indicator - Google Maps style */}
+      <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 text-xs text-gray-500 bg-white/80 px-2 py-1 rounded">
+        Zoom: {Math.round(zoom * 100)}%
       </div>
+
+      {/* Top Locations Mini-list (when not fullscreen) */}
+      {!isFullscreen && !selectedLocation && (
+        <div className="absolute bottom-4 left-4 z-10 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-3 w-56">
+          <h4 className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+            <MapPin className={`h-3 w-3 ${currentViewMode === 'state' ? 'text-blue-500' : 'text-red-500'}`} />
+            Top {currentViewMode === 'state' ? 'States' : 'Cities'}
+          </h4>
+          <div className="space-y-1.5">
+            {(currentViewMode === 'state' ? stateData : cityData).slice(0, 5).map((item, idx) => (
+              <div key={idx} className="flex justify-between items-center text-xs">
+                <span className="text-gray-700 truncate flex-1">{idx + 1}. {item.name}</span>
+                <span className="text-green-600 font-semibold ml-2">{formatIndianCurrency(item.value)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
