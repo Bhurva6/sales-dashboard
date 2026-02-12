@@ -183,7 +183,7 @@ export default function DashboardPage() {
         revenue: d.total_sales || 0,
         quantity: d.total_quantity || 0
       })));
-      setStateData(rawStateData.slice(0, 15).map((s: any) => ({
+      setStateData(rawStateData.map((s: any) => ({
         name: s.state || 'Unknown',
         value: s.total_sales || 0,
         quantity: s.total_quantity || 0
@@ -192,7 +192,7 @@ export default function DashboardPage() {
         name: c.product_name?.substring(0, 25) || 'Unknown',
         value: c.total_sales || 0
       })));
-      setCityData(rawCityData.slice(0, 15).map((c: any) => ({
+      setCityData(rawCityData.map((c: any) => ({
         name: c.city || 'Unknown',
         value: c.total_sales || 0,
         state: c.state || ''
@@ -254,7 +254,7 @@ export default function DashboardPage() {
     }
 
     // Process other data (state, category, city - keep as is since they're aggregated)
-    setStateData(filteredStates.slice(0, 15).map((s: any) => ({
+    setStateData(filteredStates.map((s: any) => ({
       name: s.state || 'Unknown',
       value: s.total_sales || 0,
       quantity: s.total_quantity || 0
@@ -265,7 +265,7 @@ export default function DashboardPage() {
       value: c.total_sales || 0
     })));
 
-    setCityData(filteredCities.slice(0, 15).map((c: any) => ({
+    setCityData(filteredCities.map((c: any) => ({
       name: c.city || 'Unknown',
       value: c.total_sales || 0,
       state: c.state || ''
@@ -465,8 +465,12 @@ export default function DashboardPage() {
           <ClickableChartWrapper
             onClick={() => openChartModal({
               type: 'horizontalBar',
-              title: '🏆 Top 10 Dealers by Revenue',
-              data: dealerData,
+              title: '🏆 All Dealers by Revenue',
+              data: rawDealerData.map((d: any) => ({
+                name: d.dealer_name?.substring(0, 25) || 'Unknown',
+                revenue: d.total_sales || 0,
+                quantity: d.total_quantity || 0
+              })),
               xKey: 'name',
               yKey: 'revenue'
             })}
@@ -482,8 +486,12 @@ export default function DashboardPage() {
           <ClickableChartWrapper
             onClick={() => openChartModal({
               type: 'composed',
-              title: '📊 Dealer Revenue vs Quantity',
-              data: combinedDealerData,
+              title: '📊 All Dealers - Revenue vs Quantity',
+              data: rawDealerData.map((d: any) => ({
+                name: d.dealer_name?.substring(0, 25) || 'Unknown',
+                revenue: d.total_sales || 0,
+                quantity: d.total_quantity || 0
+              })),
               xKey: 'name',
               yKey: 'revenue',
               barKey: 'revenue',
@@ -525,8 +533,8 @@ export default function DashboardPage() {
           <ClickableChartWrapper
             onClick={() => openChartModal({
               type: 'bar',
-              title: '🗺️ Revenue by State (Top 10)',
-              data: stateData.slice(0, 10),
+              title: '🗺️ Revenue by State (All States)',
+              data: stateData,
               xKey: 'name',
               yKey: 'value'
             })}
@@ -546,8 +554,11 @@ export default function DashboardPage() {
           <ClickableChartWrapper
             onClick={() => openChartModal({
               type: 'horizontalBar',
-              title: '🏷️ Top Products by Revenue',
-              data: categoryData,
+              title: '🏷️ All Products by Revenue',
+              data: rawCategoryData.map((c: any) => ({
+                name: c.product_name?.substring(0, 30) || 'Unknown',
+                value: c.total_sales || 0
+              })),
               xKey: 'name',
               yKey: 'value'
             })}
@@ -563,8 +574,8 @@ export default function DashboardPage() {
           <ClickableChartWrapper
             onClick={() => openChartModal({
               type: 'donut',
-              title: '🏙️ Revenue by City (Top 8)',
-              data: cityData.slice(0, 8),
+              title: '🏙️ Revenue by City (All Cities)',
+              data: cityData,
               xKey: 'name',
               yKey: 'value',
               dataKey: 'value',
