@@ -35,5 +35,5 @@ WORKDIR /app
 # Expose port (Railway sets PORT env var)
 EXPOSE 8080
 
-# Start command (Railway will override with railway.json startCommand)
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "4", "--timeout", "120"]
+# Use shell form for CMD to expand $PORT environment variable
+CMD gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 4 --timeout 120
