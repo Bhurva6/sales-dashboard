@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LineChart,
   Line,
@@ -19,7 +19,7 @@ import {
   Area,
   ComposedChart,
 } from 'recharts';
-import { X, Maximize2, Settings } from 'lucide-react';
+import { X, Maximize2, Settings, ChevronDown, Check } from 'lucide-react';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#84cc16', '#22c55e', '#14b8a6', '#06b6d4'];
 
@@ -59,13 +59,31 @@ export const ChartModal: React.FC<ChartModalProps> = ({ isOpen, onClose, config 
   const [selectedXKey, setSelectedXKey] = useState<string>('');
   const [selectedYKey, setSelectedYKey] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (config) {
       setSelectedXKey(config.xKey || config.nameKey || '');
       setSelectedYKey(config.yKey || config.dataKey || config.barKey || '');
+      // Reset selected items when config changes - select all by default
+      const xKey = config.xKey || config.nameKey || 'name';
+      const allItems = config.data.map(item => item[xKey] as string);
+      setSelectedItems(allItems);
     }
   }, [config]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Close on Escape key
   useEffect(() => {
@@ -97,10 +115,57 @@ export const ChartModal: React.FC<ChartModalProps> = ({ isOpen, onClose, config 
     typeof config.data[0][key] === 'string'
   );
 
+  // Get all unique item names based on x-axis key (for filtering dropdown)
+  const xKey = selectedXKey || config.xKey || config.nameKey || 'name';
+  const allItemNames: string[] = config.data.map(item => item[xKey] as string);
+
+  // Filter data based on selected items
+  const filteredData = config.data.filter(item => selectedItems.includes(item[xKey]));
+
+  // Helper functions for item selection
+  const toggleItem = (item: string) => {
+    setSelectedItems(prev => 
+      prev.includes(item) 
+        ? prev.filter(i => i !== item)
+        : [...prev, item]
+    );
+  };
+
+  const selectAll = () => {
+    setSelectedItems(allItemNames);
+  };
+
+  const deselectAll = () => {
+    setSelectedItems([]);
+  };
+
+  // Get a label for what type of items we're filtering
+  const getItemTypeLabel = (): string => {
+    const title = config.title.toLowerCase();
+    if (title.includes('dealer')) return 'Dealers';
+    if (title.includes('product')) return 'Products';
+    if (title.includes('state')) return 'States';
+    if (title.includes('city')) return 'Cities';
+    if (title.includes('category')) return 'Categories';
+    return 'Items';
+  };
+
   const renderChart = () => {
-    const { type, data } = config;
+    const { type } = config;
+    const data = filteredData; // Use filtered data
     const xKey = selectedXKey || config.xKey || config.nameKey || 'name';
     const yKey = selectedYKey || config.yKey || config.dataKey || 'value';
+
+    if (data.length === 0) {
+      return (
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center text-gray-500">
+            <p className="text-lg font-medium">No data to display</p>
+            <p className="text-sm mt-1">Please select at least one item from the dropdown</p>
+          </div>
+        </div>
+      );
+    }
 
     switch (type) {
       case 'bar':
@@ -267,7 +332,71 @@ export const ChartModal: React.FC<ChartModalProps> = ({ isOpen, onClose, config 
         {/* Settings Panel */}
         {showSettings && (
           <div className="p-4 bg-gray-50 border-b border-gray-200">
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-4 items-start">
+              {/* Item Selection Dropdown */}
+              <div className="flex items-start gap-2" ref={dropdownRef}>
+                <label className="text-sm font-medium text-gray-700 mt-2">
+                  Select {getItemTypeLabel()}:
+                </label>
+                <div className="relative">
+                  <button
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white flex items-center gap-2 min-w-[200px] justify-between"
+                  >
+                    <span className="truncate">
+                      {selectedItems.length === allItemNames.length 
+                        ? `All ${getItemTypeLabel()} (${allItemNames.length})`
+                        : selectedItems.length === 0
+                        ? `Select ${getItemTypeLabel()}`
+                        : `${selectedItems.length} of ${allItemNames.length} selected`}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {isDropdownOpen && (
+                    <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-hidden">
+                      {/* Select All / Deselect All */}
+                      <div className="p-2 border-b border-gray-100 flex gap-2">
+                        <button
+                          onClick={selectAll}
+                          className="flex-1 px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded"
+                        >
+                          Select All
+                        </button>
+                        <button
+                          onClick={deselectAll}
+                          className="flex-1 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded"
+                        >
+                          Deselect All
+                        </button>
+                      </div>
+                      
+                      {/* Items List */}
+                      <div className="max-h-48 overflow-y-auto">
+                        {allItemNames.map((item, index) => (
+                          <div
+                            key={index}
+                            onClick={() => toggleItem(item)}
+                            className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <div className={`w-4 h-4 border rounded flex items-center justify-center ${
+                              selectedItems.includes(item) 
+                                ? 'bg-indigo-600 border-indigo-600' 
+                                : 'border-gray-300'
+                            }`}>
+                              {selectedItems.includes(item) && (
+                                <Check className="w-3 h-3 text-white" />
+                              )}
+                            </div>
+                            <span className="text-sm text-gray-700 truncate flex-1">{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* X-Axis / Name Key Selector */}
               <div className="flex items-center gap-2">
                 <label className="text-sm font-medium text-gray-700">
@@ -275,7 +404,12 @@ export const ChartModal: React.FC<ChartModalProps> = ({ isOpen, onClose, config 
                 </label>
                 <select
                   value={selectedXKey}
-                  onChange={(e) => setSelectedXKey(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedXKey(e.target.value);
+                    // Reset selected items when changing x-axis
+                    const newItems = config.data.map(item => item[e.target.value] as string);
+                    setSelectedItems(newItems);
+                  }}
                   className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   {stringKeys.map(key => (
@@ -302,7 +436,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({ isOpen, onClose, config 
 
               {/* Data Count Info */}
               <div className="flex items-center gap-2 text-sm text-gray-500">
-                <span>📊 {config.data.length} data points</span>
+                <span>📊 Showing {filteredData.length} of {config.data.length} {getItemTypeLabel().toLowerCase()}</span>
               </div>
             </div>
           </div>
