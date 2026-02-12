@@ -13,6 +13,7 @@ import {
   ComposedChartComponent 
 } from '@/components/Charts';
 import { ChartModal, ClickableChartWrapper, ChartConfig } from '@/components/ChartModal';
+import IndiaMap from '@/components/IndiaMap';
 
 // API base URL - empty for same-origin requests in production, localhost for dev
 const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
@@ -578,6 +579,16 @@ export default function DashboardPage() {
               loading={loading}
             />
           </ClickableChartWrapper>
+        </div>
+
+        {/* India Map Visualization */}
+        <div className="grid grid-cols-1 gap-6">
+          <IndiaMap
+            stateData={stateData}
+            cityData={cityData}
+            title="🗺️ Geographic Revenue Distribution - India"
+            loading={loading}
+          />
         </div>
 
         {/* Data Tables Section */}
