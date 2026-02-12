@@ -2,12 +2,12 @@
 # Build both Next.js frontend and Python backend
 
 [phases.setup]
-nixPkgs = ["python311", "python311Packages.pip", "nodejs_20"]
+nixPkgs = ["python311Full", "nodejs_20"]
 
 [phases.install]
 cmds = [
     "cd frontend-nextjs && npm install",
-    "python3 -m pip install -r requirements.txt"
+    "pip install -r requirements.txt"
 ]
 
 [phases.build]
@@ -16,4 +16,4 @@ cmds = [
 ]
 
 [start]
-cmd = "python3 -m gunicorn app:app --bind 0.0.0.0:$PORT --workers 4 --timeout 120"
+cmd = "gunicorn app:app --bind 0.0.0.0:$PORT --workers 4 --timeout 120"
