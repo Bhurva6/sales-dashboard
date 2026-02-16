@@ -124,13 +124,17 @@ def setup_api_endpoints(app):
         start_date = request.args.get('start_date', '01-01-2025')
         end_date = request.args.get('end_date', '31-12-2025')
         
+        print(f"🔍 API Call: dealer-performance, start_date={start_date}, end_date={end_date}")
+        
         try:
             api_response = AvanteAPIClient.get_avante_sales(start_date, end_date)
             sales_data = api_response.get('report_data', []) if isinstance(api_response.get('report_data'), list) else []
             
             dealer_performance = AvanteAPIClient.get_dealer_performance(sales_data)
+            print(f"✅ Returning {len(dealer_performance)} dealer records")
             return jsonify(dealer_performance)
         except Exception as e:
+            print(f"❌ Error in dealer-performance: {str(e)}")
             return jsonify([]), 500
     
     @app.route('/api/avante/state-performance', methods=['GET'])

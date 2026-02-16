@@ -15,6 +15,7 @@ export default function Sidebar({ isOpen }: SidebarProps) {
     endDate,
     hideInnovative,
     hideAvante,
+    dashboardMode,
     setDateRange,
     setHideInnovative,
     setHideAvante,
@@ -89,31 +90,44 @@ export default function Sidebar({ isOpen }: SidebarProps) {
           </div>
         </div>
 
-        {/* Controls */}
+        {/* Controls - Show appropriate filter based on dashboard mode */}
         <div>
           <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
             <Settings className="w-4 h-4" />
-            Controls
+            Filters
           </h3>
           <div className="space-y-3">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hideInnovative}
-                onChange={(e) => setHideInnovative(e.target.checked)}
-                className="w-4 h-4 rounded text-indigo-600"
-              />
-              <span className="text-sm text-gray-700">Hide Innovative Ortho</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hideAvante}
-                onChange={(e) => setHideAvante(e.target.checked)}
-                className="w-4 h-4 rounded text-indigo-600"
-              />
-              <span className="text-sm text-gray-700">IOSPL Filter</span>
-            </label>
+            {dashboardMode === 'avante' ? (
+              <>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hideInnovative}
+                    onChange={(e) => setHideInnovative(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600"
+                  />
+                  <span className="text-sm text-gray-700">Hide Innovative</span>
+                </label>
+                <p className="text-xs text-gray-500 ml-6">
+                  Excludes dealers with "Innovative" in their name
+                </p>
+              </>
+            ) : (
+              <>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hideAvante}
+                    onChange={(e) => setHideAvante(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600"
+                  />
+                  <span className="text-sm text-gray-700">Hide Avante</span>
+                </label>
+                <p className="text-xs text-gray-500 ml-6">
+                  Excludes dealers with "Avante" in their name
+                </p>
+              </>
+            )}
           </div>
         </div>
 

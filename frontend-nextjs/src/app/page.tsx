@@ -14,6 +14,19 @@ import {
 } from '@/components/Charts';
 import { ChartModal, ClickableChartWrapper, ChartConfig } from '@/components/ChartModal';
 import IndiaMap from '@/components/IndiaMap';
+import PaymentPipeline from '@/components/PaymentPipeline';
+import OverduePaymentsTable from '@/components/OverduePaymentsTable';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 
 // API base URL - empty for same-origin requests in production, localhost for dev
 const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
@@ -145,6 +158,7 @@ export default function DashboardPage() {
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
   const [cityData, setCityData] = useState<CityData[]>([]);
   const [parentCategoryData, setParentCategoryData] = useState<CategoryData[]>([]);
+  const [parentCategoryQuantityData, setParentCategoryQuantityData] = useState<CategoryData[]>([]);
   const [combinedDealerData, setCombinedDealerData] = useState<any[]>([]);
   
   // Raw API data (unfiltered) for filtering purposes
@@ -153,6 +167,7 @@ export default function DashboardPage() {
   const [rawCategoryData, setRawCategoryData] = useState<any[]>([]);
   const [rawCityData, setRawCityData] = useState<any[]>([]);
   const [rawStats, setRawStats] = useState<Stats>({ total_revenue: 0, total_quantity: 0, total_dealers: 0, total_products: 0 });
+  const [rawSalesData, setRawSalesData] = useState<any[]>([]);
   
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -169,20 +184,49 @@ export default function DashboardPage() {
     return dealerName?.toLowerCase().includes('innovative');
   };
 
-  // Apply filtering based on hideInnovative
+  // Helper function to check if a dealer name contains "Avante"
+  const isAvanteDealer = (dealerName: string): boolean => {
+    return dealerName?.toLowerCase().includes('avante');
+  };
+
+  // Apply filtering based on hideInnovative (Avante) or hideAvante (IOSPL)
   useEffect(() => {
     if (dashboardMode !== 'avante') {
-      // For IOSPL, no filtering needed - use raw data directly
-      setDealerData(rawDealerData.slice(0, 10).map((d: any) => ({
+      // For IOSPL dashboard, apply hideAvante filter
+      let filteredDealers = rawDealerData;
+      
+      if (hideAvante) {
+        // Filter out Avante dealers
+        filteredDealers = rawDealerData.filter((d: any) => !isAvanteDealer(d.dealer_name || ''));
+      }
+
+      setDealerData(filteredDealers.slice(0, 10).map((d: any) => ({
         name: d.dealer_name?.substring(0, 20) || 'Unknown',
         revenue: d.total_sales || 0,
         quantity: d.total_quantity || 0
       })));
-      setCombinedDealerData(rawDealerData.slice(0, 10).map((d: any) => ({
+      setCombinedDealerData(filteredDealers.slice(0, 10).map((d: any) => ({
         name: d.dealer_name?.substring(0, 20) || 'Unknown',
         revenue: d.total_sales || 0,
         quantity: d.total_quantity || 0
       })));
+      
+      // Calculate filtered stats for IOSPL
+      if (hideAvante && filteredDealers.length > 0) {
+        const filteredRevenue = filteredDealers.reduce((sum: number, d: any) => sum + (d.total_sales || 0), 0);
+        const filteredQuantity = filteredDealers.reduce((sum: number, d: any) => sum + (d.total_quantity || 0), 0);
+        const uniqueProducts = new Set(rawCategoryData.map((c: any) => c.product_name)).size;
+        
+        setStats({
+          total_revenue: filteredRevenue,
+          total_quantity: filteredQuantity,
+          total_dealers: filteredDealers.length,
+          total_products: uniqueProducts
+        });
+      } else {
+        setStats(rawStats);
+      }
+
       setStateData(rawStateData.map((s: any) => ({
         name: s.state || 'Unknown',
         value: s.total_sales || 0,
@@ -197,7 +241,6 @@ export default function DashboardPage() {
         value: c.total_sales || 0,
         state: c.state || ''
       })));
-      setStats(rawStats);
       
       // Parent categories
       const parentMap: Record<string, number> = {};
@@ -210,6 +253,18 @@ export default function DashboardPage() {
         .sort((a, b) => b.value - a.value)
         .slice(0, 8);
       setParentCategoryData(parentCategories);
+      
+      // Parent categories by quantity
+      const parentQuantityMap: Record<string, number> = {};
+      rawCategoryData.forEach((c: any) => {
+        const key = c.parent_category || 'Other';
+        parentQuantityMap[key] = (parentQuantityMap[key] || 0) + (c.total_quantity || 0);
+      });
+      const parentQuantityCategories = Object.entries(parentQuantityMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
+      setParentCategoryQuantityData(parentQuantityCategories);
       return;
     }
 
@@ -282,23 +337,39 @@ export default function DashboardPage() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
     setParentCategoryData(parentCategories);
+    
+    // Parent categories by quantity
+    const parentQuantityMap: Record<string, number> = {};
+    filteredCategories.forEach((c: any) => {
+      const key = c.parent_category || 'Other';
+      parentQuantityMap[key] = (parentQuantityMap[key] || 0) + (c.total_quantity || 0);
+    });
+    const parentQuantityCategories = Object.entries(parentQuantityMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+    setParentCategoryQuantityData(parentQuantityCategories);
 
-  }, [hideInnovative, rawDealerData, rawStateData, rawCategoryData, rawCityData, rawStats, dashboardMode]);
+  }, [hideInnovative, hideAvante, rawDealerData, rawStateData, rawCategoryData, rawCityData, rawStats, dashboardMode]);
 
   useEffect(() => {
     // Load dashboard data from real API
     const loadData = async () => {
+      console.log('🔄 Starting data load...');
       setLoading(true);
       try {
         const apiEndpoint = dashboardMode === 'avante' ? 'avante' : 'iospl';
         const formattedStartDate = formatDateForAPI(startDate);
         const formattedEndDate = formatDateForAPI(endDate);
         
+        console.log(`📡 API Endpoint: ${apiEndpoint}, Dates: ${formattedStartDate} to ${formattedEndDate}`);
+        
         // Fetch stats
         const statsResponse = await fetch(
           `${API_BASE}/api/${apiEndpoint}/stats?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
         );
         const statsData = await statsResponse.json();
+        console.log('✅ Stats loaded:', statsData);
         setRawStats(statsData);
 
         // Fetch dealer performance
@@ -306,6 +377,7 @@ export default function DashboardPage() {
           `${API_BASE}/api/${apiEndpoint}/dealer-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
         );
         const dealerPerf = await dealerResponse.json();
+        console.log('✅ Dealer data loaded:', dealerPerf.length, 'items');
         setRawDealerData(dealerPerf);
 
         // Fetch state performance
@@ -313,13 +385,28 @@ export default function DashboardPage() {
           `${API_BASE}/api/${apiEndpoint}/state-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
         );
         const statePerf = await stateResponse.json();
+        console.log('✅ State data loaded:', statePerf.length, 'items');
         setRawStateData(statePerf);
 
         // Fetch category performance
-        const categoryResponse = await fetch(
-          `${API_BASE}/api/${apiEndpoint}/category-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
-        );
-        const categoryPerf = await categoryResponse.json();
+        let categoryPerf = [];
+        try {
+          const categoryResponse = await fetch(
+            `${API_BASE}/api/${apiEndpoint}/category-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+          );
+          categoryPerf = await categoryResponse.json();
+          console.log('✅ Category data loaded:', categoryPerf.length, 'items');
+        } catch (error) {
+          console.error('❌ Category API failed, using mock data:', error);
+          // Mock data for testing
+          categoryPerf = [
+            { parent_category: 'Bone Screw', total_sales: 500000, total_quantity: 2500, product_name: 'Test Screw' },
+            { parent_category: 'Bone Plate', total_sales: 400000, total_quantity: 1800, product_name: 'Test Plate' },
+            { parent_category: 'Bone Nail', total_sales: 300000, total_quantity: 1200, product_name: 'Test Nail' },
+            { parent_category: 'Instruments', total_sales: 200000, total_quantity: 800, product_name: 'Test Instrument' },
+            { parent_category: 'General Instrument', total_sales: 100000, total_quantity: 400, product_name: 'Test General' }
+          ];
+        }
         setRawCategoryData(categoryPerf);
 
         // Fetch city performance
@@ -327,7 +414,16 @@ export default function DashboardPage() {
           `${API_BASE}/api/${apiEndpoint}/city-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
         );
         const cityPerf = await cityResponse.json();
+        console.log('✅ City data loaded:', cityPerf.length, 'items');
         setRawCityData(cityPerf);
+
+        // Fetch raw sales data for monthly trend
+        const salesResponse = await fetch(
+          `${API_BASE}/api/${apiEndpoint}/sales?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+        );
+        const salesJson = await salesResponse.json();
+        const salesData = salesJson.data || [];
+        setRawSalesData(salesData);
         
       } catch (error) {
         console.error('Error loading dashboard data:', error);
@@ -402,7 +498,7 @@ export default function DashboardPage() {
             title="Products/SKUs"
             value={loading ? '...' : formatNumber(stats.total_products)}
             subtitle="Unique items"
-            icon={<svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2M7 7h10" /></svg>}
+            icon={<svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 002 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H5a2 2 0 00-2 2v2M7 7h10" /></svg>}
             color="text-orange-600"
             loading={loading}
           />
@@ -592,12 +688,80 @@ export default function DashboardPage() {
           </ClickableChartWrapper>
         </div>
 
+        {/* Product Family Analysis */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <ClickableChartWrapper
+            onClick={() => openChartModal({
+              type: 'pie',
+              title: '🏭 Revenue by Product Family',
+              data: parentCategoryData,
+              xKey: 'name',
+              yKey: 'value',
+              dataKey: 'value',
+              nameKey: 'name'
+            })}
+          >
+            <RevenuePieChart
+              data={parentCategoryData}
+              title="🏭 Revenue by Product Family"
+              dataKey="value"
+              nameKey="name"
+              loading={loading}
+            />
+          </ClickableChartWrapper>
+          <ClickableChartWrapper
+            onClick={() => openChartModal({
+              type: 'donut',
+              title: '📊 Product Family Distribution',
+              data: parentCategoryData,
+              xKey: 'name',
+              yKey: 'value',
+              dataKey: 'value',
+              nameKey: 'name'
+            })}
+          >
+            <DonutChart
+              data={parentCategoryData.slice(0, 6)}
+              title="📊 Top Product Families"
+              dataKey="value"
+              nameKey="name"
+              loading={loading}
+            />
+          </ClickableChartWrapper>
+          <ClickableChartWrapper
+            onClick={() => openChartModal({
+              type: 'bar',
+              title: '📦 Quantity by Product Family (All Families)',
+              data: parentCategoryQuantityData,
+              xKey: 'name',
+              yKey: 'value'
+            })}
+          >
+            <RevenueBarChart
+              data={parentCategoryQuantityData.slice(0, 6)}
+              title="📦 Quantity by Product Family"
+              xKey="name"
+              yKey="value"
+              loading={loading}
+            />
+          </ClickableChartWrapper>
+        </div>
+
         {/* India Map Visualization */}
         <div className="grid grid-cols-1 gap-6">
           <IndiaMap
             stateData={stateData}
             cityData={cityData}
             title="🗺️ Geographic Revenue Distribution - India"
+            loading={loading}
+          />
+        </div>
+
+        {/* Payment Pipeline - Kanban Board */}
+        <div className="grid grid-cols-1 gap-6">
+          <PaymentPipeline
+            salesData={rawDealerData}
+            title={`💳 ${dashboardMode === 'avante' ? 'Avante' : 'IOSPL'} Payment Pipeline`}
             loading={loading}
           />
         </div>

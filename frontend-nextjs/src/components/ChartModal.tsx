@@ -47,6 +47,7 @@ export interface ChartConfig {
   barKey?: string;
   lineKey?: string;
   availableKeys?: string[];
+  disableFiltering?: boolean; // For time-series charts where filtering doesn't make sense
 }
 
 interface ChartModalProps {
@@ -67,10 +68,12 @@ export const ChartModal: React.FC<ChartModalProps> = ({ isOpen, onClose, config 
     if (config) {
       setSelectedXKey(config.xKey || config.nameKey || '');
       setSelectedYKey(config.yKey || config.dataKey || config.barKey || '');
-      // Reset selected items when config changes - select all by default
-      const xKey = config.xKey || config.nameKey || 'name';
-      const allItems = config.data.map(item => item[xKey] as string);
-      setSelectedItems(allItems);
+      // Reset selected items when config changes - select all by default (only if filtering is enabled)
+      if (!config.disableFiltering) {
+        const xKey = config.xKey || config.nameKey || 'name';
+        const allItems = config.data.map(item => item[xKey] as string);
+        setSelectedItems(allItems);
+      }
     }
   }, [config]);
 
@@ -119,8 +122,10 @@ export const ChartModal: React.FC<ChartModalProps> = ({ isOpen, onClose, config 
   const xKey = selectedXKey || config.xKey || config.nameKey || 'name';
   const allItemNames: string[] = config.data.map(item => item[xKey] as string);
 
-  // Filter data based on selected items
-  const filteredData = config.data.filter(item => selectedItems.includes(item[xKey]));
+  // Filter data based on selected items (only if filtering is not disabled)
+  const filteredData = config.disableFiltering 
+    ? config.data 
+    : config.data.filter(item => selectedItems.includes(item[xKey]));
 
   // Helper functions for item selection
   const toggleItem = (item: string) => {
@@ -330,7 +335,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({ isOpen, onClose, config 
         </div>
 
         {/* Settings Panel */}
-        {showSettings && (
+        {showSettings && !config.disableFiltering && (
           <div className="p-4 bg-gray-50 border-b border-gray-200">
             <div className="flex flex-wrap gap-4 items-start">
               {/* Item Selection Dropdown */}
