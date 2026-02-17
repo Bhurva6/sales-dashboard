@@ -81,6 +81,10 @@ export const ComparativeAnalysisTable: React.FC<ComparativeAnalysisTableProps> =
   const [filterCity, setFilterCity] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  
+  // Local date range state
+  const [localStartDate, setLocalStartDate] = useState(startDate);
+  const [localEndDate, setLocalEndDate] = useState(endDate);
 
   // Helper functions for dealer filtering
   const isInnovativeDealer = (dealerName: string): boolean => {
@@ -107,14 +111,20 @@ export const ComparativeAnalysisTable: React.FC<ComparativeAnalysisTableProps> =
     [data]
   );
 
+  // Sync local dates with props
+  useEffect(() => {
+    setLocalStartDate(startDate);
+    setLocalEndDate(endDate);
+  }, [startDate, endDate]);
+
   // Load data from API
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
         const apiEndpoint = dashboardMode === 'avante' ? 'avante' : 'iospl';
-        const formattedStartDate = formatDateForAPI(startDate);
-        const formattedEndDate = formatDateForAPI(endDate);
+        const formattedStartDate = formatDateForAPI(localStartDate);
+        const formattedEndDate = formatDateForAPI(localEndDate);
         
         // Determine available years based on date range
         const currentYear = new Date().getFullYear();
@@ -211,10 +221,10 @@ export const ComparativeAnalysisTable: React.FC<ComparativeAnalysisTableProps> =
     };
     
     // Only load if dates are provided
-    if (startDate && endDate) {
+    if (localStartDate && localEndDate) {
       loadData();
     }
-  }, [dashboardMode, startDate, endDate, hideInnovative, hideAvante]);
+  }, [dashboardMode, localStartDate, localEndDate, hideInnovative, hideAvante]);
 
   // Apply filters and search
   useEffect(() => {
@@ -373,6 +383,28 @@ export const ComparativeAnalysisTable: React.FC<ComparativeAnalysisTableProps> =
                   ))}
                 </div>
               )}
+            </div>
+            
+            {/* Date Range Picker */}
+            <div className="flex items-end gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={localStartDate}
+                  onChange={(e) => setLocalStartDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 hover:border-gray-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={localEndDate}
+                  onChange={(e) => setLocalEndDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 hover:border-gray-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
             </div>
             
             {/* Filter Toggle */}

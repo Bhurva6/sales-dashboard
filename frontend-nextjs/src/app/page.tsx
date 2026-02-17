@@ -840,7 +840,8 @@ export default function DashboardPage() {
               xKey: 'name',
               yKey: 'value',
               dataKey: 'value',
-              nameKey: 'name'
+              nameKey: 'name',
+              legendBelow: true
             })}
           >
             <DonutChart

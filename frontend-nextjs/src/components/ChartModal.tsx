@@ -48,6 +48,7 @@ export interface ChartConfig {
   lineKey?: string;
   availableKeys?: string[];
   disableFiltering?: boolean; // For time-series charts where filtering doesn't make sense
+  legendBelow?: boolean; // Position legend below the chart instead of beside
 }
 
 interface ChartModalProps {
@@ -259,7 +260,7 @@ export const ChartModal: React.FC<ChartModalProps> = ({ isOpen, onClose, config 
                 dataKey={yKey} 
                 nameKey={xKey} 
                 cx="50%" 
-                cy="50%" 
+                cy={config.legendBelow ? "45%" : "50%"}
                 innerRadius={type === 'donut' ? 80 : 0}
                 outerRadius={180} 
                 paddingAngle={2}
@@ -271,7 +272,12 @@ export const ChartModal: React.FC<ChartModalProps> = ({ isOpen, onClose, config 
                 ))}
               </Pie>
               <Tooltip formatter={(value: number) => formatTooltipValue(value)} />
-              <Legend layout="vertical" align="right" verticalAlign="middle" />
+              <Legend 
+                layout={config.legendBelow ? "horizontal" : "vertical"}
+                align={config.legendBelow ? "center" : "right"}
+                verticalAlign={config.legendBelow ? "bottom" : "middle"}
+                wrapperStyle={config.legendBelow ? { paddingTop: '20px' } : {}}
+              />
             </PieChart>
           </ResponsiveContainer>
         );

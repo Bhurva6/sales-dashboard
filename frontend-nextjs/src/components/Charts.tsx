@@ -184,28 +184,33 @@ export const RevenuePieChart: React.FC<{ data: any[]; title?: string; loading?: 
   );
 };
 
-export const DonutChart: React.FC<{ data: any[]; title?: string; loading?: boolean; dataKey: string; nameKey: string; centerText?: string }> = ({
+export const DonutChart: React.FC<{ data: any[]; title?: string; loading?: boolean; dataKey: string; nameKey: string; centerText?: string; legendBelow?: boolean }> = ({
   data,
   title = 'Distribution',
   loading,
   dataKey,
   nameKey,
   centerText,
+  legendBelow = false,
 }) => {
   if (loading) return <ChartLoader title={title} />;
   if (!data || data.length === 0) return <ChartEmpty title={title} />;
 
+  // Increase height if legend is below to accommodate it
+  const containerHeight = legendBelow ? 'h-auto' : 'h-80';
+  const chartHeight = legendBelow ? '500px' : '85%';
+
   return (
-    <div className="w-full h-80 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+    <div className={`w-full ${containerHeight} bg-white p-4 rounded-lg shadow-sm border border-gray-200`}>
       <h3 className="text-lg font-semibold mb-4 text-gray-900">{title}</h3>
-      <ResponsiveContainer width="100%" height="85%">
+      <ResponsiveContainer width="100%" height={chartHeight}>
         <PieChart>
           <Pie 
             data={data} 
             dataKey={dataKey} 
             nameKey={nameKey} 
             cx="50%" 
-            cy="50%" 
+            cy={legendBelow ? "45%" : "50%"}
             innerRadius={50}
             outerRadius={80} 
             paddingAngle={3}
@@ -215,7 +220,12 @@ export const DonutChart: React.FC<{ data: any[]; title?: string; loading?: boole
             ))}
           </Pie>
           <Tooltip formatter={(value: number) => formatTooltipValue(value)} />
-          <Legend layout="vertical" align="right" verticalAlign="middle" />
+          <Legend 
+            layout={legendBelow ? "horizontal" : "vertical"} 
+            align={legendBelow ? "center" : "right"} 
+            verticalAlign={legendBelow ? "bottom" : "middle"}
+            wrapperStyle={legendBelow ? { paddingTop: '20px' } : {}}
+          />
         </PieChart>
       </ResponsiveContainer>
     </div>

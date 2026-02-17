@@ -47,6 +47,10 @@ const NonBillingDealersTable: React.FC<NonBillingDealersTableProps> = ({
   const [stateFilter, setStateFilter] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'decline' | 'days' | 'city'>('decline');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
+  // Local date range state
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Mock data for demonstration - in real app, this would come from API
   useEffect(() => {
@@ -56,13 +60,26 @@ const NonBillingDealersTable: React.FC<NonBillingDealersTableProps> = ({
     // For now, fetch from API or display empty state
     const loadData = async () => {
       try {
-        // This would be the API call when available
-        // const response = await fetch('/api/non-billing-dealers');
-        // const data = await response.json();
-        // setDealers(data);
+        // Format dates for API call if available
+        const formattedStartDate = startDate || '';
+        const formattedEndDate = endDate || '';
         
-        // For now, show empty state since no mock data should be used
-        setDealers([]);
+        // This would be the API call when available
+        const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+          ? 'http://localhost:5000' 
+          : '';
+        
+        const apiEndpoint = dashboardMode === 'avante' ? 'avante' : 'iospl';
+        
+        if (formattedStartDate && formattedEndDate && API_BASE) {
+          const response = await fetch(`${API_BASE}/api/${apiEndpoint}/non-billing-dealers?start_date=${formattedStartDate}&end_date=${formattedEndDate}&period=${timeFilter}`);
+          if (response.ok) {
+            const data = await response.json();
+            setDealers(data || []);
+          }
+        } else {
+          setDealers([]);
+        }
       } catch (error) {
         console.error('Error loading non-billing dealers:', error);
         setDealers([]);
@@ -70,7 +87,7 @@ const NonBillingDealersTable: React.FC<NonBillingDealersTableProps> = ({
     };
 
     loadData();
-  }, [loading, timeFilter, dashboardMode, hideInnovative, hideAvante]);
+  }, [loading, timeFilter, dashboardMode, hideInnovative, hideAvante, startDate, endDate]);
 
   // Get unique cities and states for filter dropdowns
   const uniqueCities = useMemo(() => {
@@ -168,19 +185,45 @@ const NonBillingDealersTable: React.FC<NonBillingDealersTableProps> = ({
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">Period:</span>
-          <select
-            value={timeFilter}
-            onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
-            className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="week">Last Week</option>
-            <option value="month">Last Month</option>
-            <option value="quarter">Last Quarter</option>
-            <option value="year">Last Year</option>
-          </select>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <p className="text-sm text-gray-600 mt-1">Dealers with no recent billing activity</p>
+        </div>
+        <div className="flex items-end gap-4">
+          {/* Date Range Pickers */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 hover:border-gray-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 hover:border-gray-400 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          
+          {/* Period Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Period</label>
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value as TimeFilter)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="week">Last Week</option>
+              <option value="month">Last Month</option>
+              <option value="quarter">Last Quarter</option>
+              <option value="year">Last Year</option>
+            </select>
+          </div>
         </div>
       </div>
 
