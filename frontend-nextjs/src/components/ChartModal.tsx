@@ -469,21 +469,36 @@ export const ClickableChartWrapper: React.FC<{
   children: React.ReactNode;
   onClick: () => void;
   title?: string;
-}> = ({ children, onClick, title }) => (
-  <div 
-    className="relative cursor-pointer group"
-    onClick={onClick}
-    title={title || 'Click to expand'}
-  >
-    {children}
-    {/* Expand overlay on hover */}
-    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-200 rounded-lg pointer-events-none flex items-center justify-center">
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-sm font-medium text-indigo-600">
-        <Maximize2 className="w-4 h-4" />
-        Click to expand
+}> = ({ children, onClick, title }) => {
+  const handleClick = (event: React.MouseEvent) => {
+    // Don't trigger modal if clicking on interactive chart elements
+    const target = event.target as HTMLElement;
+    const isInteractiveElement = target.closest('[data-interactive="true"]') || 
+                                target.closest('.recharts-pie-sector') ||
+                                target.closest('.recharts-bar') ||
+                                target.closest('button');
+    
+    if (!isInteractiveElement) {
+      onClick();
+    }
+  };
+
+  return (
+    <div 
+      className="relative cursor-pointer group"
+      onClick={handleClick}
+      title={title || 'Click to expand'}
+    >
+      {children}
+      {/* Expand overlay on hover */}
+      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-all duration-200 rounded-lg pointer-events-none flex items-center justify-center">
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-sm font-medium text-indigo-600">
+          <Maximize2 className="w-4 h-4" />
+          Click to expand
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default ChartModal;

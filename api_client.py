@@ -244,16 +244,22 @@ class AvanteAPIClient:
             sales_data: List of sales records from report_data
             
         Returns:
-            List of category performance data
+            List of category performance data with dealer information
         """
         category_stats = {}
         
         for item in sales_data:
             # Use category_name as product identifier
             product = (item.get('category_name') or 'Unknown').strip()
-            if product not in category_stats:
-                category_stats[product] = {
+            dealer = (item.get('comp_nm') or 'Unknown').strip()
+            
+            # Create a unique key for product-dealer combination
+            key = f"{product}__{dealer}"
+            
+            if key not in category_stats:
+                category_stats[key] = {
                     "product_name": product,
+                    "dealer_name": dealer,
                     "parent_category": (item.get('parent_category') or '').strip(),
                     "total_sales": 0,
                     "total_quantity": 0,
@@ -263,9 +269,9 @@ class AvanteAPIClient:
             try:
                 sales = float(item.get('SV', 0) or 0)
                 qty = float(item.get('SQ', 0) or 0)
-                category_stats[product]["total_sales"] += sales
-                category_stats[product]["total_quantity"] += qty
-                category_stats[product]["transaction_count"] += 1
+                category_stats[key]["total_sales"] += sales
+                category_stats[key]["total_quantity"] += qty
+                category_stats[key]["transaction_count"] += 1
             except (ValueError, TypeError):
                 continue
         

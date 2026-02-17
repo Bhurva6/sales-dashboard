@@ -4,29 +4,19 @@ import React, { useState, useEffect } from 'react';
 import { useDashboardStore } from '@/lib/store';
 import Layout from '@/components/Layout';
 import { 
-  RevenueLineChart, 
   RevenueBarChart, 
   RevenuePieChart, 
   HorizontalBarChart,
   DonutChart,
-  AreaChartComponent,
   ComposedChartComponent 
 } from '@/components/Charts';
 import { ChartModal, ClickableChartWrapper, ChartConfig } from '@/components/ChartModal';
 import IndiaMap from '@/components/IndiaMap';
 import PaymentPipeline from '@/components/PaymentPipeline';
-import OverduePaymentsTable from '@/components/OverduePaymentsTable';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts';
+import { DealerDrillDownWrapper } from '@/components/DealerDrillDownChart';
+import NonBillingDealersTable from '@/components/NonBillingDealersTable';
+import ComparativeAnalysisTable from '@/components/ComparativeAnalysisTable';
+
 
 // API base URL - empty for same-origin requests in production, localhost for dev
 const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
@@ -373,11 +363,24 @@ export default function DashboardPage() {
         setRawStats(statsData);
 
         // Fetch dealer performance
-        const dealerResponse = await fetch(
-          `${API_BASE}/api/${apiEndpoint}/dealer-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
-        );
-        const dealerPerf = await dealerResponse.json();
-        console.log('✅ Dealer data loaded:', dealerPerf.length, 'items');
+        let dealerPerf = [];
+        try {
+          const dealerResponse = await fetch(
+            `${API_BASE}/api/${apiEndpoint}/dealer-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+          );
+          dealerPerf = await dealerResponse.json();
+          console.log('✅ Dealer data loaded:', dealerPerf.length, 'items');
+        } catch (error) {
+          console.error('❌ Dealer API failed, using mock data:', error);
+          // Mock data for testing
+          dealerPerf = [
+            { dealer_name: 'Dealer A', total_sales: 1200000, total_quantity: 6000 },
+            { dealer_name: 'Dealer B', total_sales: 950000, total_quantity: 4750 },
+            { dealer_name: 'Dealer C', total_sales: 800000, total_quantity: 4000 },
+            { dealer_name: 'Dealer D', total_sales: 650000, total_quantity: 3250 },
+            { dealer_name: 'Dealer E', total_sales: 500000, total_quantity: 2500 }
+          ];
+        }
         setRawDealerData(dealerPerf);
 
         // Fetch state performance
@@ -400,11 +403,13 @@ export default function DashboardPage() {
           console.error('❌ Category API failed, using mock data:', error);
           // Mock data for testing
           categoryPerf = [
-            { parent_category: 'Bone Screw', total_sales: 500000, total_quantity: 2500, product_name: 'Test Screw' },
-            { parent_category: 'Bone Plate', total_sales: 400000, total_quantity: 1800, product_name: 'Test Plate' },
-            { parent_category: 'Bone Nail', total_sales: 300000, total_quantity: 1200, product_name: 'Test Nail' },
-            { parent_category: 'Instruments', total_sales: 200000, total_quantity: 800, product_name: 'Test Instrument' },
-            { parent_category: 'General Instrument', total_sales: 100000, total_quantity: 400, product_name: 'Test General' }
+            { parent_category: 'Bone Screw', total_sales: 500000, total_quantity: 2500, product_name: 'Test Screw', dealer_name: 'Dealer A' },
+            { parent_category: 'Bone Plate', total_sales: 400000, total_quantity: 1800, product_name: 'Test Plate', dealer_name: 'Dealer A' },
+            { parent_category: 'Bone Nail', total_sales: 300000, total_quantity: 1200, product_name: 'Test Nail', dealer_name: 'Dealer B' },
+            { parent_category: 'Instruments', total_sales: 200000, total_quantity: 800, product_name: 'Test Instrument', dealer_name: 'Dealer B' },
+            { parent_category: 'General Instrument', total_sales: 100000, total_quantity: 400, product_name: 'Test General', dealer_name: 'Dealer C' },
+            { parent_category: 'Bone Screw', total_sales: 150000, total_quantity: 750, product_name: 'Test Screw', dealer_name: 'Dealer C' },
+            { parent_category: 'Bone Plate', total_sales: 250000, total_quantity: 1250, product_name: 'Test Plate', dealer_name: 'Dealer C' }
           ];
         }
         setRawCategoryData(categoryPerf);
@@ -557,7 +562,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Charts Row 1 - Dealer Performance */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <ClickableChartWrapper
             onClick={() => openChartModal({
               type: 'horizontalBar',
@@ -603,6 +608,12 @@ export default function DashboardPage() {
               loading={loading}
             />
           </ClickableChartWrapper>
+          <DealerDrillDownWrapper
+            dealerData={rawDealerData}
+            categoryData={rawCategoryData}
+            title="🎯 Dealer Sales Distribution"
+            loading={loading}
+          />
         </div>
 
         {/* Charts Row 2 - Category & State */}
@@ -768,6 +779,17 @@ export default function DashboardPage() {
 
         {/* Data Tables Section */}
         <div className="grid grid-cols-1 gap-6">
+          {/* Comparative Analysis Table */}
+          <ComparativeAnalysisTable 
+            loading={loading}
+            dashboardMode={dashboardMode}
+            startDate={startDate}
+            endDate={endDate}
+          />
+
+          {/* Non-Billing Dealers Table */}
+          <NonBillingDealersTable loading={loading} />
+
           {/* Top Dealers Table */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Top Dealers Details</h3>
