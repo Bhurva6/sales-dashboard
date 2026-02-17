@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, ChevronDown, ChevronUp, ArrowUpDown, Calendar, Filter, X } from 'lucide-react';
+import { useDashboardStore } from '@/lib/store';
 
 const formatIndianCurrency = (num: number): string => {
   if (num >= 10000000) return `₹${(num / 10000000).toFixed(2)} Cr`;
@@ -34,6 +35,8 @@ interface ComparativeAnalysisTableProps {
   dashboardMode?: 'avante' | 'iospl';
   startDate?: string;
   endDate?: string;
+  hideInnovative?: boolean;
+  hideAvante?: boolean;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
@@ -57,7 +60,9 @@ export const ComparativeAnalysisTable: React.FC<ComparativeAnalysisTableProps> =
   loading: parentLoading = false,
   dashboardMode = 'iospl',
   startDate = '',
-  endDate = ''
+  endDate = '',
+  hideInnovative = false,
+  hideAvante = false
 }) => {
   const [data, setData] = useState<ComparativeDataRow[]>([]);
   const [filteredData, setFilteredData] = useState<ComparativeDataRow[]>([]);
@@ -76,6 +81,15 @@ export const ComparativeAnalysisTable: React.FC<ComparativeAnalysisTableProps> =
   const [filterCity, setFilterCity] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  // Helper functions for dealer filtering
+  const isInnovativeDealer = (dealerName: string): boolean => {
+    return dealerName?.toLowerCase().includes('innovative');
+  };
+
+  const isAvanteDealer = (dealerName: string): boolean => {
+    return dealerName?.toLowerCase().includes('avante');
+  };
 
   // Get unique values for filters
   const uniqueStates = useMemo(() => 
@@ -126,121 +140,71 @@ export const ComparativeAnalysisTable: React.FC<ComparativeAnalysisTableProps> =
           throw new Error(`API error: ${response.status}`);
         }
         
-        const apiData = await response.json();
+        const apiResponse = await response.json();
+        
+        // Handle API response structure
+        const apiData = apiResponse.report_data || apiResponse.data || [];
         console.log('✅ Comparative analysis data loaded:', apiData.length, 'records');
         
-        // Transform API data to match our interface
-        const transformedData: ComparativeDataRow[] = apiData.map((row: any) => ({
-          dealer_name: row.dealer_name || 'Unknown',
-          city: row.city || 'Unknown',
-          state: row.state || 'Unknown',
-          category: row.category || row.parent_category || 'Unknown',
-          sub_category: row.sub_category || row.product_name || 'Unknown',
-          product_code: row.product_code || row.item_code || 'N/A',
-          year_data: row.year_data || {}
-        }));
+        // Group data by dealer and year for year-wise comparison
+        const groupedByDealer: { [key: string]: ComparativeDataRow } = {};
+        
+        apiData.forEach((row: any) => {
+          const dealerName = row.comp_nm || row.dealer_name || 'Unknown';
+          const city = row.city || 'Unknown';
+          const state = row.state || 'Unknown';
+          const category = row.category_name || row.category || row.parent_category || 'Unknown';
+          const subCategory = row.meta_keyword || row.product_name || row.sub_category || 'Unknown';
+          const productCode = row.meta_keyword || row.item_code || row.product_code || 'N/A';
+          
+          // Create unique key for grouping
+          const key = `${dealerName}|${city}|${state}|${category}|${subCategory}|${productCode}`;
+          
+          if (!groupedByDealer[key]) {
+            groupedByDealer[key] = {
+              dealer_name: dealerName,
+              city,
+              state,
+              category,
+              sub_category: subCategory,
+              product_code: productCode,
+              year_data: {}
+            };
+          }
+          
+          // Extract year from current date or use current year
+          const year = new Date().getFullYear().toString();
+          
+          // Accumulate quantity and value
+          const quantity = parseFloat(row.SQ || '0') || 0;
+          const value = parseFloat(row.SV || '0') || 0;
+          
+          if (!groupedByDealer[key].year_data[year]) {
+            groupedByDealer[key].year_data[year] = { quantity: 0, value: 0 };
+          }
+          
+          groupedByDealer[key].year_data[year].quantity += quantity;
+          groupedByDealer[key].year_data[year].value += value;
+        });
+        
+        // Convert grouped data back to array
+        let transformedData: ComparativeDataRow[] = Object.values(groupedByDealer);
+        
+        // Apply dealer filters
+        if (dashboardMode === 'avante' && hideInnovative) {
+          transformedData = transformedData.filter(row => !isInnovativeDealer(row.dealer_name));
+        } else if (dashboardMode === 'iospl' && hideAvante) {
+          transformedData = transformedData.filter(row => !isAvanteDealer(row.dealer_name));
+        }
         
         setData(transformedData);
         setFilteredData(transformedData);
         
       } catch (error) {
         console.error('❌ Error loading comparative analysis data:', error);
-        
-        // Fallback to mock data if API fails
-        console.log('📝 Using mock data as fallback...');
-        const currentYear = new Date().getFullYear();
-        const years = [
-          currentYear.toString(),
-          (currentYear - 1).toString(),
-          (currentYear - 2).toString(),
-          (currentYear - 3).toString(),
-          (currentYear - 4).toString()
-        ];
-        
-        setAvailableYears(years);
-        setSelectedYears([years[0], years[1]]);
-        
-        // Mock data generation
-        const mockData: ComparativeDataRow[] = [
-          {
-            dealer_name: 'Innovative Healthcare Solutions',
-            city: 'Mumbai',
-            state: 'Maharashtra',
-            category: 'Bone Screw',
-            sub_category: 'Cortex Screw',
-            product_code: 'BS-001',
-            year_data: {
-              [years[0]]: { quantity: 1200, value: 360000 },
-              [years[1]]: { quantity: 1100, value: 330000 },
-              [years[2]]: { quantity: 900, value: 270000 },
-              [years[3]]: { quantity: 850, value: 255000 },
-              [years[4]]: { quantity: 800, value: 240000 }
-            }
-          },
-          {
-            dealer_name: 'MediTech Supplies',
-            city: 'Delhi',
-            state: 'Delhi',
-            category: 'Bone Plate',
-            sub_category: 'Locking Plate',
-            product_code: 'BP-105',
-            year_data: {
-              [years[0]]: { quantity: 850, value: 425000 },
-              [years[1]]: { quantity: 780, value: 390000 },
-              [years[2]]: { quantity: 720, value: 360000 },
-              [years[3]]: { quantity: 650, value: 325000 },
-              [years[4]]: { quantity: 600, value: 300000 }
-            }
-          },
-          {
-            dealer_name: 'Avante Medical Systems',
-            city: 'Bangalore',
-            state: 'Karnataka',
-            category: 'Instruments',
-            sub_category: 'Surgical Instruments',
-            product_code: 'INS-220',
-            year_data: {
-              [years[0]]: { quantity: 2500, value: 500000 },
-              [years[1]]: { quantity: 2300, value: 460000 },
-              [years[2]]: { quantity: 2100, value: 420000 },
-              [years[3]]: { quantity: 1900, value: 380000 },
-              [years[4]]: { quantity: 1800, value: 360000 }
-            }
-          },
-          {
-            dealer_name: 'OrthoMed Distributors',
-            city: 'Chennai',
-            state: 'Tamil Nadu',
-            category: 'Bone Nail',
-            sub_category: 'Interlocking Nail',
-            product_code: 'BN-350',
-            year_data: {
-              [years[0]]: { quantity: 650, value: 487500 },
-              [years[1]]: { quantity: 600, value: 450000 },
-              [years[2]]: { quantity: 550, value: 412500 },
-              [years[3]]: { quantity: 500, value: 375000 },
-              [years[4]]: { quantity: 480, value: 360000 }
-            }
-          },
-          {
-            dealer_name: 'HealthCare Plus',
-            city: 'Pune',
-            state: 'Maharashtra',
-            category: 'General Instrument',
-            sub_category: 'Hand Tools',
-            product_code: 'GI-450',
-            year_data: {
-              [years[0]]: { quantity: 3200, value: 384000 },
-              [years[1]]: { quantity: 3000, value: 360000 },
-              [years[2]]: { quantity: 2800, value: 336000 },
-              [years[3]]: { quantity: 2600, value: 312000 },
-              [years[4]]: { quantity: 2500, value: 300000 }
-            }
-          }
-        ];
-        
-        setData(mockData);
-        setFilteredData(mockData);
+        // Don't use mock data - only display error to user
+        setData([]);
+        setFilteredData([]);
       } finally {
         setLoading(false);
       }
@@ -250,7 +214,7 @@ export const ComparativeAnalysisTable: React.FC<ComparativeAnalysisTableProps> =
     if (startDate && endDate) {
       loadData();
     }
-  }, [dashboardMode, startDate, endDate]);
+  }, [dashboardMode, startDate, endDate, hideInnovative, hideAvante]);
 
   // Apply filters and search
   useEffect(() => {

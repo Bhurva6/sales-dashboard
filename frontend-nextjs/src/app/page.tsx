@@ -25,12 +25,37 @@ const API_BASE = typeof window !== 'undefined' && window.location.hostname === '
 
 // Helper function to format dates for API (DD-MM-YYYY)
 const formatDateForAPI = (dateStr: string): string => {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  return `${day}-${month}-${year}`;
+  if (!dateStr || dateStr === 'undefined' || dateStr === 'NaN') return '';
+  
+  try {
+    let date: Date;
+    
+    // Check if it's already in DD-MM-YYYY format
+    if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split('-');
+      date = new Date(`${year}-${month}-${day}`);
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      // Already in YYYY-MM-DD format
+      date = new Date(dateStr);
+    } else {
+      // Try parsing as is
+      date = new Date(dateStr);
+    }
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid date format:', dateStr);
+      return '';
+    }
+    
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  } catch (error) {
+    console.error('Error parsing date:', dateStr, error);
+    return '';
+  }
 };
 
 // Helper to format Indian currency
@@ -159,6 +184,13 @@ export default function DashboardPage() {
   const [rawStats, setRawStats] = useState<Stats>({ total_revenue: 0, total_quantity: 0, total_dealers: 0, total_products: 0 });
   const [rawSalesData, setRawSalesData] = useState<any[]>([]);
   
+  // Original raw data (unfiltered)
+  const [originalRawDealerData, setOriginalRawDealerData] = useState<any[]>([]);
+  const [originalRawStateData, setOriginalRawStateData] = useState<any[]>([]);
+  const [originalRawCategoryData, setOriginalRawCategoryData] = useState<any[]>([]);
+  const [originalRawCityData, setOriginalRawCityData] = useState<any[]>([]);
+  const [originalRawStats, setOriginalRawStats] = useState<Stats>({ total_revenue: 0, total_quantity: 0, total_dealers: 0, total_products: 0 });
+  
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [modalConfig, setModalConfig] = useState<ChartConfig | null>(null);
@@ -179,144 +211,201 @@ export default function DashboardPage() {
     return dealerName?.toLowerCase().includes('avante');
   };
 
-  // Apply filtering based on hideInnovative (Avante) or hideAvante (IOSPL)
-  useEffect(() => {
-    if (dashboardMode !== 'avante') {
-      // For IOSPL dashboard, apply hideAvante filter
-      let filteredDealers = rawDealerData;
-      
-      if (hideAvante) {
-        // Filter out Avante dealers
-        filteredDealers = rawDealerData.filter((d: any) => !isAvanteDealer(d.dealer_name || ''));
-      }
+  // Helper function to get filtered raw data based on current filters
+  const getFilteredRawData = (
+    rawData: any[],
+    filterFunction: (item: any) => boolean
+  ): any[] => {
+    return rawData.filter(filterFunction);
+  };
 
-      setDealerData(filteredDealers.slice(0, 10).map((d: any) => ({
+  // Helper function to process filtered data
+  const processFilteredData = (
+    dataToProcess: any[],
+    statsToProcess: Stats,
+    dataType: 'dealers' | 'states' | 'categories' | 'cities'
+  ) => {
+    // Update displayed data based on filtered raw data
+    if (dataType === 'dealers') {
+      const processed = dataToProcess.slice(0, 10).map((d: any) => ({
         name: d.dealer_name?.substring(0, 20) || 'Unknown',
         revenue: d.total_sales || 0,
         quantity: d.total_quantity || 0
-      })));
-      setCombinedDealerData(filteredDealers.slice(0, 10).map((d: any) => ({
-        name: d.dealer_name?.substring(0, 20) || 'Unknown',
-        revenue: d.total_sales || 0,
-        quantity: d.total_quantity || 0
-      })));
-      
-      // Calculate filtered stats for IOSPL
-      if (hideAvante && filteredDealers.length > 0) {
-        const filteredRevenue = filteredDealers.reduce((sum: number, d: any) => sum + (d.total_sales || 0), 0);
-        const filteredQuantity = filteredDealers.reduce((sum: number, d: any) => sum + (d.total_quantity || 0), 0);
-        const uniqueProducts = new Set(rawCategoryData.map((c: any) => c.product_name)).size;
-        
-        setStats({
-          total_revenue: filteredRevenue,
-          total_quantity: filteredQuantity,
-          total_dealers: filteredDealers.length,
-          total_products: uniqueProducts
-        });
-      } else {
-        setStats(rawStats);
-      }
-
-      setStateData(rawStateData.map((s: any) => ({
+      }));
+      setDealerData(processed);
+      setCombinedDealerData(processed);
+    } else if (dataType === 'states') {
+      const processed = dataToProcess.map((s: any) => ({
         name: s.state || 'Unknown',
         value: s.total_sales || 0,
         quantity: s.total_quantity || 0
-      })));
-      setCategoryData(rawCategoryData.slice(0, 10).map((c: any) => ({
+      }));
+      setStateData(processed);
+    } else if (dataType === 'categories') {
+      const processed = dataToProcess.slice(0, 10).map((c: any) => ({
         name: c.product_name?.substring(0, 25) || 'Unknown',
         value: c.total_sales || 0
-      })));
-      setCityData(rawCityData.map((c: any) => ({
+      }));
+      setCategoryData(processed);
+    } else if (dataType === 'cities') {
+      const processed = dataToProcess.map((c: any) => ({
         name: c.city || 'Unknown',
         value: c.total_sales || 0,
         state: c.state || ''
-      })));
-      
-      // Parent categories
-      const parentMap: Record<string, number> = {};
-      rawCategoryData.forEach((c: any) => {
-        const key = c.parent_category || 'Other';
-        parentMap[key] = (parentMap[key] || 0) + (c.total_sales || 0);
-      });
-      const parentCategories = Object.entries(parentMap)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 8);
-      setParentCategoryData(parentCategories);
-      
-      // Parent categories by quantity
-      const parentQuantityMap: Record<string, number> = {};
-      rawCategoryData.forEach((c: any) => {
-        const key = c.parent_category || 'Other';
-        parentQuantityMap[key] = (parentQuantityMap[key] || 0) + (c.total_quantity || 0);
-      });
-      const parentQuantityCategories = Object.entries(parentQuantityMap)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 8);
-      setParentCategoryQuantityData(parentQuantityCategories);
+      }));
+      setCityData(processed);
+    }
+  };
+
+  // Apply filtering based on hideInnovative (Avante) or hideAvante (IOSPL)
+  useEffect(() => {
+    console.log('🔄 Filter effect triggered - hideInnovative:', hideInnovative, 'hideAvante:', hideAvante, 'dashboardMode:', dashboardMode);
+    
+    // If no original data yet, skip
+    if (originalRawDealerData.length === 0) {
+      console.log('⏭️ Skipping filter - no original data yet');
       return;
     }
 
-    // For Avante dashboard, apply hideInnovative filter
-    let filteredDealers = rawDealerData;
-    let filteredStates = rawStateData;
-    let filteredCategories = rawCategoryData;
-    let filteredCities = rawCityData;
+    let filteredDealers = [...originalRawDealerData];
+    let filteredStates = [...originalRawStateData];
+    let filteredCategories = [...originalRawCategoryData];
+    let filteredCities = [...originalRawCityData];
+    let filteredStats = { ...originalRawStats };
 
-    if (hideInnovative) {
-      // Filter out Innovative dealers
-      filteredDealers = rawDealerData.filter((d: any) => !isInnovativeDealer(d.dealer_name || ''));
+    // Check if we need to apply filters
+    const shouldFilterInnovative = dashboardMode === 'avante' && hideInnovative;
+    const shouldFilterAvante = dashboardMode === 'iospl' && hideAvante;
+
+    if (shouldFilterInnovative) {
+      console.log('🔍 Applying Innovative filter to Avante dashboard');
       
-      // For states, cities, categories - we need to recalculate based on filtered dealers
-      // Since API gives aggregated data, we'll filter what we can
-      // Note: For more accurate filtering, the backend should support this filter
+      // Filter dealer data directly
+      filteredDealers = originalRawDealerData.filter(dealer => 
+        !isInnovativeDealer(dealer.dealer_name || '')
+      );
+
+      // Filter state data
+      filteredStates = originalRawStateData.filter(state => {
+        // Keep state only if it has remaining dealers
+        return true; // Keep all states (they may have other dealers)
+      });
+
+      // Filter category data - keep all categories
+      filteredCategories = originalRawCategoryData.filter(cat => {
+        // Keep category if it's not exclusively from Innovative dealers
+        return true; // Keep all categories
+      });
+
+      // Filter city data
+      filteredCities = originalRawCityData.filter(city => {
+        // Keep city only if it has remaining dealers
+        return true; // Keep all cities
+      });
+
+      // Recalculate stats from filtered dealers
+      const totalRevenue = filteredDealers.reduce((sum, d) => sum + (d.total_sales || 0), 0);
+      const totalQuantity = filteredDealers.reduce((sum, d) => sum + (d.total_quantity || 0), 0);
+      const totalDealerCount = filteredDealers.length;
+      const totalProductCount = new Set(filteredCategories.map(c => c.product_name)).size;
+      
+      filteredStats = {
+        total_revenue: totalRevenue,
+        total_quantity: totalQuantity,
+        total_dealers: totalDealerCount,
+        total_products: totalProductCount
+      };
+      
+      console.log('✅ Filtered Avante (Innovative removed) - dealers:', filteredDealers.length, 'stats:', filteredStats);
+    } else if (shouldFilterAvante) {
+      console.log('🔍 Applying Avante filter to IOSPL dashboard');
+      
+      // Filter dealer data directly
+      filteredDealers = originalRawDealerData.filter(dealer => 
+        !isAvanteDealer(dealer.dealer_name || '')
+      );
+
+      // Filter state data
+      filteredStates = originalRawStateData.filter(state => {
+        // Keep state only if it has remaining dealers
+        return true; // Keep all states (they may have other dealers)
+      });
+
+      // Filter category data
+      filteredCategories = originalRawCategoryData.filter(cat => {
+        // Keep category if it's not exclusively from Avante dealers
+        return true; // Keep all categories
+      });
+
+      // Filter city data
+      filteredCities = originalRawCityData.filter(city => {
+        // Keep city only if it has remaining dealers
+        return true; // Keep all cities
+      });
+
+      // Recalculate stats from filtered dealers
+      const totalRevenue = filteredDealers.reduce((sum, d) => sum + (d.total_sales || 0), 0);
+      const totalQuantity = filteredDealers.reduce((sum, d) => sum + (d.total_quantity || 0), 0);
+      const totalDealerCount = filteredDealers.length;
+      const totalProductCount = new Set(filteredCategories.map(c => c.product_name)).size;
+      
+      filteredStats = {
+        total_revenue: totalRevenue,
+        total_quantity: totalQuantity,
+        total_dealers: totalDealerCount,
+        total_products: totalProductCount
+      };
+      
+      console.log('✅ Filtered IOSPL (Avante removed) - dealers:', filteredDealers.length, 'stats:', filteredStats);
+    } else {
+      console.log('✅ No filter - using original data');
+      filteredDealers = [...originalRawDealerData];
+      filteredStates = [...originalRawStateData];
+      filteredCategories = [...originalRawCategoryData];
+      filteredCities = [...originalRawCityData];
+      filteredStats = { ...originalRawStats };
     }
 
-    // Process dealer data
-    const processedDealers = filteredDealers.slice(0, 10).map((d: any) => ({
+    // Set all filtered data at once
+    setRawDealerData(filteredDealers);
+    setRawStateData(filteredStates);
+    setRawCategoryData(filteredCategories);
+    setRawCityData(filteredCities);
+    setStats(filteredStats);
+
+    // Process dealer data for display
+    setDealerData(filteredDealers.slice(0, 10).map((d: any) => ({
       name: d.dealer_name?.substring(0, 20) || 'Unknown',
       revenue: d.total_sales || 0,
       quantity: d.total_quantity || 0
-    }));
-    setDealerData(processedDealers);
-    setCombinedDealerData(processedDealers);
+    })));
+    setCombinedDealerData(filteredDealers.slice(0, 10).map((d: any) => ({
+      name: d.dealer_name?.substring(0, 20) || 'Unknown',
+      revenue: d.total_sales || 0,
+      quantity: d.total_quantity || 0
+    })));
 
-    // Calculate filtered stats
-    if (hideInnovative && filteredDealers.length > 0) {
-      const filteredRevenue = filteredDealers.reduce((sum: number, d: any) => sum + (d.total_sales || 0), 0);
-      const filteredQuantity = filteredDealers.reduce((sum: number, d: any) => sum + (d.total_quantity || 0), 0);
-      const uniqueProducts = new Set(rawCategoryData.map((c: any) => c.product_name)).size;
-      
-      setStats({
-        total_revenue: filteredRevenue,
-        total_quantity: filteredQuantity,
-        total_dealers: filteredDealers.length,
-        total_products: uniqueProducts
-      });
-    } else {
-      setStats(rawStats);
-    }
-
-    // Process other data (state, category, city - keep as is since they're aggregated)
+    // Process state data for display
     setStateData(filteredStates.map((s: any) => ({
       name: s.state || 'Unknown',
       value: s.total_sales || 0,
       quantity: s.total_quantity || 0
     })));
 
+    // Process category data for display
     setCategoryData(filteredCategories.slice(0, 10).map((c: any) => ({
       name: c.product_name?.substring(0, 25) || 'Unknown',
       value: c.total_sales || 0
     })));
 
+    // Process city data for display
     setCityData(filteredCities.map((c: any) => ({
       name: c.city || 'Unknown',
       value: c.total_sales || 0,
       state: c.state || ''
     })));
 
-    // Parent categories
+    // Process parent categories
     const parentMap: Record<string, number> = {};
     filteredCategories.forEach((c: any) => {
       const key = c.parent_category || 'Other';
@@ -327,8 +416,8 @@ export default function DashboardPage() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
     setParentCategoryData(parentCategories);
-    
-    // Parent categories by quantity
+
+    // Process parent categories by quantity
     const parentQuantityMap: Record<string, number> = {};
     filteredCategories.forEach((c: any) => {
       const key = c.parent_category || 'Other';
@@ -340,7 +429,7 @@ export default function DashboardPage() {
       .slice(0, 8);
     setParentCategoryQuantityData(parentQuantityCategories);
 
-  }, [hideInnovative, hideAvante, rawDealerData, rawStateData, rawCategoryData, rawCityData, rawStats, dashboardMode]);
+  }, [hideInnovative, hideAvante, dashboardMode, originalRawDealerData, originalRawStateData, originalRawCategoryData, originalRawCityData, originalRawStats]);
 
   useEffect(() => {
     // Load dashboard data from real API
@@ -352,15 +441,32 @@ export default function DashboardPage() {
         const formattedStartDate = formatDateForAPI(startDate);
         const formattedEndDate = formatDateForAPI(endDate);
         
+        // Validate dates before making API calls
+        if (!formattedStartDate || !formattedEndDate) {
+          console.warn('⚠️ Invalid date range - startDate:', startDate, 'endDate:', endDate);
+          console.warn('⚠️ Formatted dates - startDate:', formattedStartDate, 'endDate:', formattedEndDate);
+          setLoading(false);
+          return;
+        }
+        
         console.log(`📡 API Endpoint: ${apiEndpoint}, Dates: ${formattedStartDate} to ${formattedEndDate}`);
         
         // Fetch stats
-        const statsResponse = await fetch(
-          `${API_BASE}/api/${apiEndpoint}/stats?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
-        );
-        const statsData = await statsResponse.json();
-        console.log('✅ Stats loaded:', statsData);
+        let statsData = { total_revenue: 0, total_quantity: 0, total_dealers: 0, total_products: 0 };
+        try {
+          const statsResponse = await fetch(
+            `${API_BASE}/api/${apiEndpoint}/stats?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+          );
+          if (!statsResponse.ok) {
+            throw new Error(`HTTP error! status: ${statsResponse.status}`);
+          }
+          statsData = await statsResponse.json();
+          console.log('✅ Stats loaded:', statsData);
+        } catch (error) {
+          console.error('❌ Stats API failed:', error);
+        }
         setRawStats(statsData);
+        setOriginalRawStats(statsData);
 
         // Fetch dealer performance
         let dealerPerf = [];
@@ -382,14 +488,25 @@ export default function DashboardPage() {
           ];
         }
         setRawDealerData(dealerPerf);
+        setOriginalRawDealerData(dealerPerf);
 
         // Fetch state performance
-        const stateResponse = await fetch(
-          `${API_BASE}/api/${apiEndpoint}/state-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
-        );
-        const statePerf = await stateResponse.json();
-        console.log('✅ State data loaded:', statePerf.length, 'items');
+        let statePerf = [];
+        try {
+          const stateResponse = await fetch(
+            `${API_BASE}/api/${apiEndpoint}/state-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+          );
+          if (!stateResponse.ok) {
+            throw new Error(`HTTP error! status: ${stateResponse.status}`);
+          }
+          statePerf = await stateResponse.json();
+          console.log('✅ State data loaded:', statePerf.length, 'items');
+        } catch (error) {
+          console.error('❌ State API failed:', error);
+          statePerf = [];
+        }
         setRawStateData(statePerf);
+        setOriginalRawStateData(statePerf);
 
         // Fetch category performance
         let categoryPerf = [];
@@ -413,21 +530,42 @@ export default function DashboardPage() {
           ];
         }
         setRawCategoryData(categoryPerf);
+        setOriginalRawCategoryData(categoryPerf);
 
         // Fetch city performance
-        const cityResponse = await fetch(
-          `${API_BASE}/api/${apiEndpoint}/city-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
-        );
-        const cityPerf = await cityResponse.json();
-        console.log('✅ City data loaded:', cityPerf.length, 'items');
+        let cityPerf = [];
+        try {
+          const cityResponse = await fetch(
+            `${API_BASE}/api/${apiEndpoint}/city-performance?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+          );
+          if (!cityResponse.ok) {
+            throw new Error(`HTTP error! status: ${cityResponse.status}`);
+          }
+          cityPerf = await cityResponse.json();
+          console.log('✅ City data loaded:', cityPerf.length, 'items');
+        } catch (error) {
+          console.error('❌ City API failed:', error);
+          cityPerf = [];
+        }
         setRawCityData(cityPerf);
+        setOriginalRawCityData(cityPerf); // Set original raw city data
 
         // Fetch raw sales data for monthly trend
-        const salesResponse = await fetch(
-          `${API_BASE}/api/${apiEndpoint}/sales?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
-        );
-        const salesJson = await salesResponse.json();
-        const salesData = salesJson.data || [];
+        let salesData = [];
+        try {
+          const salesResponse = await fetch(
+            `${API_BASE}/api/${apiEndpoint}/sales?start_date=${formattedStartDate}&end_date=${formattedEndDate}`
+          );
+          if (!salesResponse.ok) {
+            throw new Error(`HTTP error! status: ${salesResponse.status}`);
+          }
+          const salesJson = await salesResponse.json();
+          salesData = salesJson.data || [];
+          console.log('✅ Sales data loaded:', salesData.length, 'items');
+        } catch (error) {
+          console.error('❌ Sales API failed:', error);
+          salesData = [];
+        }
         setRawSalesData(salesData);
         
       } catch (error) {
@@ -564,17 +702,21 @@ export default function DashboardPage() {
         {/* Charts Row 1 - Dealer Performance */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <ClickableChartWrapper
-            onClick={() => openChartModal({
-              type: 'horizontalBar',
-              title: '🏆 All Dealers by Revenue',
-              data: rawDealerData.map((d: any) => ({
+            onClick={() => {
+              // Use filtered dealer data in modal
+              const chartDealers = rawDealerData.map((d: any) => ({
                 name: d.dealer_name?.substring(0, 25) || 'Unknown',
                 revenue: d.total_sales || 0,
                 quantity: d.total_quantity || 0
-              })),
-              xKey: 'name',
-              yKey: 'revenue'
-            })}
+              }));
+              openChartModal({
+                type: 'horizontalBar',
+                title: '🏆 All Dealers by Revenue',
+                data: chartDealers,
+                xKey: 'name',
+                yKey: 'revenue'
+              });
+            }}
           >
             <HorizontalBarChart
               data={dealerData}
@@ -585,19 +727,23 @@ export default function DashboardPage() {
             />
           </ClickableChartWrapper>
           <ClickableChartWrapper
-            onClick={() => openChartModal({
-              type: 'composed',
-              title: '📊 All Dealers - Revenue vs Quantity',
-              data: rawDealerData.map((d: any) => ({
+            onClick={() => {
+              // Use filtered dealer data in modal
+              const chartDealers = rawDealerData.map((d: any) => ({
                 name: d.dealer_name?.substring(0, 25) || 'Unknown',
                 revenue: d.total_sales || 0,
                 quantity: d.total_quantity || 0
-              })),
-              xKey: 'name',
-              yKey: 'revenue',
-              barKey: 'revenue',
-              lineKey: 'quantity'
-            })}
+              }));
+              openChartModal({
+                type: 'composed',
+                title: '📊 All Dealers - Revenue vs Quantity',
+                data: chartDealers,
+                xKey: 'name',
+                yKey: 'revenue',
+                barKey: 'revenue',
+                lineKey: 'quantity'
+              });
+            }}
           >
             <ComposedChartComponent
               data={combinedDealerData}
@@ -641,7 +787,11 @@ export default function DashboardPage() {
             onClick={() => openChartModal({
               type: 'bar',
               title: '🗺️ Revenue by State (All States)',
-              data: stateData,
+              data: rawStateData.map((s: any) => ({
+                name: s.state || 'Unknown',
+                value: s.total_sales || 0,
+                quantity: s.total_quantity || 0
+              })),
               xKey: 'name',
               yKey: 'value'
             })}
@@ -682,7 +832,11 @@ export default function DashboardPage() {
             onClick={() => openChartModal({
               type: 'donut',
               title: '🏙️ Revenue by City (All Cities)',
-              data: cityData,
+              data: rawCityData.map((c: any) => ({
+                name: c.city || 'Unknown',
+                value: c.total_sales || 0,
+                state: c.state || ''
+              })),
               xKey: 'name',
               yKey: 'value',
               dataKey: 'value',
@@ -774,6 +928,9 @@ export default function DashboardPage() {
             salesData={rawDealerData}
             title={`💳 ${dashboardMode === 'avante' ? 'Avante' : 'IOSPL'} Payment Pipeline`}
             loading={loading}
+            hideInnovative={hideInnovative}
+            hideAvante={hideAvante}
+            dashboardMode={dashboardMode}
           />
         </div>
 
@@ -785,10 +942,17 @@ export default function DashboardPage() {
             dashboardMode={dashboardMode}
             startDate={startDate}
             endDate={endDate}
+            hideInnovative={hideInnovative}
+            hideAvante={hideAvante}
           />
 
           {/* Non-Billing Dealers Table */}
-          <NonBillingDealersTable loading={loading} />
+          <NonBillingDealersTable 
+            loading={loading} 
+            dashboardMode={dashboardMode}
+            hideInnovative={hideInnovative}
+            hideAvante={hideAvante}
+          />
 
           {/* Top Dealers Table */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">

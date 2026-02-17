@@ -24,6 +24,9 @@ interface PaymentPipelineProps {
   salesData: any[];
   title?: string;
   loading?: boolean;
+  hideInnovative?: boolean;
+  hideAvante?: boolean;
+  dashboardMode?: 'avante' | 'iospl';
 }
 
 // Status configuration with colors and icons
@@ -82,6 +85,16 @@ const formatIndianCurrency = (num: number): string => {
 // Helper to format full currency
 const formatFullCurrency = (num: number): string => {
   return `₹${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+// Helper function to check if a dealer name contains "Innovative"
+const isInnovativeDealer = (dealerName: string): boolean => {
+  return dealerName?.toLowerCase().includes('innovative');
+};
+
+// Helper function to check if a dealer name contains "Avante"
+const isAvanteDealer = (dealerName: string): boolean => {
+  return dealerName?.toLowerCase().includes('avante');
 };
 
 // Assign payment status based on data characteristics
@@ -210,16 +223,44 @@ const KanbanColumn: React.FC<{
 };
 
 // Main Payment Pipeline Component
-export default function PaymentPipeline({ salesData, title, loading }: PaymentPipelineProps) {
+export default function PaymentPipeline({ 
+  salesData, 
+  title, 
+  loading,
+  hideInnovative = false,
+  hideAvante = false,
+  dashboardMode = 'iospl'
+}: PaymentPipelineProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [collapsedColumns, setCollapsedColumns] = useState<Set<PaymentStatus>>(new Set());
   const [sortBy, setSortBy] = useState<'amount' | 'date' | 'dealer'>('amount');
   
-  // Transform sales data into payment items
-  const paymentItems: PaymentItem[] = useMemo(() => {
+  // Filter sales data based on hideInnovative/hideAvante
+  const filteredSalesData = React.useMemo(() => {
     if (!salesData || salesData.length === 0) return [];
     
-    return salesData.map((item, index) => {
+    return salesData.filter(sale => {
+      const dealerName = sale.dealer_name || sale.comp_nm || '';
+      
+      // For Avante dashboard, apply hideInnovative filter
+      if (dashboardMode === 'avante' && hideInnovative) {
+        return !isInnovativeDealer(dealerName);
+      }
+      
+      // For IOSPL dashboard, apply hideAvante filter
+      if (dashboardMode !== 'avante' && hideAvante) {
+        return !isAvanteDealer(dealerName);
+      }
+      
+      return true;
+    });
+  }, [salesData, hideInnovative, hideAvante, dashboardMode]);
+  
+  // Transform sales data into payment items
+  const paymentItems: PaymentItem[] = useMemo(() => {
+    if (!filteredSalesData || filteredSalesData.length === 0) return [];
+    
+    return filteredSalesData.map((item, index) => {
       const status = assignPaymentStatus(item, index);
       const daysOverdue = status === 'overdue' ? Math.floor(Math.random() * 30) + 1 : undefined;
       
@@ -243,7 +284,7 @@ export default function PaymentPipeline({ salesData, title, loading }: PaymentPi
         transactionCount: transactionCount
       };
     });
-  }, [salesData]);
+  }, [filteredSalesData]);
   
   // Filter payments by search term
   const filteredPayments = useMemo(() => {

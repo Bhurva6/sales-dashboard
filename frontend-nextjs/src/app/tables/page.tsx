@@ -7,7 +7,7 @@ import DataTable from '@/components/DataTable';
 import { formatIndianNumber } from '@/lib/utils';
 
 export default function TablesPage() {
-  const { dashboardMode, startDate, endDate } = useDashboardStore();
+  const { dashboardMode, startDate, endDate, hideInnovative, hideAvante } = useDashboardStore();
   const [loading, setLoading] = useState(false);
   const [salesData, setSalesData] = useState<any[]>([]);
 
@@ -15,52 +15,24 @@ export default function TablesPage() {
     const loadData = async () => {
       setLoading(true);
       try {
-        // Mock data - replace with actual API call
-        const mockData = [
-          {
-            id: 1,
-            date: '2024-01-15',
-            dealer: 'Dealer A',
-            state: 'Maharashtra',
-            city: 'Mumbai',
-            product: 'Hip Implant',
-            category: 'Orthopedic Implants',
-            quantity: 5,
-            value: 125000,
-          },
-          {
-            id: 2,
-            date: '2024-01-16',
-            dealer: 'Dealer B',
-            state: 'Karnataka',
-            city: 'Bangalore',
-            product: 'Knee Implant',
-            category: 'Orthopedic Implants',
-            quantity: 3,
-            value: 87000,
-          },
-          {
-            id: 3,
-            date: '2024-01-17',
-            dealer: 'Dealer C',
-            state: 'Delhi',
-            city: 'Delhi',
-            product: 'Spine Implant',
-            category: 'Surgical Instruments',
-            quantity: 2,
-            value: 65000,
-          },
-        ];
-        setSalesData(mockData);
+        // TODO: Replace with actual API call when endpoint is available
+        // Example:
+        // const response = await fetch(`/api/sales-data?start_date=${startDate}&end_date=${endDate}`);
+        // const data = await response.json();
+        // setSalesData(data);
+        
+        // For now, show empty state since no mock data should be used
+        setSalesData([]);
       } catch (error) {
         console.error('Error loading data:', error);
+        setSalesData([]);
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-  }, [startDate, endDate, dashboardMode]);
+  }, [startDate, endDate, dashboardMode, hideInnovative, hideAvante]);
 
   const columns = [
     { key: 'date', label: 'Date' },

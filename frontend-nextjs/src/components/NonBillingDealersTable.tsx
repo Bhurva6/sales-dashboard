@@ -17,13 +17,28 @@ interface NonBillingDealer {
 interface NonBillingDealersTableProps {
   title?: string;
   loading?: boolean;
+  dashboardMode?: 'avante' | 'iospl';
+  hideInnovative?: boolean;
+  hideAvante?: boolean;
 }
 
 type TimeFilter = 'week' | 'month' | 'quarter' | 'year';
 
+// Helper functions for dealer filtering
+const isInnovativeDealer = (dealerName: string): boolean => {
+  return dealerName?.toLowerCase().includes('innovative');
+};
+
+const isAvanteDealer = (dealerName: string): boolean => {
+  return dealerName?.toLowerCase().includes('avante');
+};
+
 const NonBillingDealersTable: React.FC<NonBillingDealersTableProps> = ({
   title = "🚫 Non-Billing Dealers",
-  loading = false
+  loading = false,
+  dashboardMode = 'iospl',
+  hideInnovative = false,
+  hideAvante = false
 }) => {
   const [dealers, setDealers] = useState<NonBillingDealer[]>([]);
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
@@ -37,70 +52,25 @@ const NonBillingDealersTable: React.FC<NonBillingDealersTableProps> = ({
   useEffect(() => {
     if (loading) return;
 
-    // Generate mock data based on time filter
-    const generateMockData = (): NonBillingDealer[] => {
-      const baseDealers = [
-        'ABC Medical Supplies', 'XYZ Healthcare Ltd', 'MediCare Solutions', 
-        'HealthFirst Distributors', 'Prime Medical Corp', 'Global Health Corp',
-        'MedTech Solutions', 'CarePlus Distributors', 'BioMed Supplies',
-        'Surgical Solutions Ltd'
-      ];
-
-      const cities = ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Pune', 'Kolkata', 'Hyderabad', 'Ahmedabad'];
-      const states = ['Maharashtra', 'Delhi', 'Karnataka', 'Tamil Nadu', 'Maharashtra', 'West Bengal', 'Telangana', 'Gujarat'];
-
-      return baseDealers.map((name, index) => {
-        const now = new Date();
-        let daysSince: number;
-        let previousSales: number;
-        let currentSales: number;
-
-        // Generate different scenarios based on time filter
-        switch (timeFilter) {
-          case 'week':
-            daysSince = Math.floor(Math.random() * 7) + 1; // 1-7 days
-            previousSales = Math.floor(Math.random() * 50000) + 50000; // 50k-100k
-            currentSales = Math.floor(previousSales * (Math.random() * 0.3)); // 0-30% of previous
-            break;
-          case 'month':
-            daysSince = Math.floor(Math.random() * 30) + 1; // 1-30 days
-            previousSales = Math.floor(Math.random() * 200000) + 100000; // 100k-300k
-            currentSales = Math.floor(previousSales * (Math.random() * 0.4)); // 0-40% of previous
-            break;
-          case 'quarter':
-            daysSince = Math.floor(Math.random() * 90) + 30; // 30-120 days
-            previousSales = Math.floor(Math.random() * 500000) + 200000; // 200k-700k
-            currentSales = Math.floor(previousSales * (Math.random() * 0.5)); // 0-50% of previous
-            break;
-          case 'year':
-            daysSince = Math.floor(Math.random() * 365) + 90; // 90-455 days
-            previousSales = Math.floor(Math.random() * 1000000) + 500000; // 500k-1.5M
-            currentSales = Math.floor(previousSales * (Math.random() * 0.6)); // 0-60% of previous
-            break;
-          default:
-            daysSince = Math.floor(Math.random() * 30) + 1;
-            previousSales = Math.floor(Math.random() * 200000) + 100000;
-            currentSales = Math.floor(previousSales * (Math.random() * 0.4));
-        }
-
-        const lastBillingDate = new Date(now.getTime() - daysSince * 24 * 60 * 60 * 1000);
-        const declinePercentage = previousSales > 0 ? ((previousSales - currentSales) / previousSales) * 100 : 0;
-
-        return {
-          dealer_name: name,
-          city: cities[index % cities.length],
-          state: states[index % states.length],
-          last_billing_date: lastBillingDate.toISOString().split('T')[0],
-          previous_period_sales: previousSales,
-          current_period_sales: currentSales,
-          decline_percentage: Math.round(declinePercentage * 10) / 10,
-          days_since_last_billing: daysSince
-        };
-      });
+    // TODO: Replace with API call when endpoint is available
+    // For now, fetch from API or display empty state
+    const loadData = async () => {
+      try {
+        // This would be the API call when available
+        // const response = await fetch('/api/non-billing-dealers');
+        // const data = await response.json();
+        // setDealers(data);
+        
+        // For now, show empty state since no mock data should be used
+        setDealers([]);
+      } catch (error) {
+        console.error('Error loading non-billing dealers:', error);
+        setDealers([]);
+      }
     };
 
-    setDealers(generateMockData());
-  }, [loading, timeFilter]);
+    loadData();
+  }, [loading, timeFilter, dashboardMode, hideInnovative, hideAvante]);
 
   // Get unique cities and states for filter dropdowns
   const uniqueCities = useMemo(() => {
