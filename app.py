@@ -5,7 +5,6 @@ Dashboard application entry point
 import os
 from flask import Flask, send_from_directory, request, jsonify
 from flask_cors import CORS
-from frontend_integration import setup_nextjs_frontend
 from api_client import AvanteAPIClient
 
 # Create Flask app
@@ -14,54 +13,9 @@ app = Flask(__name__)
 # Enable CORS
 CORS(app)
 
-# Setup frontend serving
-setup_nextjs_frontend(app)
-
-def _setup_nextjs_frontend(app):
-    """
-    Setup Next.js frontend serving with Flask
-    
-    Usage in app.py:
-        from frontend_integration import setup_nextjs_frontend
-        setup_nextjs_frontend(app)
-    """
-    
-    # Enable CORS for all routes
-    CORS(app, resources={
-        r"/api/*": {
-            "origins": ["http://localhost:3000", "http://localhost:5000"],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
-        }
-    })
-    
-    # Path to Next.js build output
-    frontend_build_path = os.path.join(
-        os.path.dirname(__file__), 
-        'frontend-nextjs/out'
-    )
-    
-    @app.route('/', defaults={'path': ''})
-    @app.route('/<path:path>')
-    def serve_nextjs_frontend(path):
-        """
-        Serve Next.js frontend files
-        Falls back to index.html for client-side routing
-        """
-        # Check if path is a static file
-        if path != '' and os.path.exists(os.path.join(frontend_build_path, path)):
-            return send_from_directory(frontend_build_path, path)
-        
-        # Check if file exists without path
-        full_path = os.path.join(frontend_build_path, path)
-        if os.path.exists(full_path) and os.path.isfile(full_path):
-            return send_from_directory(frontend_build_path, path)
-        
-        # Fallback to index.html for SPA routing
-        if os.path.exists(os.path.join(frontend_build_path, 'index.html')):
-            return send_from_directory(frontend_build_path, 'index.html')
-        
-        return {'error': 'Frontend not built. Run: npm run build'}, 404
+# NOTE: Next.js frontend now runs as a separate server on port 3000
+# Flask only serves API endpoints (starting below with setup_api_endpoints)
+# On Railway, Procfile starts Next server first, then Flask on PORT (default 8080)
 
 
 def setup_api_endpoints(app):
