@@ -1,1 +1,1 @@
-web: gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 4 --timeout 120
+web: bash -lc "cd frontend-nextjs && npm ci && npm run build && npm run start & cd .. && gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 4 --timeout 120"
