@@ -4,17 +4,23 @@ export interface AuthState {
   username: string;
   password: string;
   isAuthenticated: boolean;
-  setCredentials: (username: string, password: string) => void;
+  userRole: 'admin' | 'user';
+  allowedStates: string[];
+  setCredentials: (username: string, password: string, role?: 'admin' | 'user', states?: string[]) => void;
   logout: () => void;
+  setAllowedStates: (states: string[]) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   username: '',
   password: '',
   isAuthenticated: false,
-  setCredentials: (username: string, password: string) =>
-    set({ username, password, isAuthenticated: true }),
-  logout: () => set({ username: '', password: '', isAuthenticated: false }),
+  userRole: 'user',
+  allowedStates: [],
+  setCredentials: (username: string, password: string, role = 'user', states = []) =>
+    set({ username, password, isAuthenticated: true, userRole: role, allowedStates: states }),
+  logout: () => set({ username: '', password: '', isAuthenticated: false, userRole: 'user', allowedStates: [] }),
+  setAllowedStates: (states: string[]) => set({ allowedStates: states }),
 }));
 
 export interface DashboardState {

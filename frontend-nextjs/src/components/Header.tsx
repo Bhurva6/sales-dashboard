@@ -4,7 +4,8 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboardStore, useAuthStore } from '@/lib/store';
 import { formatDate, getQuickDateRange } from '@/lib/utils';
-import { Menu, LogOut } from 'lucide-react';
+import { Menu, LogOut, Shield } from 'lucide-react';
+import AccessManagementModal from './AccessManagementModal';
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -12,13 +13,18 @@ interface HeaderProps {
 
 export default function Header({ onToggleSidebar }: HeaderProps) {
   const router = useRouter();
-  const { logout } = useAuthStore();
+  const { logout, userRole } = useAuthStore();
   const dashboardMode = useDashboardStore((state) => state.dashboardMode);
   const setDashboardMode = useDashboardStore((state) => state.setDashboardMode);
+  const [showAccessManagement, setShowAccessManagement] = React.useState(false);
 
   const handleLogout = () => {
     logout();
     router.push('/login');
+  };
+
+  const handleAccessManagement = () => {
+    setShowAccessManagement(true);
   };
 
   return (
@@ -68,17 +74,40 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             </button>
           </div>
 
-          {/* Logout Button */}
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-3 py-2 hover:bg-red-50 rounded-lg transition-colors text-red-600"
-            aria-label="Logout"
-          >
-            <LogOut className="w-5 h-5" />
-            <span className="text-sm font-medium">Logout</span>
-          </button>
+          {/* Right Actions - Access Management & Logout */}
+          <div className="flex items-center gap-2 border-l border-gray-200 pl-4">
+            {/* Access Management Button - Only show for admins */}
+            {userRole === 'admin' && (
+              <button
+                onClick={handleAccessManagement}
+                className="flex items-center gap-2 px-4 py-2 hover:bg-blue-50 rounded-lg transition-colors text-blue-600 font-medium hover:text-blue-700"
+                aria-label="Access Management"
+                title="Manage user access and permissions"
+              >
+                <Shield className="w-5 h-5" />
+                <span className="text-sm">Access Management</span>
+              </button>
+            )}
+
+            {/* Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 hover:bg-red-50 rounded-lg transition-colors text-red-600 font-medium hover:text-red-700"
+              aria-label="Logout"
+              title="Log out from the dashboard"
+            >
+              <LogOut className="w-5 h-5" />
+              <span className="text-sm">Logout</span>
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Access Management Modal */}
+      <AccessManagementModal
+        isOpen={showAccessManagement}
+        onClose={() => setShowAccessManagement(false)}
+      />
     </header>
   );
 }

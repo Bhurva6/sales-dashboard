@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useDashboardStore } from '@/lib/store';
+import { useDashboardStore, useAuthStore } from '@/lib/store';
 import Layout from '@/components/Layout';
 import { 
   RevenueBarChart, 
@@ -166,6 +166,7 @@ const MiniMetricCard: React.FC<{
 
 export default function DashboardPage() {
   const { dashboardMode, startDate, endDate, hideInnovative, hideAvante } = useDashboardStore();
+  const { allowedStates } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<Stats>({ total_revenue: 0, total_quantity: 0, total_dealers: 0, total_products: 0 });
   const [dealerData, setDealerData] = useState<DealerData[]>([]);
@@ -259,7 +260,7 @@ export default function DashboardPage() {
 
   // Apply filtering based on hideInnovative (Avante) or hideAvante (IOSPL)
   useEffect(() => {
-    console.log('🔄 Filter effect triggered - hideInnovative:', hideInnovative, 'hideAvante:', hideAvante, 'dashboardMode:', dashboardMode);
+    console.log('🔄 Filter effect triggered - hideInnovative:', hideInnovative, 'hideAvante:', hideAvante, 'dashboardMode:', dashboardMode, 'allowedStates:', allowedStates);
     
     // If no original data yet, skip
     if (originalRawDealerData.length === 0) {
@@ -276,6 +277,7 @@ export default function DashboardPage() {
     // Check if we need to apply filters
     const shouldFilterInnovative = dashboardMode === 'avante' && hideInnovative;
     const shouldFilterAvante = dashboardMode === 'iospl' && hideAvante;
+    const hasStateRestrictions = allowedStates && allowedStates.length > 0;
 
     if (shouldFilterInnovative) {
       console.log('🔍 Applying Innovative filter to Avante dashboard');
@@ -366,6 +368,35 @@ export default function DashboardPage() {
       filteredStats = { ...originalRawStats };
     }
 
+    // Apply state-based filtering if user has state restrictions
+    if (hasStateRestrictions) {
+      console.log('🔍 Applying state-based filter - allowedStates:', allowedStates);
+      
+      // Filter states to only allowed ones
+      filteredStates = filteredStates.filter(state => 
+        allowedStates.includes(state.state || '')
+      );
+
+      // Filter cities to only those in allowed states
+      filteredCities = filteredCities.filter(city => 
+        allowedStates.includes(city.state || '')
+      );
+
+      // Recalculate stats from filtered states/cities
+      const totalRevenue = filteredStates.reduce((sum, s) => sum + (s.total_sales || 0), 0);
+      const totalQuantity = filteredStates.reduce((sum, s) => sum + (s.total_quantity || 0), 0);
+      const totalDealerCount = new Set(filteredCities.map(c => c.city)).size; // Approx dealer count
+      
+      filteredStats = {
+        total_revenue: totalRevenue,
+        total_quantity: totalQuantity,
+        total_dealers: totalDealerCount,
+        total_products: filteredCategories.length
+      };
+      
+      console.log('✅ Applied state filter - states:', filteredStates.length, 'cities:', filteredCities.length);
+    }
+
     // Set all filtered data at once
     setRawDealerData(filteredDealers);
     setRawStateData(filteredStates);
@@ -429,7 +460,7 @@ export default function DashboardPage() {
       .slice(0, 8);
     setParentCategoryQuantityData(parentQuantityCategories);
 
-  }, [hideInnovative, hideAvante, dashboardMode, originalRawDealerData, originalRawStateData, originalRawCategoryData, originalRawCityData, originalRawStats]);
+  }, [hideInnovative, hideAvante, dashboardMode, allowedStates, originalRawDealerData, originalRawStateData, originalRawCategoryData, originalRawCityData, originalRawStats]);
 
   useEffect(() => {
     // Load dashboard data from real API
