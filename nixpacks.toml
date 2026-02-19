@@ -1,0 +1,5 @@
+[build]
+cmds = ["cd frontend-nextjs && npm ci && npm run build"]
+
+[start]
+cmd = "cd frontend-nextjs && npm start"
