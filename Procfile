@@ -1,1 +1,1 @@
-web: cd frontend-nextjs && npm run build && npm run start
+web: cd frontend-nextjs && npm ci && npm run build && npm start

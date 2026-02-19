@@ -1,3 +1,6 @@
+[languages]
+node = "18"
+
 [build]
 cmds = ["cd frontend-nextjs && npm ci && npm run build"]
 
