@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { mockUsers, type User } from '@/lib/mockDatabase';
+import { getUsers, type User } from '@/lib/mockDatabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,8 +13,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Load users via adapter
+    const users = await getUsers();
+
     // Find user by email or username
-    const user = mockUsers.find(
+    const user = users.find(
       (u: User) => u.email.toLowerCase() === email.toLowerCase() || u.username === email
     );
 
@@ -33,7 +36,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Successful login
+    // Successful login — include role and states for frontend
     return NextResponse.json({
       success: true,
       user: {
@@ -44,6 +47,8 @@ export async function POST(request: NextRequest) {
         role: user.role,
         allowedStates: user.allowedStates,
       },
+      role: user.role,
+      states: user.allowedStates,
       message: 'Login successful!',
     });
 

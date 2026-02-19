@@ -185,6 +185,43 @@ export async function approveAccessRequest(requestId: string) {
   };
 }
 
+// Add rejectAccessRequest to allow marking a request rejected via API
+export async function rejectAccessRequest(requestId: string) {
+  if (!supabase) {
+    const idx = inMemoryAccessRequests.findIndex(r => r.id === requestId);
+    if (idx === -1) throw new Error('Not found');
+    inMemoryAccessRequests[idx].status = 'rejected';
+    return { request: inMemoryAccessRequests[idx] };
+  }
+
+  const { data: reqData, error: getErr } = await supabase
+    .from('access_requests')
+    .select('*')
+    .eq('id', requestId)
+    .single();
+
+  if (getErr) throw getErr;
+
+  const { error: updateErr } = await supabase
+    .from('access_requests')
+    .update({ status: 'rejected' })
+    .eq('id', requestId);
+
+  if (updateErr) throw updateErr;
+
+  return {
+    request: {
+      id: reqData.id,
+      fullName: reqData.full_name,
+      email: reqData.email,
+      password: reqData.password,
+      requestedStates: reqData.requested_states || [],
+      status: 'rejected',
+      requestedAt: reqData.requested_at,
+    }
+  };
+}
+
 export async function getUsers(): Promise<User[]> {
   if (!supabase) return inMemoryUsers;
 
@@ -261,6 +298,7 @@ export default {
   getAccessRequests,
   createAccessRequest,
   approveAccessRequest,
+  rejectAccessRequest,
   getUsers,
   createUser,
   deleteUser,

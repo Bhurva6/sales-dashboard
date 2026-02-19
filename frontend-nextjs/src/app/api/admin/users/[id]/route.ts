@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { mockUsers } from '@/lib/mockDatabase';
+import { deleteUser } from '@/lib/mockDatabase';
 
 export async function DELETE(
   request: NextRequest,
@@ -7,18 +7,10 @@ export async function DELETE(
 ) {
   try {
     const userId = params.id;
-    const userIndex = mockUsers.findIndex(u => u.id === userId);
 
-    if (userIndex === -1) {
-      return NextResponse.json(
-        { message: 'User not found' },
-        { status: 404 }
-      );
-    }
+    // Delete via adapter (in-memory or Supabase)
+    await deleteUser(userId);
 
-    mockUsers.splice(userIndex, 1);
-
-    // In production, delete from database
     console.log('Deleted user:', userId);
 
     return NextResponse.json({ message: 'User deleted successfully' });

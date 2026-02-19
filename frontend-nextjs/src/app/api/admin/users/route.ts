@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { mockUsers, type User } from '@/lib/mockDatabase';
+import { getUsers, createUser, type User } from '@/lib/mockDatabase';
 
 export async function GET() {
   try {
-    // In production, fetch from database
-    return NextResponse.json({ users: mockUsers });
+    // Fetch users from adapter (Supabase or in-memory)
+    const users = await getUsers();
+    return NextResponse.json({ users });
   } catch (error) {
     return NextResponse.json(
-      { message: 'Error fetching users', error },
+      { message: 'Error fetching users', error: String(error) },
       { status: 500 }
     );
   }
@@ -16,7 +17,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, states, role = 'user' } = body;
+    const { email, password, states, role = 'user', fullName } = body;
 
     if (!email || !password || !states || states.length === 0) {
       return NextResponse.json(
@@ -26,28 +27,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    if (mockUsers.find((u: User) => u.email === email)) {
+    const users = await getUsers();
+    if (users.find((u: User) => u.email === email)) {
       return NextResponse.json(
         { message: 'User already exists' },
         { status: 409 }
       );
     }
 
-    const newUser: User = {
-      id: `user-${Date.now()}`,
+    const newUser = await createUser({
       email,
-      username: email.split('@')[0],
-      password, // In production, hash this
-      fullName: email.split('@')[0], // Extract name from email
-      role: role as 'admin' | 'user',
-      allowedStates: states,
-      status: 'active',
-      createdAt: new Date().toISOString()
-    };
+      password,
+      states,
+      role,
+      fullName
+    });
 
-    mockUsers.push(newUser);
-
-    // In production, save to database
     console.log('Created user:', { email: newUser.email, allowedStates: newUser.allowedStates });
 
     return NextResponse.json(
