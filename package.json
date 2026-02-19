@@ -1,0 +1,14 @@
+{
+  "name": "dashboard-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend-nextjs && npm ci && npm run build",
+    "start": "cd frontend-nextjs && npm start",
+    "dev": "cd frontend-nextjs && npm run dev"
+  },
+  "engines": {
+    "node": "18.x",
+    "npm": "9.x"
+  }
+}
