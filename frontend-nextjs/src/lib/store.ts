@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 export interface AuthState {
   username: string;
@@ -11,17 +12,31 @@ export interface AuthState {
   setAllowedStates: (states: string[]) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  username: '',
-  password: '',
-  isAuthenticated: false,
-  userRole: 'user',
-  allowedStates: [],
-  setCredentials: (username: string, password: string, role = 'user', states = []) =>
-    set({ username, password, isAuthenticated: true, userRole: role, allowedStates: states }),
-  logout: () => set({ username: '', password: '', isAuthenticated: false, userRole: 'user', allowedStates: [] }),
-  setAllowedStates: (states: string[]) => set({ allowedStates: states }),
-}));
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      username: '',
+      password: '',
+      isAuthenticated: false,
+      userRole: 'user',
+      allowedStates: [],
+      setCredentials: (username: string, password: string, role = 'user', states = []) =>
+        set({ username, password, isAuthenticated: true, userRole: role, allowedStates: states }),
+      logout: () => set({ username: '', password: '', isAuthenticated: false, userRole: 'user', allowedStates: [] }),
+      setAllowedStates: (states: string[]) => set({ allowedStates: states }),
+    }),
+    {
+      name: 'auth-storage', // name of item in storage
+      partialize: (state) => ({
+        username: state.username,
+        password: state.password,
+        isAuthenticated: state.isAuthenticated,
+        userRole: state.userRole,
+        allowedStates: state.allowedStates,
+      }),
+    }
+  )
+);
 
 export interface DashboardState {
   dashboardMode: 'avante' | 'iospl';
