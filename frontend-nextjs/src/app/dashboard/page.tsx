@@ -3,7 +3,6 @@
 import React, { useEffect } from 'react';
 import { useAuthStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
-import DashboardPage from '@/app/page';
 
 export default function DashboardIndexPage() {
   const { isAuthenticated, username, userRole } = useAuthStore();
@@ -20,5 +19,11 @@ export default function DashboardIndexPage() {
     return <div>Redirecting to login...</div>;
   }
 
-  return <DashboardPage />;
+  return (
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-4">Welcome to the Dashboard</h1>
+      <p>Logged in as: <strong>{username}</strong> ({userRole})</p>
+      {/* Add your dashboard content here */}
+    </div>
+  );
 }
