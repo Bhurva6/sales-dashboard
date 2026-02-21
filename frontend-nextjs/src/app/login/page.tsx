@@ -49,6 +49,7 @@ export default function AuthPage() {
         // Login as admin with all states access
         setCredentials(email, password, 'admin', ALL_STATES);
         router.push('/dashboard');
+        return; // Prevent backend call!
       } else {
         // Try to authenticate with backend
         const response = await fetch('/api/auth/login', {
